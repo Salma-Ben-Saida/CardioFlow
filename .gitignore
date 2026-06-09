@@ -1,2 +1,75 @@
 .env
 conquest.sql
+
+# ── .NET build outputs ────────────────────────────────────
+bin/
+obj/
+out/
+
+# ── NuGet ─────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ── Entity Framework migrations (generated files) ─────────
+# Uncomment if you want to exclude generated scaffolding
+# **/Pacs/Generated/
+
+# ── Visual Studio / Rider ─────────────────────────────────
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.vscode/settings.json
+
+# ── Secrets & config overrides ────────────────────────────
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+secrets.json
+*.pfx
+*.p12
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+logs/
+LogFiles/
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+
+# ── Docker ────────────────────────────────────────────────
+# Keep docker-compose.yml but ignore override files
+docker-compose.override.yml
+
+# ── DICOM files ───────────────────────────────────────────
+*.dcm
+dicom-samples/
+
+# ── PDF reports generated ─────────────────────────────────
+*.pdf
+
+# ── Node (if any frontend tooling added later) ────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+dist/
+
+# ── Test results ──────────────────────────────────────────
+TestResults/
+coverage/
+*.trx
+*.coveragexml

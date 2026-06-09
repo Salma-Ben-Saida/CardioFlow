@@ -1,0 +1,6 @@
+@CathLab.WebApi_HostAddress = http://localhost:5152
+
+GET {{CathLab.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
