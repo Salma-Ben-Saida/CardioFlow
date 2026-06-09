@@ -1,0 +1,32 @@
+{
+  "Name": "CathLabPACS",
+  "HttpPort": 8042,
+  "DicomPort": 4242,
+  "DicomAet": "ORTHANC",
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": false,
+
+  "DicomModalities": {
+    "PHILIPS_XA": {
+      "AET": "PHILIPS_XA",
+      "Host": "host.docker.internal",
+      "Port": 4242
+    }
+  },
+
+  "Plugins": ["/usr/share/orthanc/plugins-available/libOrthancOdbcIndex.so"],
+
+  "Odbc": {
+    "EnableIndex": true,
+    "EnableStorage": false,
+    "IndexConnectionString": "${INDEX_CONNECTION_STRING}",
+    "MaximumConnectionRetries": 10,
+    "ConnectionRetryInterval": 5,
+    "IndexConnectionsCount": 4
+  },
+
+
+  "StorageDirectory": "/var/lib/orthanc/db",
+  "DefaultEncoding": "Utf8",
+  "OverwriteInstances": true
+}

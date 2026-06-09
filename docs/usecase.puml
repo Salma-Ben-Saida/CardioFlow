@@ -1,0 +1,20 @@
+@startuml "usecase"
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Médecin" as Doctor
+actor "Manipulateur" as Technician
+actor "Pharmacien" as Pharmacist
+actor "Administrateur" as Admin
+
+rectangle "CardioFlow - Cath Lab Management System" {
+
+    usecase "S'authentifier" as UC1
+
+   
+}
+
+Doctor --> UC1
+
+
+@enduml

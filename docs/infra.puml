@@ -1,0 +1,66 @@
+@startuml CathLab_Docker_Architecture
+
+skinparam linetype ortho
+skinparam ranksep 120
+skinparam nodesep 100
+
+skinparam rectangle {
+  BorderColor #888780
+  FontSize 12
+}
+
+skinparam component {
+  BorderColor #888780
+  FontSize 12
+}
+
+skinparam arrow {
+  Color #888780
+  FontSize 10
+}
+
+rectangle "Infrastructure" as host #F1EFE8 {
+
+  rectangle "sqlserver\n(standalone container)\nmssql/server:2022\nport 1433" as sqlserver #B5D4F4
+
+  rectangle "OrthancPACS\n(SQL Server database)\nDICOM index & metadata" as orthancdb #B5D4F4
+
+  rectangle "CathLabDB\n(SQL Server database)\nPatients · Reports · Inventory" as cathlabdb #B5D4F4
+
+  rectangle "docker compose · database/" as compose #9FE1CB {
+
+    rectangle "cathlab-orthanc\northancteam/orthanc + msodbcsql18\nport 4242 (DICOM) · port 8042 (HTTP)" as orthanc #9FE1CB
+
+    rectangle "/My_Disk/orthanc/db\nSSD · .dcm files" as ssd #FAC775
+
+    rectangle "orthanc-config/orthanc.json\n(mounted read-only)" as config #D3D1C7
+
+  }
+
+  rectangle "storescu\nmimics Philips XA machine\nC-STORE via DICOM" as storescu #F5C4B3
+
+  rectangle "Orthanc Explorer\nhttp://localhost:8042" as explorer #CECBF6
+
+  rectangle "ASP.NET Core Web API\nCathLab.WebApi · port 5000" as api #CECBF6
+
+  rectangle "Frontend\nHTML5 · D3.js · Cornerstone.js\nport 3000" as frontend #CECBF6
+
+}
+
+sqlserver      --> orthancdb    : contains
+sqlserver      --> cathlabdb    : contains
+
+orthanc        --> sqlserver    : host.docker.internal:1433\n(ODBC Driver 18)
+orthanc        --> ssd          : stores .dcm files
+orthanc        --> config       : reads config
+storescu       --> orthanc      : C-STORE · port 4242
+orthanc        --> explorer     : serves UI
+
+api            --> cathlabdb    : EF Core (read/write)\nLayer 2
+api            --> orthancdb    : EF Core (read-only)\nLayer 1
+api            --> orthanc      : REST · WADO-URI\nDICOM image fetch
+
+frontend       --> api          : HTTP/JSON · JWT
+frontend       --> orthanc      : WADO-URI · Cornerstone.js\nDICOM viewer
+
+@enduml
