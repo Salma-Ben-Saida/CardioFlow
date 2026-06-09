@@ -1,0 +1,23 @@
+services:
+  orthanc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cathlab-orthanc
+    restart: unless-stopped
+    ports:
+      - "4242:4242"
+      - "8042:8042"
+    volumes:
+      - ./orthanc-config/orthanc.json:/etc/orthanc/orthanc.json:ro
+      - /Volumes/My_Disk/orthanc/db:/var/lib/orthanc/db
+    environment:
+      VERBOSE_ENABLED: "true"
+    networks:
+      - cathlab-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  cathlab-net:
+    driver: bridge
