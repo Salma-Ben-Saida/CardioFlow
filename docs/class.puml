@@ -232,7 +232,6 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   enum StudyStatus {
     Scheduled
     InProgress
-    ReportPending
     Completed
     Cancelled
   }
@@ -258,14 +257,13 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     GuideCatheter
     Sheath
     Other
-  }
+  } 
 
   enum ItemStatus {
     InStock
     Reserved
-    Used
+    InUse
     Expired
-    Recalled
   }
 
   enum MovementType {
@@ -273,6 +271,7 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     Consumption
     Return
     Adjustment
+    Waste
     Expiry
   }
 

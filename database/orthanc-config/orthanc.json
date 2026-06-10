@@ -19,7 +19,7 @@
   "Odbc": {
     "EnableIndex": true,
     "EnableStorage": false,
-    "IndexConnectionString": "${INDEX_CONNECTION_STRING}",
+    "IndexConnectionString": "Driver={ODBC Driver 18 for SQL Server};Server=tcp:host.docker.internal,1433;Database=OrthancPACS;Uid=sa;Pwd=myinternship@2026;Encrypt=no;TrustServerCertificate=yes",
     "MaximumConnectionRetries": 10,
     "ConnectionRetryInterval": 5,
     "IndexConnectionsCount": 4
