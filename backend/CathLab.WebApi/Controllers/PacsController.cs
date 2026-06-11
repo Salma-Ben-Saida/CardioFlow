@@ -1,4 +1,5 @@
 using CathLab.Application.Interfaces;
+using CathLab.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -6,12 +7,36 @@ using Microsoft.AspNetCore.Mvc;
 public class PacsController : ControllerBase
 {
     private readonly IPacsReader _pacs;
-    public PacsController(IPacsReader pacs) => _pacs = pacs;
+    private readonly StudyIngestionService _ingestion;
+
+    public PacsController(IPacsReader pacs, StudyIngestionService ingestion)
+    {
+        _pacs = pacs;
+        _ingestion = ingestion;
+    }
 
     [HttpGet("studies")]
     public async Task<IActionResult> GetStudies()
     {
         var studies = await _pacs.GetPendingStudiesAsync(DateTime.UtcNow.AddDays(-30));
         return Ok(studies);
+    }
+
+    // Ingest one study by accession number
+    [HttpPost("ingest/{accessionNumber}")]
+    public async Task<IActionResult> IngestOne(string accessionNumber)
+    {
+        var result = await _ingestion.IngestStudyAsync(accessionNumber);
+        if (!result.Succeeded)
+            return BadRequest(new { error = result.Error });
+        return Ok(result);
+    }
+
+    // Ingest all studies from last 30 days
+    [HttpPost("ingest/all")]
+    public async Task<IActionResult> IngestAll()
+    {
+        var results = await _ingestion.IngestAllPendingAsync();
+        return Ok(results);
     }
 }

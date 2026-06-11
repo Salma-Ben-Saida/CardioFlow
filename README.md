@@ -86,3 +86,92 @@ If you want, I can also:
 
 -- CardioFlow
 
+
+## Detailed backend implementation (what I did)
+
+This section documents, file-by-file and class-by-class, the work implemented under `backend/` so reviewers can quickly understand the code and responsibilities.
+
+
+**CathLab.Domain**
+
+- `backend/CathLab.Domain/Entities/Patient.cs` — `Patient` entity with core patient fields and navigation properties:
+	- Properties: `Id`, `CreatedBy`, `ConquestPatientID`, `NationalId`, `FullName`, `BirthDate`, `Sex`, `PhoneNumber`, `Address`, `BloodGroup`, `IsIncomplete`, `CreatedAt`, `UpdatedAt`.
+	- Navigation: `CreatedByUser` (to `AppUser`), `RiskProfile`, `Studies` (collection of `CathStudy`).
+- `backend/CathLab.Domain/Entities/CathStudy.cs` — `CathStudy` entity representing a cath lab study:
+	- Properties: `Id`, `PatientId`, `OperatorId`, `AccessionNumber`, `StudyInstanceUid`, `StudyDate`, `Status`, `CreatedAt`.
+	- Navigation: `Patient`, `Operator` (an `AppUser`).
+- `backend/CathLab.Domain/Entities/RiskProfile.cs` — risk profile details tied to a `Patient`.
+- `backend/CathLab.Domain/Entities/AppUser.cs` — basic user entity: `Id`, `Username`, `PasswordHash`, `FullName`, `Specialty`, `Role`, `IsActive`, `CreatedAt`.
+
+
+**CathLab.Application**
+
+- `backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs` — transfer object used for PACS → application boundaries. Contains study identifiers and basic patient/study metadata (StudyInstanceUid, AccessionNumber, PatientId, PatientName, PatientBirthDate, PatientSex, StudyDate, Modality).
+- `backend/CathLab.Application/Interfaces/IPacsReader.cs` — PACS abstraction used by application services. Methods implemented:
+	- `Task<PacsStudyDto?> GetStudyByAccessionAsync(string accessionNumber)`
+	- `Task<List<PacsStudyDto>> GetPendingStudiesAsync(DateTime since)`
+	- `Task<List<PacsStudyDto>> GetPatientStudiesAsync(string patientId)`
+- `backend/CathLab.Application/Interfaces/IPatientRepository.cs` — repository contract for patient persistence (Find/Create/Update methods).
+- `backend/CathLab.Application/Interfaces/ICathStudyRepository.cs` — repository contract for studies (FindByAccession/Create).
+- `backend/CathLab.Application/Services/StudyIngestionService.cs` — core ingestion logic implemented:
+	- Uses `IPacsReader` to fetch studies from PACS.
+	- Uses `IPatientRepository` and `ICathStudyRepository` to avoid duplicates, create or update patients and persist studies.
+	- Public methods: `IngestStudyAsync(string accessionNumber)` and `IngestAllPendingAsync()`.
+	- Returns `IngestResult` (success, already exists, or failure with error). The service also contains helper logic to build a `Patient` from a `PacsStudyDto` (formatting DICOM patient name, marking `IsIncomplete` true).
+
+
+**CathLab.Infrastructure**
+
+- `backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs` — EF Core DB context for application data.
+	- Registers `DbSet<AppUser>`, `DbSet<Patient>`, `DbSet<RiskProfile>`, `DbSet<CathStudy>`.
+	- Fluent API config: relationships (Patient ↔ RiskProfile one-to-one, Patient ↔ CathStudy one-to-many), precision for decimals, Id generation, timestamps.
+- `backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs` — concrete `IPatientRepository` implementation using `CathLabDbContext`.
+	- Implements `FindByConquestIdAsync`, `CreateAsync`, `UpdateAsync` with proper Id generation and timestamp handling.
+- `backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs` — concrete `ICathStudyRepository` implementation.
+
+- PACS integration (Orthanc):
+	- `backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs` — EF Core context targeting Orthanc's internal database tables (generated models in `Pacs/Generated/*`).
+		- Registers `DbSet<MainDicomTag>`, `DbSet<DicomIdentifier>`, `DbSet<Resource>`, and the rest of Orthanc tables.
+	- `backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs` — `IPacsReader` implementation that reads Orthanc tables via `OrthancPacsContext`:
+		- Implements the three methods from `IPacsReader`.
+		- Uses DICOM tag constants to locate accession numbers, patient IDs, study UIDs and build `PacsStudyDto`.
+		- Key private helpers: `BuildDtoAsync(internalId, publicId)` and `ParseDate(string?)`.
+	- Generated models: `backend/CathLab.Infrastructure/Pacs/Generated/*` — classes mapping Orthanc tables (e.g., `MainDicomTag`, `DicomIdentifier`, `Resource`, `AttachedFile`, etc.). These are used by `OrthancPacsContext`.
+
+
+**CathLab.WebApi**
+
+- `backend/CathLab.WebApi/Program.cs` — application startup and DI wiring:
+	- Registers `CathLabDbContext` and `OrthancPacsContext` with connection strings `CathLabDb` and `OrthancPACS`.
+	- Registers implementations: `IPacsReader` → `OrthancPacsReader`, `IPatientRepository` → `PatientRepository`, `ICathStudyRepository` → `CathStudyRepository`.
+	- Registers `StudyIngestionService` and maps controllers.
+- `backend/CathLab.WebApi/Controllers/PacsController.cs` — API endpoints:
+	- `GET /api/pacs/studies` — returns pending studies (last 30 days) via `IPacsReader`.
+	- `POST /api/pacs/ingest/{accessionNumber}` — ingests a single study using `StudyIngestionService.IngestStudyAsync`.
+	- `POST /api/pacs/ingest/all` — ingests all pending studies returned by PACS.
+
+
+**How the pieces interact (summary)**
+
+- The Web API controller calls `StudyIngestionService` for ingestion operations.
+- `StudyIngestionService` queries the PACS through `IPacsReader` (implemented by `OrthancPacsReader`).
+- `OrthancPacsReader` reads Orthanc's DB using `OrthancPacsContext` to build `PacsStudyDto` objects.
+- The ingestion service uses repository interfaces (`IPatientRepository`, `ICathStudyRepository`) to persist domain entities in `CathLabDbContext`.
+
+
+**Files to review**
+
+- Domain entities: [backend/CathLab.Domain/Entities/Patient.cs](backend/CathLab.Domain/Entities/Patient.cs), [backend/CathLab.Domain/Entities/CathStudy.cs](backend/CathLab.Domain/Entities/CathStudy.cs), [backend/CathLab.Domain/Entities/RiskProfile.cs](backend/CathLab.Domain/Entities/RiskProfile.cs), [backend/CathLab.Domain/Entities/AppUser.cs](backend/CathLab.Domain/Entities/AppUser.cs)
+- Application DTO & interfaces: [backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs](backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs), [backend/CathLab.Application/Interfaces/IPacsReader.cs](backend/CathLab.Application/Interfaces/IPacsReader.cs)
+- Ingestion service: [backend/CathLab.Application/Services/StudyIngestionService.cs](backend/CathLab.Application/Services/StudyIngestionService.cs)
+- Persistence and repositories: [backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs](backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs)
+- Orthanc PACS integration: [backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs), [backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs)
+- API: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Program.cs](backend/CathLab.WebApi/Program.cs)
+
+
+If you want, I can now:
+
+- Add example `curl` commands for the `/api/pacs` endpoints into this README.
+- Add a compact diagram (ASCII or PlantUML) summarizing the data flow from Orthanc → ingestion → DB.
+
+
