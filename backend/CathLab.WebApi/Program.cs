@@ -2,6 +2,8 @@ using CathLab.Infrastructure.Persistence;
 using CathLab.Infrastructure.Pacs;
 using CathLab.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using CathLab.Infrastructure.Persistence.Repositories;
+using CathLab.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,10 @@ builder.Services.AddDbContext<OrthancPacsContext>(opt =>
 
 builder.Services.AddScoped<IPacsReader, OrthancPacsReader>();
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<IPatientRepository, PatientRepository>();
+builder.Services.AddScoped<ICathStudyRepository, CathStudyRepository>();
+builder.Services.AddScoped<StudyIngestionService>();
 
 var app = builder.Build();
 app.MapControllers();
