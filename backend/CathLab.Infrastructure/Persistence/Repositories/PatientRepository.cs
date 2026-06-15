@@ -30,4 +30,62 @@ public class PatientRepository : IPatientRepository
         await _ctx.SaveChangesAsync();
         return patient;
     }
+
+    public async Task<(List<Patient> Items, int TotalCount)> SearchAsync(
+    string? search, 
+    string? sex, 
+    bool? isIncomplete, 
+    string? sortBy,     // Added parameter
+    string? sortDir,    // Added parameter
+    int page, 
+    int pageSize)
+{
+    var query = _ctx.Patients
+        .Include(p => p.Studies)
+        .AsNoTracking()
+        .AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(search))
+        query = query.Where(p =>
+            p.FullName.Contains(search) ||
+            p.ConquestPatientID!.Contains(search) ||
+            p.NationalId!.Contains(search));
+
+    if (!string.IsNullOrWhiteSpace(sex))
+        query = query.Where(p => p.Sex == sex);
+
+    if (isIncomplete.HasValue)
+        query = query.Where(p => p.IsIncomplete == isIncomplete.Value);
+
+    // 1. Calculate the total count BEFORE pagination modifiers are applied
+    var total = await query.CountAsync();
+
+    // 2. Check if the sorting direction requested by the UI is descending
+    bool desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+    // 3. Dynamically switch sorting column based on what header the user clicked
+    query = (sortBy?.ToLowerInvariant()) switch
+    {
+        "fullname"  => desc ? query.OrderByDescending(p => p.FullName)  : query.OrderBy(p => p.FullName),
+        "birthdate" => desc ? query.OrderByDescending(p => p.BirthDate) : query.OrderBy(p => p.BirthDate),
+        "updatedat" => desc ? query.OrderByDescending(p => p.UpdatedAt) : query.OrderBy(p => p.UpdatedAt),
+        _           => query.OrderByDescending(p => p.UpdatedAt), // Default sorting fallback
+    };
+
+    // 4. Fetch the paginated page subset from the database
+    var items = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+    return (items, total);
+}
+public async Task<Patient?> GetByIdWithDetailsAsync(Guid id) =>
+    await _ctx.Patients
+        .Include(p => p.RiskProfile)
+        .Include(p => p.Studies)
+            .ThenInclude(s => s.Operator)
+        .AsNoTracking()
+        .FirstOrDefaultAsync(p => p.Id == id);
+
 }

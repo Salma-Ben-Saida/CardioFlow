@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patients - CathLab Management System</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/components.css">
+    <link rel="stylesheet" href="../../assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left"><nav class="topbar-breadcrumb"><a href="/frontend/pages/dashboard/index.html">Home</a><span>/</span><span>Patients</span></nav></div>
+                <div class="topbar-right"><div class="topbar-user"><div class="topbar-user-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div></div></div>
+            </header>
+            <div class="page-content">
+                <div class="page-header">
+                    <div class="page-header-left"><h1 class="page-header-title">Patient List</h1><p class="page-header-subtitle">Manage and view all patient records</p></div>
+                    <div class="page-header-actions"><a href="/frontend/pages/patients/admission.html" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New Patient</a></div>
+                </div>
+                <div class="filter-bar">
+                    <div class="filter-group filter-group-search">
+                        <div class="search-input"><span class="search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><input type="text" class="form-control" id="searchInput" placeholder="Search by name or ID..."></div>
+                    </div>
+                    <div class="filter-separator"></div>
+                    <div class="filter-group"><label class="filter-label">Sex:</label><select class="form-control" id="sexFilter" title="Filter by sex"><option value="">All</option><option value="M">Male</option><option value="F">Female</option></select></div>
+                    <div class="filter-group"><label class="filter-label">Status:</label><select class="form-control" id="statusFilter" title="Filter by status"><option value="">All</option><option value="complete">Complete</option><option value="incomplete">Incomplete</option></select></div>
+                    <div class="filter-separator"></div>
+                    <div class="filter-group"><label class="filter-label">Sort by:</label><select class="form-control" id="sortByFilter" title="Sort by"><option value="updatedAt">Last Updated</option><option value="fullName">Name</option><option value="createdAt">Created Date</option></select></div>
+                    <div class="filter-group"><select class="form-control" id="sortDirFilter" title="Sort direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
+                </div>
+                <div class="card">
+                    <div class="table-container"><table class="table" id="patientsTable"><thead><tr><th>Full Name</th><th>Patient ID</th><th>Birth Date</th><th>Sex</th><th>Blood Group</th><th style="text-align:center;">Studies</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody id="patientsTableBody"></tbody></table></div>
+                    <div id="paginationContainer" class="pagination-container"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div class="loading-overlay" id="loadingOverlay"><div class="loading-overlay-content"><div class="spinner spinner-lg"></div><p class="loading-text">Loading patients...</p></div></div>
+    <script type="module">
+        import { renderSidebar } from '../../assets/js/components/sidebar.js';
+        import { showToast } from '../../assets/js/components/toast.js';
+        import { createPagination } from '../../assets/js/components/pagination.js';
+        import { getPatients } from '../../assets/js/api/patients.js';
+        import { formatDate, formatSex, formatStatusBadge, debounce, getQueryParam, setQueryParams } from '../../assets/js/utils.js';
+
+        if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
+        renderSidebar('sidebar-container');
+
+        let currentPage = 1, pageSize = 20, paginationInstance = null;
+        const searchInput = document.getElementById('searchInput');
+        const sexFilter = document.getElementById('sexFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const sortByFilter = document.getElementById('sortByFilter');
+        const sortDirFilter = document.getElementById('sortDirFilter');
+        const tableBody = document.getElementById('patientsTableBody');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        function initFromUrl() {
+            const params = getQueryParam();
+            if (params.search) searchInput.value = params.search;
+            if (params.sex) sexFilter.value = params.sex;
+            if (params.status) statusFilter.value = params.status;
+            if (params.sortBy) sortByFilter.value = params.sortBy;
+            if (params.sortDir) sortDirFilter.value = params.sortDir;
+            if (params.page) currentPage = parseInt(params.page, 10) || 1;
+        }
+
+        function getFilterValues() {
+            return { search: searchInput.value.trim() || undefined, sex: sexFilter.value || undefined, status: statusFilter.value || undefined, sortBy: sortByFilter.value || 'updatedAt', sortDir: sortDirFilter.value || 'desc', page: currentPage, pageSize };
+        }
+
+        async function loadPatients() {
+            loadingOverlay.style.display = 'flex';
+            const filters = getFilterValues();
+            setQueryParams(filters);
+            try {
+                const data = await getPatients(filters);
+                const patients = data.items || data.patients || [];
+                const totalCount = data.totalCount || data.total || patients.length;
+                const totalPages = Math.ceil(totalCount / pageSize);
+                renderTable(patients);
+                renderPagination(totalPages, totalCount);
+            } catch (error) {
+                showToast.error('Failed to load patients: ' + error.message);
+                renderEmptyState('Failed to load patients. Please try again.');
+            } finally { loadingOverlay.style.display = 'none'; }
+        }
+
+        function renderTable(patients) {
+            if (!patients || patients.length === 0) { renderEmptyState('No patients found matching your criteria.'); return; }
+            tableBody.innerHTML = patients.map(p => `<tr class="${p.isIncomplete ? 'row-highlight' : ''}" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><td><div style="font-weight:500;">${escapeHtml(p.fullName)}</div></td><td>${escapeHtml(p.conquestPatientID || p.nationalId || '-')}</td><td>${formatDate(p.birthDate)}</td><td>${formatSex(p.sex)}</td><td>${p.bloodGroup || '-'}</td><td style="text-align:center;"><span class="badge badge-info">${p.studyCount || 0}</span></td><td>${formatStatusBadge(p.isIncomplete)}</td><td style="text-align:center;"><div class="actions"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'" title="View"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></td></tr>`).join('');
+        }
+
+        function renderEmptyState(message) { tableBody.innerHTML = `<tr><td colspan="8" class="table-empty"><p>${message}</p></td></tr>`; }
+
+        function renderPagination(totalPages, totalItems) {
+            paginationInstance = createPagination({ currentPage, totalPages, totalItems, pageSize, onChange: (page) => { currentPage = page; loadPatients(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+            paginationInstance.renderTo('paginationContainer');
+        }
+
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        const debouncedLoad = debounce(loadPatients, 300);
+        searchInput.addEventListener('input', () => { currentPage = 1; debouncedLoad(); });
+        [sexFilter, statusFilter, sortByFilter, sortDirFilter].forEach(el => el.addEventListener('change', () => { currentPage = 1; loadPatients(); }));
+
+        initFromUrl();
+        loadPatients();
+    </script>
+</body>
+</html>
