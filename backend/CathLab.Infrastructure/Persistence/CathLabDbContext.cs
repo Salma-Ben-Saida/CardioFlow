@@ -14,38 +14,51 @@ public class CathLabDbContext : DbContext
     public DbSet<CathStudy> CathStudies => Set<CathStudy>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Patient>(e =>
-        {
-            e.HasKey(p => p.Id);
-            e.Property(p => p.Id).ValueGeneratedOnAdd();
-            e.HasOne(p => p.RiskProfile)
-             .WithOne(r => r.Patient)
-             .HasForeignKey<RiskProfile>(r => r.PatientId);
-            e.HasMany(p => p.Studies)
-             .WithOne(s => s.Patient)
-             .HasForeignKey(s => s.PatientId);
-        });
-
-        modelBuilder.Entity<RiskProfile>(e =>
 {
-    e.HasKey(r => r.Id);
-    e.Property(r => r.ObesityBMI)
-     .HasPrecision(5, 2);      // ex: 999.99
-    e.Property(r => r.EjectionFraction)
-     .HasPrecision(5, 4);      // ex: 0.6543 (fraction entre 0 et 1)
-});
+    modelBuilder.Entity<Patient>(e =>
+    {
+        e.HasKey(p => p.Id);
+        e.Property(p => p.Id).ValueGeneratedOnAdd();
+        e.Property(p => p.FullName).HasMaxLength(200);
+        e.Property(p => p.ConquestPatientID).HasMaxLength(100);
+        e.Property(p => p.NationalId).HasMaxLength(50);
+        e.Property(p => p.Sex).HasMaxLength(1);
+        e.Property(p => p.BloodGroup).HasMaxLength(10);
+        e.HasOne(p => p.RiskProfile)
+         .WithOne(r => r.Patient)
+         .HasForeignKey<RiskProfile>(r => r.PatientId);
+        e.HasMany(p => p.Studies)
+         .WithOne(s => s.Patient)
+         .HasForeignKey(s => s.PatientId);
+    });
 
-        modelBuilder.Entity<CathStudy>(e =>
-        {
-            e.HasKey(s => s.Id);
-            e.Property(s => s.Id).ValueGeneratedOnAdd();
-        });
+    modelBuilder.Entity<CathStudy>(e =>
+    {
+        e.HasKey(s => s.Id);
+        e.Property(s => s.Id).ValueGeneratedOnAdd();
+        e.Property(s => s.AccessionNumber).HasMaxLength(100);
+        e.Property(s => s.StudyInstanceUid).HasMaxLength(200);
+        e.Property(s => s.Status)
+         .HasConversion<string>()
+         .HasMaxLength(50);
+    });
 
-        modelBuilder.Entity<AppUser>(e =>
-        {
-            e.HasKey(u => u.Id);
-            e.Property(u => u.Id).ValueGeneratedOnAdd();
-        });
-    }
+    modelBuilder.Entity<AppUser>(e =>
+    {
+        e.HasKey(u => u.Id);
+        e.Property(u => u.Id).ValueGeneratedOnAdd();
+        e.Property(u => u.Username).HasMaxLength(100);
+        e.Property(u => u.FullName).HasMaxLength(200);
+        e.Property(u => u.Role)
+         .HasConversion<string>()
+         .HasMaxLength(50);
+    });
+
+    modelBuilder.Entity<RiskProfile>(e =>
+    {
+        e.HasKey(r => r.Id);
+        e.Property(r => r.ObesityBMI).HasPrecision(5, 2);
+        e.Property(r => r.EjectionFraction).HasPrecision(5, 4);
+    });
+}
 }

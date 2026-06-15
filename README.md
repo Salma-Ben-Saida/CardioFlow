@@ -24,12 +24,14 @@ This repository contains the CardioFlow solution. This README summarizes what wa
 
 - Layered solution (Clean/Onion-like structure): Domain, Application, Infrastructure, and WebApi projects are separated to keep concerns clear.
 - Domain model: core entity classes representing users, patients, studies, and risk profiles were created under `CathLab.Domain/Entities`.
-- Application layer: DTOs and interfaces (`IPacsReader` etc.) were added in `CathLab.Application/` to define boundaries and interaction contracts.
+- Application layer: DTOs and interfaces (`IPacsReader`, `IPatientsRepository` etc.) were added in `CathLab.Application/` to define boundaries and interaction contracts.
 - Infrastructure:
 	- Implemented EF Core persistence with `CathLabDbContext` in `CathLab.Infrastructure/Persistence` and prepared migrations.
 	- Integrated Orthanc PACS client in `CathLab.Infrastructure/Pacs` with a concrete `OrthancPacsReader` and generated models for Orthanc API resources.
 	- Added `OrthancPacsContext` to centralize PACS connectivity and configuration.
-- Web API: lightweight REST API in `CathLab.WebApi/` exposing PACS-related endpoints (see `Controllers/PacsController.cs`) and configuration in `appsettings.json` / `appsettings.Development.json`.
+	- Implemented background services in `CathLab.Infrastructure/Background_Services` for automatic PACS polling and ingestion.
+- Web API: lightweight REST API in `CathLab.WebApi/` exposing PACS-related and patient-related endpoints (see `Controllers/`), with CORS enabled for frontend development and configuration in `appsettings.json` / `appsettings.Development.json`.
+- Services: `StudyIngestionService` (core PACS ingestion logic) and `PatientService` (patient queries and filtering).
 
 
 **Infrastructure: what was implemented**
@@ -56,14 +58,113 @@ dotnet build
 dotnet run --project CathLab.WebApi/CathLab.WebApi.csproj
 ```
 
-3. Verify PACS connectivity: the Web API exposes PACS-related endpoints (see `CathLab.WebApi/Controllers/PacsController.cs`) which use the Orthanc integration in `CathLab.Infrastructure/Pacs`.
+3. Once running, the Web API will:
+	- Expose REST endpoints for querying patients and studies (see API Endpoints section below)
+	- Automatically start background workers that poll PACS every 15 minutes for new studies
+	- Log ingestion cycles and study metadata to the console
+
+4. Verify PACS connectivity: the Web API exposes PACS and patient endpoints (see `CathLab.WebApi/Controllers/`) which use the Orthanc integration and database persistence.
 
 
-**Configuration notes**
+---
 
-- App settings and connection strings are stored in `CathLab.WebApi/appsettings.json` and `appsettings.Development.json`. Update the Orthanc URL, credentials, and database connection string there for your environment.
-- The Orthanc configuration file is located at `database/orthanc-config/orthanc.json` and is referenced by the Docker Compose setup.
+## API Endpoints (for Frontend Development)
 
+**Base URL:** `http://localhost:5152` (default when running locally)
+
+### 1. Get Patients List (with filtering & pagination)
+
+**Endpoint:** `GET /api/patients`
+
+**Query Parameters:**
+- `search` (string, optional) — Filter by patient name, national ID, or conquest patient ID
+- `sex` (string, optional) — Filter by sex (e.g., "M", "F")
+- `status` (string, optional) — Filter by completion status: `"complete"` or `"incomplete"` (empty string = no filter)
+- `page` (integer, default: 1) — Page number (1-indexed)
+- `pageSize` (integer, default: 20, max: 100) — Number of results per page
+
+**Example Request:**
+```
+GET http://localhost:5152/api/patients?search=ali&sex=M&status=complete&page=1&pageSize=20
+```
+
+**Response Structure:**
+```json
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "fullName": "Ali Ahmed Hassan",
+      "conquestPatientId": "PACS00001",
+      "nationalId": "123456789",
+      "birthDate": "1985-03-15",
+      "sex": "M",
+      "bloodGroup": "O+",
+      "phoneNumber": "+966501234567",
+      "isIncomplete": false,
+      "studyCount": 5,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-06-10T14:25:00Z"
+    }
+  ],
+  "totalCount": 124,
+  "page": 1,
+  "pageSize": 20,
+  "totalPages": 7
+}
+```
+
+**Response Field Descriptions:**
+- `id` — Unique patient identifier (GUID)
+- `fullName` — Patient full name
+- `conquestPatientId` — PACS system patient ID
+- `nationalId` — National/Government ID number
+- `birthDate` — Date of birth (ISO 8601 format, nullable)
+- `sex` — Sex/Gender (nullable)
+- `bloodGroup` — Blood group type (nullable)
+- `phoneNumber` — Contact phone number (nullable)
+- `isIncomplete` — Boolean flag: `true` if patient record is incomplete, `false` if complete
+- `studyCount` — Number of cath lab studies associated with this patient
+- `createdAt` — Record creation timestamp (UTC)
+- `updatedAt` — Last modification timestamp (UTC)
+- `totalPages` — Total number of pages available (calculated from totalCount / pageSize)
+
+---
+
+### 2. Get Pending PACS Studies (Last 30 Days)
+
+**Endpoint:** `GET /api/pacs/studies`
+
+**Response:** Returns list of studies pending ingestion from PACS (Orthanc)
+
+---
+
+### 3. Ingest Single Study
+
+**Endpoint:** `POST /api/pacs/ingest/{accessionNumber}`
+
+**Description:** Manually trigger ingestion of a specific study from PACS by its accession number
+
+---
+
+### 4. Ingest All Pending Studies
+
+**Endpoint:** `POST /api/pacs/ingest/all`
+
+**Description:** Manually trigger ingestion of all pending studies from PACS (runs automatically every 15 minutes via background service)
+
+---
+
+**CORS Configuration:**
+- Frontend URL: `http://127.0.0.1:5500` (configured in `Program.cs`)
+- All HTTP methods and headers are allowed
+
+**Configuration notes:**
+- App settings and connection strings are stored in `CathLab.WebApi/appsettings.json` and `appsettings.Development.json`
+- The Orthanc configuration file is located at `database/orthanc-config/orthanc.json`
+- Frontend is expected to run on `http://127.0.0.1:5500` to allow CORS requests to the API
+
+---
 
 **Development tips & next steps**
 
@@ -139,34 +240,83 @@ This section documents, file-by-file and class-by-class, the work implemented un
 	- Generated models: `backend/CathLab.Infrastructure/Pacs/Generated/*` — classes mapping Orthanc tables (e.g., `MainDicomTag`, `DicomIdentifier`, `Resource`, `AttachedFile`, etc.). These are used by `OrthancPacsContext`.
 
 
+**CathLab.Infrastructure — Background Services**
+
+- `backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs` — long-running background service implementing `BackgroundService`:
+	- Runs continuously in the background, polling PACS every 15 minutes (900 seconds)
+	- Creates a scoped DI container on each cycle to safely call scoped services
+	- Uses `StudyIngestionService.IngestAllPendingAsync()` to automatically ingest new studies
+	- Logs each ingestion cycle with timestamp and any errors encountered
+	- Registered as a hosted service in `Program.cs` via `AddHostedService<PacsIngestionWorker>()`
+
+**CathLab.Application — Patient Service**
+
+- `backend/CathLab.Application/Services/PatientService.cs` — application service for patient queries:
+	- Uses `IPatientRepository` to search and filter patients from the database
+	- Public method: `GetListAsync(search, sex, status, page, pageSize)` returns paginated results
+	- Supports filtering by: patient name/ID (search), sex, completion status (complete/incomplete)
+	- Converts domain `Patient` entities to `PatientListItemDto` for API responses
+- `backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs` — transfer object containing patient summary data returned by API
+
 **CathLab.WebApi**
 
 - `backend/CathLab.WebApi/Program.cs` — application startup and DI wiring:
 	- Registers `CathLabDbContext` and `OrthancPacsContext` with connection strings `CathLabDb` and `OrthancPACS`.
 	- Registers implementations: `IPacsReader` → `OrthancPacsReader`, `IPatientRepository` → `PatientRepository`, `ICathStudyRepository` → `CathStudyRepository`.
-	- Registers `StudyIngestionService` and maps controllers.
-- `backend/CathLab.WebApi/Controllers/PacsController.cs` — API endpoints:
+	- Registers `StudyIngestionService` and `PatientService`.
+	- Adds CORS policy for frontend at `http://127.0.0.1:5500`.
+	- Registers `PacsIngestionWorker` as a hosted service for automatic background polling.
+- `backend/CathLab.WebApi/Controllers/PacsController.cs` — PACS ingestion endpoints:
 	- `GET /api/pacs/studies` — returns pending studies (last 30 days) via `IPacsReader`.
 	- `POST /api/pacs/ingest/{accessionNumber}` — ingests a single study using `StudyIngestionService.IngestStudyAsync`.
 	- `POST /api/pacs/ingest/all` — ingests all pending studies returned by PACS.
+- `backend/CathLab.WebApi/Controllers/PatientsController.cs` — patient management endpoints:
+	- `GET /api/patients` — returns paginated, filtered list of patients using `PatientService.GetListAsync`.
+		- Query parameters: `search` (name/ID), `sex` (M/F), `status` (complete/incomplete), `page`, `pageSize`.
+	- Response: paginated result object with patient summaries (see API Endpoints section above).
 
 
 **How the pieces interact (summary)**
 
-- The Web API controller calls `StudyIngestionService` for ingestion operations.
-- `StudyIngestionService` queries the PACS through `IPacsReader` (implemented by `OrthancPacsReader`).
-- `OrthancPacsReader` reads Orthanc's DB using `OrthancPacsContext` to build `PacsStudyDto` objects.
-- The ingestion service uses repository interfaces (`IPatientRepository`, `ICathStudyRepository`) to persist domain entities in `CathLabDbContext`.
+1. **Manual/On-demand ingestion** (triggered via API):
+	- The `PacsController` HTTP endpoint receives a request to ingest studies
+	- Controller calls `StudyIngestionService` for ingestion operations
+	- `StudyIngestionService` queries the PACS through `IPacsReader` (implemented by `OrthancPacsReader`)
+	- `OrthancPacsReader` reads Orthanc's DB using `OrthancPacsContext` to build `PacsStudyDto` objects
+	- The ingestion service uses repository interfaces (`IPatientRepository`, `ICathStudyRepository`) to persist domain entities in `CathLabDbContext`
+
+2. **Automatic background ingestion** (runs every 15 minutes):
+	- `PacsIngestionWorker` background service wakes up on schedule
+	- Creates a scoped DI container and retrieves `StudyIngestionService`
+	- Calls `IngestAllPendingAsync()` to automatically query PACS and ingest new studies
+	- Logs ingestion activity to console
+
+3. **Patient queries** (via frontend or API client):
+	- `PatientsController` receives HTTP GET requests with filtering parameters
+	- Controller calls `PatientService.GetListAsync()` to search the database
+	- `PatientService` uses `IPatientRepository` to query domain entities and convert them to DTOs
+	- Returns paginated results as JSON response
 
 
 **Files to review**
 
+**Domain & Common:**
 - Domain entities: [backend/CathLab.Domain/Entities/Patient.cs](backend/CathLab.Domain/Entities/Patient.cs), [backend/CathLab.Domain/Entities/CathStudy.cs](backend/CathLab.Domain/Entities/CathStudy.cs), [backend/CathLab.Domain/Entities/RiskProfile.cs](backend/CathLab.Domain/Entities/RiskProfile.cs), [backend/CathLab.Domain/Entities/AppUser.cs](backend/CathLab.Domain/Entities/AppUser.cs)
-- Application DTO & interfaces: [backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs](backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs), [backend/CathLab.Application/Interfaces/IPacsReader.cs](backend/CathLab.Application/Interfaces/IPacsReader.cs)
-- Ingestion service: [backend/CathLab.Application/Services/StudyIngestionService.cs](backend/CathLab.Application/Services/StudyIngestionService.cs)
-- Persistence and repositories: [backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs](backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs)
-- Orthanc PACS integration: [backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs), [backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs)
-- API: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Program.cs](backend/CathLab.WebApi/Program.cs)
+- Common types: [backend/CathLab.Application/Common/PagedResult.cs](backend/CathLab.Application/Common/PagedResult.cs)
+
+**Application Layer:**
+- DTOs: [backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs](backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs), [backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs](backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs)
+- Interfaces: [backend/CathLab.Application/Interfaces/IPacsReader.cs](backend/CathLab.Application/Interfaces/IPacsReader.cs), [backend/CathLab.Application/Interfaces/IPatientRepository.cs](backend/CathLab.Application/Interfaces/IPatientRepository.cs), [backend/CathLab.Application/Interfaces/ICathStudyRepository.cs](backend/CathLab.Application/Interfaces/ICathStudyRepository.cs)
+- Services: [backend/CathLab.Application/Services/StudyIngestionService.cs](backend/CathLab.Application/Services/StudyIngestionService.cs), [backend/CathLab.Application/Services/PatientService.cs](backend/CathLab.Application/Services/PatientService.cs)
+
+**Infrastructure Layer:**
+- Persistence: [backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs](backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs)
+- PACS integration: [backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs), [backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs)
+- Background services: [backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs](backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs)
+
+**API Layer:**
+- Controllers: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Controllers/PatientsController.cs](backend/CathLab.WebApi/Controllers/PatientsController.cs)
+- Configuration: [backend/CathLab.WebApi/Program.cs](backend/CathLab.WebApi/Program.cs)
 
 
 If you want, I can now:

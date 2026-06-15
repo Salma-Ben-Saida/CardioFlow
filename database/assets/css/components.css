@@ -1,0 +1,100 @@
+/* ============================================
+   CATH LAB - Components CSS
+   ============================================ */
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--spacing-2); padding: var(--spacing-2) var(--spacing-4); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); line-height: 1; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all var(--transition); white-space: nowrap; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: var(--spacing-1) var(--spacing-3); font-size: var(--font-size-xs); }
+.btn-lg { padding: var(--spacing-3) var(--spacing-6); font-size: var(--font-size-base); }
+.btn-primary { background-color: var(--color-accent); color: var(--color-white); border-color: var(--color-accent); }
+.btn-primary:hover:not(:disabled) { background-color: var(--color-accent-dark); }
+.btn-secondary { background-color: var(--color-white); color: var(--color-gray-700); border-color: var(--color-gray-300); }
+.btn-secondary:hover:not(:disabled) { background-color: var(--color-gray-50); }
+.btn-success { background-color: var(--color-success); color: var(--color-white); }
+.btn-danger { background-color: var(--color-danger); color: var(--color-white); }
+.btn-ghost { background: transparent; color: var(--color-gray-600); border-color: transparent; }
+.btn-ghost:hover:not(:disabled) { background-color: var(--color-gray-100); }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; padding: var(--spacing-1) var(--spacing-2); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); border-radius: var(--radius-full); }
+.badge-success { background-color: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.badge-warning { background-color: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+.badge-danger { background-color: rgba(239, 68, 68, 0.1); color: var(--color-danger); }
+.badge-info { background-color: rgba(37, 99, 235, 0.1); color: var(--color-accent); }
+.badge-neutral { background-color: var(--color-gray-100); color: var(--color-gray-600); }
+
+/* CARDS */
+.card { background-color: var(--color-white); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-4) var(--spacing-5); border-bottom: 1px solid var(--color-gray-200); }
+.card-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+.card-subtitle { font-size: var(--font-size-sm); color: var(--color-gray-500); margin-top: var(--spacing-1); }
+.card-body { padding: var(--spacing-6); }
+.card-footer { padding: var(--spacing-4) var(--spacing-5); border-top: 1px solid var(--color-gray-200); background-color: var(--color-gray-50); }
+
+/* STAT CARDS */
+.stat-card { display: flex; align-items: flex-start; gap: var(--spacing-4); padding: var(--spacing-6); }
+.stat-card .stat-icon { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); background-color: var(--color-gray-100); flex-shrink: 0; }
+.stat-card .stat-value { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--color-gray-900); line-height: 1; }
+.stat-card .stat-label { font-size: var(--font-size-sm); color: var(--color-gray-500); margin-top: var(--spacing-1); }
+.stat-card.stat-card-primary .stat-icon { background-color: rgba(37, 99, 235, 0.1); color: var(--color-accent); }
+.stat-card.stat-card-success .stat-icon { background-color: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.stat-card.stat-card-warning .stat-icon { background-color: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+.stat-card.stat-card-danger .stat-icon { background-color: rgba(239, 68, 68, 0.1); color: var(--color-danger); }
+
+/* TABLES */
+.table-container { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.table th { padding: var(--spacing-3) var(--spacing-4); text-align: left; font-weight: var(--font-weight-medium); color: var(--color-gray-600); background-color: var(--color-gray-50); border-bottom: 1px solid var(--color-gray-200); }
+.table td { padding: var(--spacing-3) var(--spacing-4); border-bottom: 1px solid var(--color-gray-100); color: var(--color-gray-700); }
+.table tbody tr { transition: background-color var(--transition); }
+.table tbody tr:hover { background-color: var(--color-gray-50); }
+.table tbody tr.clickable { cursor: pointer; }
+.table tbody tr.row-highlight { border-left: 3px solid var(--color-warning); }
+.table .actions { display: flex; align-items: center; gap: var(--spacing-2); }
+.table-empty { text-align: center; padding: var(--spacing-12) var(--spacing-4); color: var(--color-gray-500); }
+
+/* FORMS */
+.form-group { margin-bottom: var(--spacing-4); }
+.form-label { display: block; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-gray-700); margin-bottom: var(--spacing-1); }
+.form-label.required::after { content: '*'; color: var(--color-danger); margin-left: var(--spacing-1); }
+.form-control { width: 100%; padding: var(--spacing-2) var(--spacing-3); font-size: var(--font-size-base); color: var(--color-gray-900); background-color: var(--color-white); border: 1px solid var(--color-gray-300); border-radius: var(--radius); transition: border-color var(--transition), box-shadow var(--transition); }
+.form-control:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+.form-control:disabled { background-color: var(--color-gray-100); cursor: not-allowed; }
+.form-control::placeholder { color: var(--color-gray-400); }
+.form-control-readonly { background-color: var(--color-gray-50); border: 1px dashed var(--color-gray-300); pointer-events: none; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-4); }
+.form-check { display: flex; align-items: center; gap: var(--spacing-2); }
+.form-check-input { width: 18px; height: 18px; accent-color: var(--color-accent); }
+
+/* SEARCH INPUT */
+.search-input { position: relative; }
+.search-input .search-icon { position: absolute; left: var(--spacing-3); top: 50%; transform: translateY(-50%); color: var(--color-gray-400); pointer-events: none; }
+.search-input .form-control { padding-left: 2.5rem; }
+
+/* TABS */
+.tabs { border-bottom: 1px solid var(--color-gray-200); display: flex; gap: var(--spacing-1); }
+.tab { padding: var(--spacing-3) var(--spacing-4); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-gray-500); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all var(--transition); }
+.tab:hover { color: var(--color-gray-700); }
+.tab.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* SPINNER */
+.spinner { width: 24px; height: 24px; border: 2px solid var(--color-gray-200); border-top-color: var(--color-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner-sm { width: 16px; height: 16px; }
+.spinner-lg { width: 32px; height: 32px; border-width: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.loading-text { margin-top: var(--spacing-3); color: var(--color-gray-600); font-size: var(--font-size-sm); }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: var(--spacing-12) var(--spacing-4); }
+.empty-state-icon { width: 80px; height: 80px; margin: 0 auto var(--spacing-4); color: var(--color-gray-300); }
+.empty-state-description { font-size: var(--font-size-sm); color: var(--color-gray-500); max-width: 400px; margin: 0 auto; }
+
+/* RISK FACTORS */
+.risk-factor { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-3) var(--spacing-4); background-color: var(--color-gray-50); border-radius: var(--radius-md); margin-bottom: var(--spacing-2); }
+.risk-factor.active { background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); }
+.risk-factor-label { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-gray-700); }
+.risk-factor.active .risk-factor-label { color: var(--color-danger); }
