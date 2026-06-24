@@ -51,7 +51,7 @@
                             </div>
                         </div>
                         <div class="tab-panel" id="studiesPanel">
-                            <div class="table-container"><table class="table"><thead><tr><th>Accession Number</th><th>Study Date</th><th>Status</th><th>Operator</th><th>Created At</th></tr></thead><tbody id="studiesTableBody"></tbody></table></div>
+                            <div class="table-container"><table class="table"><thead><tr><th>Accession Number</th><th>Study Date</th><th>Status</th><th>Operator</th><th>Created At</th><th>Actions</th></tr></thead><tbody id="studiesTableBody"></tbody></table></div>
                         </div>
                         <div class="tab-panel" id="riskPanel">
                             <div id="riskProfileContent"><div class="content-grid" style="grid-template-columns:1fr 1fr;">
@@ -134,13 +134,44 @@
         }
 
         async function loadStudies() {
-            const tbody = document.getElementById('studiesTableBody');
-            try {
-                const studies = await getPatientStudies(patientId);
-                if (!studies || studies.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="table-empty"><p>No studies found for this patient</p></td></tr>'; return; }
-                tbody.innerHTML = studies.map(s => `<tr><td><div style="font-weight:500;">${escapeHtml(s.accessionNumber)}</div></td><td>${formatDate(s.studyDate)}</td><td><span class="badge ${s.status === 'Complete' ? 'badge-success' : 'badge-warning'}">${escapeHtml(s.status)}</span></td><td>${escapeHtml(s.operatorName || '-')}</td><td>${formatDateTime(s.createdAt)}</td></tr>`).join('');
-            } catch { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--color-danger);">Failed to load studies</td></tr>'; }
+    const tbody = document.getElementById('studiesTableBody');
+    try {
+        const studies = await getPatientStudies(patientId);
+        if (!studies || studies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>No studies found for this patient</p></td></tr>';
+            return;
         }
+        tbody.innerHTML = studies.map(s => `
+            <tr>
+                <td><div style="font-weight:500;">${escapeHtml(s.accessionNumber)}</div></td>
+                <td>${formatDate(s.studyDate)}</td>
+                <td><span class="badge ${s.status === 'Complete' ? 'badge-success' : 'badge-warning'}">${escapeHtml(s.status)}</span></td>
+                <td>${escapeHtml(s.operatorName || '-')}</td>
+                <td>${formatDateTime(s.createdAt)}</td>
+                <td>
+                    ${s.studyInstanceUid
+                        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="btn btn-ghost btn-sm"
+                              title="Open DICOM viewer">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2">
+                                 <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                 <circle cx="12" cy="12" r="3"/>
+                                 <path d="M3 12h3m12 0h3M12 3v3m0 12v3"/>
+                               </svg>
+                               View Images
+                           </a>`
+                        : `<span style="color:var(--color-gray-400);font-size:var(--font-size-sm);">No images</span>`
+                    }
+                </td>
+            </tr>
+        `).join('');
+    } catch {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-danger);">Failed to load studies</td></tr>';
+    }
+}
 
         async function loadRiskProfile() {
             try {

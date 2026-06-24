@@ -5,6 +5,8 @@
   "DicomAet": "ORTHANC",
   "RemoteAccessAllowed": true,
   "AuthenticationEnabled": false,
+  
+  "AcgCorsEnabled": true,
 
   "DicomModalities": {
     "PHILIPS_XA": {
@@ -14,7 +16,14 @@
     }
   },
 
-  "Plugins": ["/usr/share/orthanc/plugins-available/libOrthancOdbcIndex.so"],
+  "Plugins": [ "/usr/share/orthanc/plugins" ],
+
+  "DicomWeb" : {
+    "Enable" : true,
+    "Root" : "/dicom-web/",
+    "EnableWado" : true,
+    "WadoRoot" : "/wado"
+  },
 
   "Odbc": {
     "EnableIndex": true,
@@ -24,7 +33,6 @@
     "ConnectionRetryInterval": 5,
     "IndexConnectionsCount": 4
   },
-
 
   "StorageDirectory": "/var/lib/orthanc/db",
   "DefaultEncoding": "Utf8",

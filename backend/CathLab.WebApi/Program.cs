@@ -59,12 +59,16 @@ builder.Services.AddCors(options =>
             return host == "localhost"
                 || host == "127.0.0.1"
                 || host.EndsWith(".stackblitz.io")    // Bolt.new Sandbox
-                || host.EndsWith(".webcontainer.io");  // Bolt.new WebContainers
+                || host.EndsWith(".webcontainer.io")  // Bolt.new WebContainers
+                || host.EndsWith(":5501")  ;        // Local Vite server for DICOM viewer
+                
                 
         })
         .AllowAnyHeader() 
         .AllowAnyMethod());
 });
+
+builder.Services.AddHttpClient("orthanc");
 
 var app = builder.Build();
 

@@ -73,3 +73,6 @@ TestResults/
 coverage/
 *.trx
 *.coveragexml
+
+
+orthanc.json
