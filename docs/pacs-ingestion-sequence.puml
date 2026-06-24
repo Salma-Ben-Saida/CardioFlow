@@ -1,0 +1,56 @@
+@startuml ""
+title PACS Ingestion Sequence — CardioFlow
+actor Client
+participant "PacsController" as Controller
+participant "PacsIngestionWorker" as Worker
+participant "StudyIngestionService" as Service
+participant "IPacsReader / OrthancPacsReader" as Reader
+participant "Orthanc (PACS)" as Orthanc
+participant "IPatientRepository" as PatientRepo
+participant "ICathStudyRepository" as StudyRepo
+
+== Trigger ==
+alt Manual ingestion
+    Client -> Controller: POST /api/pacs/ingest/{accession}
+    Controller -> Service: IngestStudy(accession)
+else Scheduled ingestion
+    Worker -> Service: IngestAllPending()
+end
+
+== Read from PACS ==
+Service -> Reader: GetStudyByAccession(accession) / GetPendingStudies()
+Reader -> Orthanc: Query DB / API for studies
+Orthanc --> Reader: PacsStudyDto (Accession, StudyUID, PatientIds, StudyDate, Modality)
+Reader --> Service: List<PacsStudyDto>
+
+== For each study ==
+loop for each study
+    Service -> StudyRepo: ExistsByAccession(study.AccessionNumber)?
+    alt study exists
+        StudyRepo --> Service: true
+        Service -> Service: log("already exists")
+    else new study
+        Service -> PatientRepo: FindByConquestId(study.ConquestPatientId)
+        alt patient found
+            PatientRepo --> Service: Patient
+        else create patient
+            Service -> PatientRepo: CreatePatient(from PacsStudyDto)
+            PatientRepo --> Service: Patient
+        end
+        Service -> StudyRepo: CreateStudy(CathStudy entity linked to Patient)
+        StudyRepo --> Service: Created
+        Service -> Service: mark IsIncomplete if patient metadata incomplete
+    end
+    Service -> Service: log result (success/failed)
+end
+
+== Completion ==
+alt called from Controller
+    Service --> Controller: IngestResult (success/alreadyExists/error)
+    Controller --> Client: HTTP Response
+else called from Worker
+    Service --> Worker: Summary (counts, errors)
+    Worker -> Worker: log and continue
+end
+
+@enduml

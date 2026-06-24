@@ -300,6 +300,45 @@ This section documents, file-by-file and class-by-class, the work implemented un
 
 **Files to review**
 
+	---
+
+	## PACS Ingestion Logic
+
+	This project includes both manual and automatic PACS ingestion. The core logic and responsibilities are:
+
+	- Triggering
+		- Manual: `POST /api/pacs/ingest/{accessionNumber}` ingests a single study.
+		- Manual: `POST /api/pacs/ingest/all` ingests all pending studies.
+		- Automatic: `PacsIngestionWorker` runs on a schedule (default: every 15 minutes) and calls `StudyIngestionService.IngestAllPendingAsync()`.
+
+	- Reading PACS
+		- `IPacsReader` abstraction is implemented by `OrthancPacsReader`, which reads Orthanc's DB via `OrthancPacsContext`.
+		- The reader returns `PacsStudyDto` objects with study metadata (AccessionNumber, StudyInstanceUid, Patient identifiers, StudyDate, Modality).
+
+	- Ingestion service responsibilities (`StudyIngestionService`)
+		- Fetch pending studies from `IPacsReader` or a specific study by accession number.
+		- For each study, check existing `ICathStudyRepository` to avoid duplicates (idempotency by `AccessionNumber`/StudyInstanceUid).
+		- Ensure patient exists: use `IPatientRepository.FindByConquestIdAsync` (or create a new `Patient` entity if missing).
+		- Persist `CathStudy` entities via `ICathStudyRepository` and link to `Patient`.
+		- Mark records `IsIncomplete` when DICOM patient metadata is missing or ambiguous.
+
+	- Error handling & logging
+		- Each ingestion attempt logs success/failure and exceptions. The background worker continues on errors (logs and moves to next study).
+		- The service returns structured results (success, already exists, failed) for API responses.
+
+	- Idempotency & safety
+		- Ingestion checks for existing studies to avoid duplicates.
+		- Re-running ingestion for the same accession is safe and returns an appropriate status (already exists).
+
+	Key implementation files:
+
+	- `backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs` — PACS reader implementation.
+	- `backend/CathLab.Application/Services/StudyIngestionService.cs` — ingestion business logic.
+	- `backend/CathLab.Infrastructure/Persistence/Repositories/*` — repositories used to persist patients and studies.
+	- `backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs` — scheduled background worker.
+
+	This section can be expanded with sequence diagrams or example flows on request.
+
 **Domain & Common:**
 - Domain entities: [backend/CathLab.Domain/Entities/Patient.cs](backend/CathLab.Domain/Entities/Patient.cs), [backend/CathLab.Domain/Entities/CathStudy.cs](backend/CathLab.Domain/Entities/CathStudy.cs), [backend/CathLab.Domain/Entities/RiskProfile.cs](backend/CathLab.Domain/Entities/RiskProfile.cs), [backend/CathLab.Domain/Entities/AppUser.cs](backend/CathLab.Domain/Entities/AppUser.cs)
 - Common types: [backend/CathLab.Application/Common/PagedResult.cs](backend/CathLab.Application/Common/PagedResult.cs)

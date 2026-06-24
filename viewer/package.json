@@ -1,0 +1,31 @@
+{
+  "name": "viewer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cornerstonejs/core": "^5.0.8",
+    "@cornerstonejs/dicom-codec": "^1.0.9",
+    "@cornerstonejs/dicom-image-loader": "^5.0.8",
+    "@cornerstonejs/metadata": "^5.0.8",
+    "@cornerstonejs/tools": "^5.0.8",
+    "d3-array": "^3.2.4",
+    "d3-interpolate": "^3.0.1",
+    "dicom-parser": "^1.8.21",
+    "gl-matrix": "^3.4.3",
+    "vite": "^5.4.21"
+  },
+  "devDependencies": {
+    "vite-plugin-commonjs": "^0.10.4"
+  }
+}
