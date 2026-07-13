@@ -102,6 +102,178 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.ToTable("CathStudies");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.CoronaryLesion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsTreated")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LesionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("ProcedureReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("SegmentNumber")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte>("StenosisPercent")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte?>("TimiFlow")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Vessel")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcedureReportId");
+
+                    b.ToTable("CoronaryLesions");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReservedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReservedForCathStudyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ReservedForCathStudyId");
+
+                    b.ToTable("InventoryItems");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.InventoryProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CurrentStock")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DeviceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("MinimumStockLevel")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UnitOfMeasure")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.ToTable("InventoryProducts");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.LesionTreatment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LesionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("PerformedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte?>("TimiFlowAfter")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId")
+                        .IsUnique();
+
+                    b.HasIndex("LesionId");
+
+                    b.ToTable("LesionTreatments", (string)null);
+
+                    b.UseTptMappingStrategy();
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.Patient", b =>
                 {
                     b.Property<Guid>("Id")
@@ -160,6 +332,59 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.ToTable("Patients");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.ProcedureReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Approach")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("CathStudyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CatheterUsed")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Conclusion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("ContrastVolumeMl")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<string>("DominanceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal?>("DoseAreaProductGycm2")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("PdfStoragePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("ReportGeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte?>("TimiFlowBaseline")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte?>("TimiFlowFinal")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CathStudyId")
+                        .IsUnique();
+
+                    b.ToTable("ProcedureReports");
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.RiskProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -215,6 +440,98 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.ToTable("RiskProfiles");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("MovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("StockMovements");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.BalloonDilation", b =>
+                {
+                    b.HasBaseType("CathLab.Domain.Entities.LesionTreatment");
+
+                    b.Property<decimal>("BalloonDiameterMm")
+                        .HasPrecision(4, 2)
+                        .HasColumnType("decimal(4,2)");
+
+                    b.Property<decimal>("BalloonLengthMm")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("InflationDurationSec")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPostDilation")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPreDilation")
+                        .HasColumnType("bit");
+
+                    b.Property<byte>("MaxPressureAtm")
+                        .HasColumnType("tinyint");
+
+                    b.ToTable("BalloonDilations", (string)null);
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.StentImplant", b =>
+                {
+                    b.HasBaseType("CathLab.Domain.Entities.LesionTreatment");
+
+                    b.Property<string>("LandingZoneDistal")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("LandingZoneProximal")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("PostDilationPerformed")
+                        .HasColumnType("bit");
+
+                    b.Property<byte?>("PostDilationPressure")
+                        .HasColumnType("tinyint");
+
+                    b.Property<decimal>("StentDiameterMm")
+                        .HasPrecision(4, 2)
+                        .HasColumnType("decimal(4,2)");
+
+                    b.Property<decimal>("StentLengthMm")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.ToTable("StentImplants", (string)null);
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.CathStudy", b =>
                 {
                     b.HasOne("CathLab.Domain.Entities.AppUser", "Operator")
@@ -232,6 +549,54 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.CoronaryLesion", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.ProcedureReport", "ProcedureReport")
+                        .WithMany("Lesions")
+                        .HasForeignKey("ProcedureReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcedureReport");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.InventoryItem", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.InventoryProduct", "Product")
+                        .WithMany("Items")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CathLab.Domain.Entities.CathStudy", "ReservedForCathStudy")
+                        .WithMany("ReservedItems")
+                        .HasForeignKey("ReservedForCathStudyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ReservedForCathStudy");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.LesionTreatment", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithOne("Treatment")
+                        .HasForeignKey("CathLab.Domain.Entities.LesionTreatment", "InventoryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CathLab.Domain.Entities.CoronaryLesion", "Lesion")
+                        .WithMany("Treatments")
+                        .HasForeignKey("LesionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("Lesion");
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.Patient", b =>
                 {
                     b.HasOne("CathLab.Domain.Entities.AppUser", "CreatedByUser")
@@ -239,6 +604,17 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CreatedByUserId");
 
                     b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.ProcedureReport", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.CathStudy", "CathStudy")
+                        .WithOne("ProcedureReport")
+                        .HasForeignKey("CathLab.Domain.Entities.ProcedureReport", "CathStudyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CathStudy");
                 });
 
             modelBuilder.Entity("CathLab.Domain.Entities.RiskProfile", b =>
@@ -252,11 +628,77 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.StockMovement", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CathLab.Domain.Entities.InventoryProduct", "Product")
+                        .WithMany("Movements")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.BalloonDilation", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.LesionTreatment", null)
+                        .WithOne()
+                        .HasForeignKey("CathLab.Domain.Entities.BalloonDilation", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.StentImplant", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.LesionTreatment", null)
+                        .WithOne()
+                        .HasForeignKey("CathLab.Domain.Entities.StentImplant", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.CathStudy", b =>
+                {
+                    b.Navigation("ProcedureReport");
+
+                    b.Navigation("ReservedItems");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.CoronaryLesion", b =>
+                {
+                    b.Navigation("Treatments");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Navigation("Treatment");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.InventoryProduct", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("Movements");
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.Patient", b =>
                 {
                     b.Navigation("RiskProfile");
 
                     b.Navigation("Studies");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.ProcedureReport", b =>
+                {
+                    b.Navigation("Lesions");
                 });
 #pragma warning restore 612, 618
         }

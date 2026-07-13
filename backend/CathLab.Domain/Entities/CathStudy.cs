@@ -14,4 +14,7 @@ public class CathStudy
 
     public Patient? Patient { get; set; }
     public AppUser? Operator { get; set; }
+
+    public ProcedureReport? ProcedureReport { get; set; }
+    public ICollection<InventoryItem> ReservedItems { get; set; } = new List<InventoryItem>();
 }
