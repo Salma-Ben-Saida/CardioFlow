@@ -1,0 +1,172 @@
+using System.Security.Claims;
+using CathLab.Application.DTOs.Pharmacy;
+using CathLab.Application.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace CathLab.WebApi.Controllers;
+
+[ApiController]
+[Route("api/pharmacy")]
+public class PharmacyController : ControllerBase
+{
+    private readonly InventoryService _inventory;
+
+    public PharmacyController(InventoryService inventory)
+    {
+        _inventory = inventory;
+    }
+
+    /// <summary>GET /api/pharmacy/products?search=&page=1&pageSize=20</summary>
+    [HttpGet("products")]
+    public async Task<IActionResult> GetProducts([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var result = await _inventory.GetProductsAsync(search, page, pageSize);
+        return Ok(result);
+    }
+
+    /// <summary>GET /api/pharmacy/products/low-stock - products at or below MinimumStockLevel.</summary>
+    [HttpGet("products/low-stock")]
+    public async Task<IActionResult> GetLowStockProducts()
+    {
+        var result = await _inventory.GetLowStockAsync();
+        return Ok(result);
+    }
+
+    /// <summary>POST /api/pharmacy/products - add a new catalog product.</summary>
+    [HttpPost("products")]
+    public async Task<IActionResult> CreateProduct([FromBody] CreateInventoryProductDto dto)
+    {
+        try
+        {
+            var product = await _inventory.CreateProductAsync(dto);
+            return CreatedAtAction(nameof(GetProducts), new { }, product);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>POST /api/pharmacy/items/receive - register one new physical unit into stock.</summary>
+    [HttpPost("items/receive")]
+    public async Task<IActionResult> ReceiveItem([FromBody] ReceiveInventoryItemDto dto)
+    {
+        try
+        {
+            var item = await _inventory.ReceiveItemAsync(dto, GetCurrentUserId());
+            return Ok(item);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/pharmacy/items/{id}/reserve - called the moment a cardiologist
+    /// selects this item in the segmentation UI, before the report is finalized.
+    /// </summary>
+    [HttpPost("items/{id:guid}/reserve")]
+    public async Task<IActionResult> ReserveItem(Guid id, [FromBody] ReserveItemRequest request)
+    {
+        try
+        {
+            await _inventory.ReserveItemAsync(id, request.CathStudyId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>POST /api/pharmacy/items/{id}/release - deselected before opening, back to InStock.</summary>
+    [HttpPost("items/{id:guid}/release")]
+    public async Task<IActionResult> ReleaseReservation(Guid id)
+    {
+        try
+        {
+            await _inventory.ReleaseReservationAsync(id);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>POST /api/pharmacy/items/{id}/waste - opened but never implanted.</summary>
+    [HttpPost("items/{id:guid}/waste")]
+    public async Task<IActionResult> MarkWasted(Guid id, [FromBody] MarkWastedRequest request)
+    {
+        try
+        {
+            await _inventory.MarkWastedAsync(id, request.Note, GetCurrentUserId());
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>GET /api/pharmacy/items/expiring?withinDays=30</summary>
+    [HttpGet("items/expiring")]
+    public async Task<IActionResult> GetExpiringItems([FromQuery] int withinDays = 30)
+    {
+        var items = await _inventory.GetExpiringItemsAsync(withinDays);
+        return Ok(items);
+    }
+
+    // TODO: replace with however your auth actually resolves the current
+    // user once it's wired up (JWT claim, session, etc.) - this assumes
+    // ClaimTypes.NameIdentifier holds the AppUser.Id as a Guid string.
+    private Guid GetCurrentUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(claim, out var userId))
+            return userId;
+
+        throw new UnauthorizedAccessException("No authenticated user found.");
+    }
+    [HttpGet("items/reserved/{cathStudyId:guid}")]
+public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
+{
+    var items = await _inventory.GetReservedItemsForStudyAsync(cathStudyId);
+    return Ok(items);
+}
+
+[HttpPost("items/receive-batch")]
+public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)
+{
+    try
+    {
+        var items = await _inventory.ReceiveBatchAsync(dto, GetCurrentUserId());
+        return Ok(items);
+    }
+    catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
+    catch (UnauthorizedAccessException ex) { return Unauthorized(new { error = ex.Message }); }
+}
+}
+
+public class ReserveItemRequest
+{
+    public Guid CathStudyId { get; set; }
+}
+
+public class MarkWastedRequest
+{
+    public string? Note { get; set; }
+}
