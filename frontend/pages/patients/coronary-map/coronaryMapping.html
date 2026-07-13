@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartographie Coronaire — Prototype</title>
+<style>
+  :root{
+    --bg-app:#F3F4F6; --surface:#FFFFFF; --border:#D7DEE3; --ink:#1F2A33; --muted:#64707A;
+    --vessel:#B3352F; --vessel-deco:#C97873; --accent:#2C5F82; --accent-dark:#204A66;
+    --mild:#F2C86D; --moderate:#E8823C; --severe:#C0392B; --critical:#7A1F1F;
+    --stent:#2E9E5B; --stent-dark:#1F7A45; --balloon:#D99B1F;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg-app); color:var(--ink); font-family:'Segoe UI', Inter, system-ui, sans-serif;
+    height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header{ background:var(--surface); border-bottom:1px solid var(--border); padding:9px 18px;
+    display:flex; align-items:center; justify-content:space-between; }
+  header .patient{ font-size:14px; } header .patient b{ font-size:15px; }
+  header .patient span{ color:var(--muted); font-family:'Consolas', monospace; margin-left:10px; }
+  .tag{ background:var(--accent); color:#fff; font-size:11px; padding:3px 9px; border-radius:3px; }
+
+  .subbar{ background:#F7F9FA; border-bottom:1px solid var(--border); padding:7px 18px;
+    display:flex; align-items:center; gap:14px; font-size:12.5px; }
+  .subbar label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .subbar b{ color:var(--muted); font-weight:600; margin-right:2px; }
+
+.main{ flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.workspace{ flex:1; display:flex; overflow:hidden; min-height:0; }
+  .toolbar{ width:104px; background:var(--surface); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; align-items:center; padding:14px 8px; gap:7px; }
+  .tool-btn{ width:100%; padding:8px 4px 9px; border:1px solid var(--border); background:#FAFBFC;
+    border-radius:7px; cursor:pointer; font-size:10.5px; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .tool-btn svg{ width:28px; height:28px; }
+  .tool-btn:hover{ border-color:var(--accent); }
+  .tool-btn.active{ background:var(--accent); border-color:var(--accent-dark); color:#fff; }
+  .tool-btn.disabled{ opacity:.4; cursor:not-allowed; }
+  .toolbar hr{ width:100%; border:none; border-top:1px solid var(--border); margin:4px 0; }
+
+  .canvas-wrap{ flex:1; position:relative; background:#FFFFFF; overflow:auto; }
+  svg#tree{ width:100%; height:100%; display:block; min-width:1100px; }
+  .axis{ stroke:#C9CDD2; stroke-width:1.5; stroke-dasharray:6 6; }
+  .vessel{ fill:none; stroke:rgba(255,210,0,0); stroke-width:12; stroke-linecap:round; stroke-linejoin:round; cursor:pointer; transition:stroke .12s ease; }
+  #treeLeft .vessel{ stroke-width:30; }
+  .vessel:hover{ stroke:rgba(255,210,0,.35); }
+  .deco-branch{ display:none; }
+  .marker-dot{ fill:#fff; stroke:#8A8F95; stroke-width:2.5; cursor:pointer; }
+  .marker-dot.selected{ stroke:var(--accent); stroke-width:3.5; }
+  .leader{ stroke:#9AA0A6; stroke-width:1.3; fill:none; }
+
+  .info-box{ position:absolute; background:#EAEAEA; border-radius:3px; padding:8px 12px;
+    font-size:12px; color:#222; line-height:1.55; min-width:170px; box-shadow:0 2px 8px rgba(0,0,0,.2); z-index:15; }
+  .info-box .title{ font-weight:700; margin-bottom:2px; }
+  .info-box .ev-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .info-box .edit-ic{ border:none; background:none; cursor:pointer; color:var(--accent-dark); font-size:12px; padding:0 2px; }
+
+  .popover{ position:absolute; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.18); width:252px; z-index:30; font-size:13px; }
+  .popover h4{ margin:0 0 10px; font-size:13px; color:var(--accent-dark); }
+  .popover label{ display:block; margin:8px 0 3px; color:var(--muted); font-size:11.5px; }
+  .popover select, .popover input{ width:100%; padding:6px 7px; border:1px solid var(--border); border-radius:4px; font-size:13px; }
+  .popover .checks label{ display:flex; align-items:center; gap:6px; font-size:12px; margin:5px 0 0; color:var(--ink); }
+  .popover .checks input{ width:auto; }
+  .popover .actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  .btn{ padding:6px 13px; border-radius:5px; border:1px solid var(--border); background:#F5F6F7; cursor:pointer; font-size:12.5px; }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent-dark); }
+  .btn.danger{ background:#C0392B; color:#fff; border-color:#8f2a1f; }
+
+  .modal-overlay{ position:fixed; inset:0; background:rgba(20,25,30,.4); z-index:100;
+    display:flex; align-items:center; justify-content:center; }
+  .modal-box{ background:#fff; border-radius:10px; padding:20px 22px; width:320px; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+  .modal-box h4{ margin:0 0 10px; font-size:14.5px; }
+  .modal-box p{ margin:0 0 16px; font-size:13px; color:var(--muted); }
+  .modal-box .actions{ display:flex; justify-content:flex-end; gap:10px; }
+
+  .resize-handle{ height:7px; background:#F0F2F3; border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    cursor:row-resize; position:relative; flex:0 0 auto; touch-action:none; }
+  .resize-handle:hover, .resize-handle.dragging{ background:var(--accent); }
+  .resize-handle::after{ content:''; position:absolute; left:50%; top:50%; width:36px; height:3px;
+    background:var(--muted); border-radius:2px; transform:translate(-50%,-50%); }
+  .resize-handle:hover::after, .resize-handle.dragging::after{ background:#fff; }
+
+  .side{ height:260px; flex:0 0 auto; min-height:120px; max-height:75vh; background:var(--surface);
+  display:flex; flex-direction:row; overflow:hidden; }
+.side h3{ margin:0; padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); color:var(--accent-dark); background:#F7F9FA; }
+.findings-list{ width:340px; flex:0 0 340px; overflow-y:auto; padding:8px; border-right:1px solid var(--border); }
+.finding-row{ border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:7px; font-size:12px; cursor:pointer; }
+  .finding-row.selected{ border-color:var(--accent); background:#F0F6FA; }
+  .finding-row .head{ font-weight:700; }
+  .finding-row ul{ margin:5px 0 0; padding-left:15px; color:var(--muted); }
+  .empty{ color:var(--muted); font-size:12px; padding:14px; text-align:center; }
+  .report-wrap{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  #report{ flex:1; resize:none; border:none; padding:12px 14px; font-family:'Consolas',monospace; font-size:12px; line-height:1.55; color:var(--ink); outline:none; }
+  .hint{ font-size:11px; color:var(--muted); padding:6px 16px 10px; background:#F7F9FA; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="patient"><b>MAHIEDINE, Mohammed</b><span>68 ans · Coronarographie · 01/07/2026</span></div>
+  <div class="tag">Schéma Post-PCI — prototype</div>
+</header>
+
+<div class="subbar">
+  <b>Dominance coronaire</b>
+  <label><input type="radio" name="dom" value="droite" checked> Droite</label>
+  <label><input type="radio" name="dom" value="gauche"> Gauche</label>
+  <label title="En attente d'une image de référence co-dominante"><input type="radio" name="dom" value="co" disabled style="opacity:.4"> Co-dominante</label>
+  <span style="margin-left:auto;color:var(--muted)">Cliquez sur un marqueur pour l'ouvrir · sélectionnez-le puis "Effacer" pour le supprimer</span>
+</div>
+
+<div class="main">
+  <div class="workspace"> 
+  <div class="toolbar" id="toolbar"></div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <div id="treeMount">Chargement du schéma coronaire...</div>
+    <div id="infoLayer" style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none;"></div>
+    <div id="popoverLayer"></div>
+  </div>
+  </div>
+  <div class="resize-handle" id="resizeHandle" title="Glisser pour redimensionner"></div>
+  <div class="side">
+    <h3>Constatations (<span id="countLabel">0</span>)</h3>
+    <div class="findings-list" id="findingsList"><div class="empty">Sélectionnez un matériel puis cliquez sur une artère.</div></div>
+    <div class="report-wrap">
+      <h3>Compte-rendu généré</h3>
+      <textarea id="report" readonly title="Compte-rendu généré" placeholder="Le rapport s’affichera ici." aria-label="Compte-rendu généré"></textarea>
+      <div class="hint">Moteur de template déterministe — 0% IA, éditable avant validation.</div>
+    </div>
+  </div>
+</div>
+
+<div id="modalLayer"></div>
+
+<script>
+
+const API_BASE = 'http://localhost:5152/api';
+const CATH_STUDY_ID = new URLSearchParams(location.search).get('cathStudyId');
+
+async function apiPost(path, body){
+  const res = await fetch(API_BASE + path, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+  return res.status === 204 ? null : res.json();
+}
+async function apiGet(path){
+  const res = await fetch(API_BASE + path);
+  if(!res.ok) throw new Error(res.statusText);
+  return res.json();
+}
+const ICONS = {
+  lesion: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="#C0392B" stroke-width="3"/><circle cx="20" cy="20" r="8" fill="none" stroke="#C0392B" stroke-width="3"/><circle cx="20" cy="20" r="2.5" fill="#C0392B"/></svg>',
+  ballon: '<svg viewBox="0 0 40 40"><line x1="2" y1="20" x2="12" y2="20" stroke="#333" stroke-width="2.5"/><ellipse cx="24" cy="20" rx="13" ry="7" fill="#FBD98A" stroke="#B9860B" stroke-width="2.5"/></svg>',
+  stent: '<svg viewBox="0 0 40 40"><rect x="8" y="13" width="24" height="14" rx="6" fill="none" stroke="#2E9E5B" stroke-width="2.5"/><path d="M8 15 L15 25 L22 15 L29 25 L32 19" fill="none" stroke="#2E9E5B" stroke-width="2"/></svg>',
+  controle: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#2C5F82" stroke-width="2.5"/><path d="M12 21 L17 26 L28 14" fill="none" stroke="#2C5F82" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const TOOL_LABEL = {lesion:'Lésion', ballon:'Ballon', stent:'Stent', controle:'Contrôle'};
+
+const toolbarEl = document.getElementById('toolbar');
+Object.keys(ICONS).forEach(tool=>{
+  const btn = document.createElement('div');
+  btn.className = 'tool-btn' + (tool==='lesion' ? ' active' : '');
+  btn.dataset.tool = tool;
+  btn.innerHTML = ICONS[tool] + '<span>'+TOOL_LABEL[tool]+'</span>';
+  toolbarEl.appendChild(btn);
+});
+toolbarEl.appendChild(document.createElement('hr'));
+const deleteBtn = document.createElement('div');
+deleteBtn.className='tool-btn disabled'; deleteBtn.id='deleteBtn';
+deleteBtn.innerHTML = '<svg viewBox="0 0 40 40"><path d="M10 12 L30 12 M15 12 L15 30 L25 30 L25 12 M17 12 V8 H23 V12" fill="none" stroke="currentColor" stroke-width="2.5"/></svg><span>Effacer</span>';
+toolbarEl.appendChild(deleteBtn);
+
+const VESSELS = {
+  'v-CD-I':   { code:'CD', segments:[{max:1.01,num:1,roman:'I'}] },
+  'v-CD-II':  { code:'CD', segments:[{max:1.01,num:2,roman:'II'}] },
+  'v-CD-III': { code:'CD', segments:[{max:1.01,num:3,roman:'III'}] },
+  'v-TC':  { code:'TC',  segments:[{max:1.01,num:5,roman:''}] },
+  'v-CX-I':   { code:'Cx', segments:[{max:1.01,num:11,roman:'I'}] },
+  'v-CX-II':  { code:'Cx', segments:[{max:1.01,num:12,roman:'II'}] },
+  'v-CX-III': { code:'Cx', segments:[{max:1.01,num:13,roman:'III'}] },
+  'v-CX-IV':  { code:'Cx', segments:[{max:1.01,num:14,roman:'IV'}] },
+  'v-IVA-I':   { code:'IVA', segments:[{max:1.01,num:6,roman:'I'}] },
+  'v-IVA-II':  { code:'IVA', segments:[{max:1.01,num:7,roman:'II'}] },
+  'v-IVA-III': { code:'IVA', segments:[{max:1.01,num:8,roman:'III'}] },
+  'v-D1':  { code:'D1',  segments:[{max:1.01,num:9,roman:''}] },
+  'v-D2':  { code:'D2',  segments:[{max:1.01,num:10,roman:''}] },
+  'v-OM1': { code:'OM1', segments:[{max:1.01,num:12,roman:''}] },
+  'v-OM2': { code:'OM2', segments:[{max:1.01,num:14,roman:''}] },
+  'v-PDA-rca': { code:'IVP', segments:[{max:1.01,num:4,roman:''}] },
+  'v-PL-rca':  { code:'PL',  segments:[{max:1.01,num:16,roman:''}] },
+  'v-PDA-cx':  { code:'IVP', segments:[{max:1.01,num:15,roman:''}] },
+  'v-MA':   { code:'MA',   segments:[{max:1.01,num:19,roman:''}] },
+  'v-D3':   { code:'D3',   segments:[{max:1.01,num:20,roman:''}] },
+  'v-SEPT': { code:'Sept', segments:[{max:1.01,num:21,roman:''}] },
+  'v-SEPT2':{ code:'Sept', segments:[{max:1.01,num:22,roman:''}] },
+  'v-SEPT3':{ code:'Sept', segments:[{max:1.01,num:23,roman:''}] },
+  'v-DTICK':{ code:'D',    segments:[{max:1.01,num:24,roman:''}] },
+  'v-CD-L':  { code:'CD',  segments:[{max:1.01,num:1,roman:''}] },
+  'v-MA-L':  { code:'MA',  segments:[{max:1.01,num:19,roman:''}] },
+  'v-TC-L':  { code:'TC',  segments:[{max:1.01,num:5,roman:''}] },
+  'v-IVA-L': { code:'IVA', segments:[{max:1.01,num:6,roman:''}] },
+  'v-D1-L':  { code:'D1',  segments:[{max:1.01,num:9,roman:''}] },
+  'v-D2-L':  { code:'D2',  segments:[{max:1.01,num:10,roman:''}] },
+  'v-D3-L':  { code:'D3',  segments:[{max:1.01,num:20,roman:''}] },
+  'v-D4-L':  { code:'D4',  segments:[{max:1.01,num:25,roman:''}] },
+  'v-D5-L':  { code:'D5',  segments:[{max:1.01,num:26,roman:''}] },
+  'v-CX-L-I':   { code:'Cx', segments:[{max:1.01,num:11,roman:'I'}] },
+  'v-CX-L-II':  { code:'Cx', segments:[{max:1.01,num:12,roman:'II'}] },
+  'v-CX-L-III': { code:'Cx', segments:[{max:1.01,num:13,roman:'III'}] },
+  'v-CX-L-IV':  { code:'Cx', segments:[{max:1.01,num:14,roman:'IV'}] },
+  'v-OM1-L': { code:'OM1', segments:[{max:1.01,num:12,roman:''}] },
+  'v-OM2-L': { code:'OM2', segments:[{max:1.01,num:14,roman:''}] },
+  'v-OM3-L': { code:'OM3', segments:[{max:1.01,num:27,roman:''}] },
+  'v-OM4-L': { code:'OM4', segments:[{max:1.01,num:28,roman:''}] },
+  'v-PDA-L': { code:'IVP', segments:[{max:1.01,num:4,roman:''}] },
+  'v-PL-L':  { code:'PL',  segments:[{max:1.01,num:16,roman:''}] },
+  'v-PLb-L': { code:'PL',  segments:[{max:1.01,num:29,roman:''}] },
+};
+
+document.querySelectorAll('input[name="dom"]').forEach(r=>{
+  r.addEventListener('change', e=>{
+    const v = e.target.value;
+    document.querySelectorAll('.dom-rca').forEach(el=> el.style.display = (v==='droite'||v==='co') ? '' : 'none');
+    document.querySelectorAll('.dom-cx').forEach(el=> el.style.display = (v==='gauche'||v==='co') ? '' : 'none');
+    const svgEl = document.getElementById('tree');
+    const treeRight = document.getElementById('treeRight');
+    const treeLeft = document.getElementById('treeLeft');
+    if (v === 'gauche') {
+      treeRight.style.display = 'none';
+      treeLeft.style.display = '';
+      svgEl.setAttribute('viewBox', '0 0 1504 1008');
+    } else {
+      treeLeft.style.display = 'none';
+      treeRight.style.display = '';
+      svgEl.setAttribute('viewBox', '0 0 611 408');
+    }
+    attachVesselHandlers();
+  });
+});
+
+let currentTool = 'lesion';
+let findings = [];
+let idSeq = 1;
+let selectedId = null;   // finding currently selected (via marker/list click) — eligible for delete
+let openId = null;       // finding whose info box is currently shown
+
+const canvasWrap = document.getElementById('canvasWrap');
+let svg, overlayLayer, markersLayer;
+
+async function loadVesselTree(){
+  const res = await fetch('vessel-tree.html');
+  if(!res.ok) throw new Error('Impossible de charger le schéma vasculaire: ' + res.statusText);
+  const html = await res.text();
+  document.getElementById('treeMount').outerHTML = html; // becomes the real <svg id="tree">...
+
+  svg = document.getElementById('tree');
+  overlayLayer = document.getElementById('overlayLayer');
+  markersLayer = document.getElementById('markers');
+
+  attachVesselHandlers(); // only meaningful once .vessel paths actually exist
+  render();
+}
+
+loadVesselTree().catch(err=>{
+  console.error(err);
+  document.getElementById('treeMount').textContent = 'Erreur de chargement du schéma vasculaire.';
+});
+
+window.addEventListener('resize', ()=>{ if(svg) render(); });
+canvasWrap.addEventListener('scroll', ()=>{ if(svg) render(); });
+
+toolbarEl.addEventListener('click', e=>{
+  const btn = e.target.closest('.tool-btn');
+  if(!btn) return;
+  if(btn.id === 'deleteBtn'){
+    if(!selectedId) return;
+    askDeleteConfirmation(selectedId);
+    return;
+  }
+  toolbarEl.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTool = btn.dataset.tool;
+});
+
+function askDeleteConfirmation(id){
+  const f = findings.find(x=>x.id===id);
+  if(!f) return;
+  modalLayer.innerHTML = '';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = '<div class="modal-box"><h4>Supprimer cette intervention ?</h4>' +
+    '<p>'+f.label+' — cette action est irréversible et retirera cet élément du compte-rendu.</p>' +
+    '<div class="actions"><button class="btn" id="cancelDel">Annuler</button><button class="btn danger" id="confirmDel">Supprimer</button></div></div>';
+  modalLayer.appendChild(overlay);
+  document.getElementById('cancelDel').onclick = ()=>{ modalLayer.innerHTML=''; };
+  document.getElementById('confirmDel').onclick = ()=>{
+    findings = findings.filter(x=>x.id!==id);
+    selectedId = null; openId = null;
+    modalLayer.innerHTML = '';
+    render();
+  };
+}
+
+function svgPointFromEvent(evt){
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function nearestPointOnPath(path, target){
+  const total = path.getTotalLength();
+  let best = { distSq: Infinity, len: 0, point: null };
+  const steps = 260;
+  for(let i=0;i<=steps;i++){
+    const len = (i/steps)*total;
+    const p = path.getPointAtLength(len);
+    const d = (p.x-target.x)**2 + (p.y-target.y)**2;
+    if(d < best.distSq) best = { distSq:d, len, point:p };
+  }
+  return { point: best.point, percent: best.len/total };
+}
+function tangentAngle(path, len, total){
+  const eps = Math.min(6, total*0.02);
+  const p1 = path.getPointAtLength(Math.max(0,len-eps));
+  const p2 = path.getPointAtLength(Math.min(total,len+eps));
+  return Math.atan2(p2.y-p1.y, p2.x-p1.x);
+}
+function segmentInfoFor(vesselId, percent){
+  const cfg = VESSELS[vesselId];
+  for(const seg of cfg.segments){ if(percent <= seg.max) return seg; }
+  return cfg.segments[cfg.segments.length-1];
+}
+/* Returns the [min,max] percent-of-length range that belongs to the same
+   anatomical segment as `percent`, so overlay markers can be clamped to it
+   and never bleed across a segment boundary (the dashed guide lines). */
+function segmentBoundsFor(vesselId, percent){
+  const cfg = VESSELS[vesselId];
+  let prevMax = 0;
+  for(const seg of cfg.segments){
+    if(percent <= seg.max) return { min: prevMax, max: seg.max };
+    prevMax = seg.max;
+  }
+  const last = cfg.segments[cfg.segments.length-1];
+  return { min: prevMax, max: last.max };
+}
+function displayLabel(vesselId, seg){
+  const cfg = VESSELS[vesselId];
+  return cfg.code + (seg.roman ? ' '+seg.roman : '');
+}
+
+const MORPHOLOGY_MAP = {A:'TypeA', B1:'TypeB1', B2:'TypeB2', C:'TypeC'};
+function stenosisToByte(sev){
+  // Backend StenosisPercent is a single byte - collapse the range to its midpoint.
+  const map = {'<30%':20,'30-49%':40,'50-69%':60,'70-89%':80,'90-99%':95,'Occlusion (100%)':100};
+  return map[sev] ?? 60;
+}
+
+function parseSize(str){
+  const m = /([\d.]+)\s*[x×]\s*([\d.]+)/i.exec(str||'');
+  if(m) return {diameter: parseFloat(m[1]), length: parseFloat(m[2])};
+  return {diameter:2.5, length:15};
+}
+function diameterToWidth(d){ return Math.max(3, Math.min(11, 3 + (d-1.5)*1.8)); }
+function lengthToPx(l){ return Math.max(9, Math.min(50, 7 + (l-8)*0.95)); }
+
+function attachVesselHandlers(){
+  document.querySelectorAll('.vessel').forEach(path=>{
+    path.onclick = evt=>{
+      if(getComputedStyle(path).display === 'none') return;
+      evt.stopPropagation();
+      closePopover();
+      const clickPt = svgPointFromEvent(evt);
+      const {point, percent} = nearestPointOnPath(path, clickPt);
+      const SNAP = 9;
+      let target = findings.find(f => f.vesselId === path.id && Math.hypot(f.x-point.x, f.y-point.y) < SNAP);
+      let isNewDraft = false;
+      if(!target){
+        const seg = segmentInfoFor(path.id, percent);
+        target = { id: idSeq++, vesselId: path.id, percent, x: point.x, y: point.y,
+          segNum: seg.num, label: displayLabel(path.id, seg), events: [] };
+        isNewDraft = true; // not added to findings[] until "Ajouter" is confirmed
+      }
+      openPopover(evt, currentTool, target, null, isNewDraft);
+    };
+  });
+}
+attachVesselHandlers();
+
+/* click on empty canvas closes any open (read-only) info box, but never touches
+   an in-progress add/edit popover — that only closes via Annuler or Ajouter/Enregistrer */
+canvasWrap.addEventListener('click', ()=>{ openId = null; render(); });
+
+function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
+  const wrapRect = canvasWrap.getBoundingClientRect();
+  const left = evt.clientX - wrapRect.left + canvasWrap.scrollLeft + 14;
+  const top  = evt.clientY - wrapRect.top + canvasWrap.scrollTop - 10;
+  const existing = editEventIndex!=null ? finding.events[editEventIndex] : null;
+
+  let fieldsHtml = '';
+  if(tool === 'lesion'){
+    const e = existing || {};
+    fieldsHtml = '<label>Sévérité de la sténose</label><select id="f-severity">' +
+      opt('<30%', e.severity)+opt('30-49%', e.severity)+opt('50-69%', e.severity, true)+opt('70-89%', e.severity)+opt('90-99%', e.severity)+opt('Occlusion (100%)', e.severity) + '</select>' +
+      '<label>Diamètre de référence</label><input id="f-refdiam" value="'+(e.refDiam||'3.0mm')+'">' +
+      '<label>Type de lésion</label><select id="f-lesiontype">'+opt('De Novo',e.lesionType,true)+opt('Resténose',e.lesionType)+opt('Occlusion chronique (CTO)',e.lesionType)+'</select>' +
+      '<label>Morphologie</label><select id="f-morpho">'+opt('A',e.morphology)+opt('B1',e.morphology)+opt('B2',e.morphology,true)+opt('C',e.morphology)+'</select>' +
+      '<div class="checks"><label><input type="checkbox" id="f-calc" '+(e.calcified?'checked':'')+'> Calcification sévère</label>' +
+      '<label><input type="checkbox" id="f-thrombus" '+(e.thrombus?'checked':'')+'> Thrombus visible</label></div>';
+  } else if(tool === 'ballon' || tool === 'stent'){
+  const e = existing || {};
+  const options = (window.__reservedItems||[])
+    .filter(i => i.status === 'Reserved')
+    .map(i => '<option value="'+i.id+'">'+i.productName+' — Lot '+(i.lotNumber||'?')+'</option>').join('');
+  fieldsHtml = '<label>Dispositif réservé</label><select id="f-item">'+
+      (options || '<option value="">Aucun item réservé pour cette étude</option>')+'</select>' +
+    '<label>Taille implantée (Øxlongueur)</label><input id="f-size" value="'+(e.size||(tool==='stent'?'3.0x18mm':'2.5x15mm'))+'">';
+} else if(tool === 'controle'){
+    const e = existing || {};
+    fieldsHtml = '<label>Flux TIMI</label><select id="f-timi">'+opt('0',e.timi)+opt('1',e.timi)+opt('2',e.timi)+opt('3',e.timi,true)+'</select>' +
+      '<label>Sténose résiduelle</label><input id="f-residual" value="'+(e.residual||'0%')+'">';
+  }
+
+  const pop = document.createElement('div');
+  pop.className = 'popover';
+  pop.style.left = left+'px';
+  pop.style.top = top+'px';
+  pop.innerHTML = '<h4>'+finding.label+' — '+TOOL_LABEL[tool]+(editEventIndex!=null?' (modifier)':'')+'</h4>' + fieldsHtml +
+    '<div class="error" id="popError" style="display:none;color:#C0392B;font-size:11px;margin-top:8px;"></div>' +
+    '<div class="actions"><button class="btn" id="cancelBtn">Annuler</button><button class="btn primary" id="saveBtn">'+(editEventIndex!=null?'Enregistrer':'Ajouter')+'</button></div>';
+  popoverLayer.appendChild(pop);
+  pop.onclick = e=>e.stopPropagation();
+
+  // Clamp the popover so it always stays fully inside the visible (scrolled)
+  // viewport of canvas-wrap — prevents it rendering off-screen near edges.
+  requestAnimationFrame(()=>{
+    const popW = pop.offsetWidth, popH = pop.offsetHeight;
+    const viewLeft = canvasWrap.scrollLeft, viewTop = canvasWrap.scrollTop;
+    const viewRight = viewLeft + canvasWrap.clientWidth;
+    const viewBottom = viewTop + canvasWrap.clientHeight;
+    const margin = 8;
+
+    let curLeft = parseFloat(pop.style.left);
+    let curTop = parseFloat(pop.style.top);
+
+    if(curLeft + popW > viewRight - margin) curLeft = viewRight - popW - margin;
+    if(curTop + popH > viewBottom - margin) curTop = viewBottom - popH - margin;
+    if(curLeft < viewLeft + margin) curLeft = viewLeft + margin;
+    if(curTop < viewTop + margin) curTop = viewTop + margin;
+
+    pop.style.left = curLeft + 'px';
+    pop.style.top = curTop + 'px';
+  });
+
+  /* Annuler never mutates findings[] — a new intervention is only ever added
+     to the array below, inside the validated "Ajouter" handler. */
+  pop.querySelector('#cancelBtn').onclick = ()=>{
+    closePopover(); render();
+  };
+  pop.querySelector('#saveBtn').onclick = async ()=>{
+  const errMsg = validateFields(tool, pop);
+  const errBox = pop.querySelector('#popError');
+  if(errMsg){ errBox.textContent = errMsg; errBox.style.display = 'block'; return; }
+
+  const ev = collectEvent(tool, pop);
+  try{
+    if(tool === 'lesion' && isNewDraft){
+      const created = await apiPost('/procedures/lesions', {
+        cathStudyId: CATH_STUDY_ID,
+        vessel: finding.label,
+        segmentNumber: finding.segNum,
+        stenosisPercent: stenosisToByte(ev.severity),
+        lesionType: MORPHOLOGY_MAP[ev.morphology] || 'TypeB1',
+        timiFlow: null
+        // refDiam / calcified / thrombus / ev.lesionType (De Novo etc.) aren't
+        // persisted yet - CoronaryLesion needs those columns added first.
+      });
+      finding.id = created.id; // real server GUID replaces the temp idSeq value
+    } else if(tool === 'stent' || tool === 'ballon'){
+      const itemId = pop.querySelector('#f-item')?.value;
+      if(!itemId) throw new Error('Sélectionnez un dispositif réservé.');
+      const {diameter, length} = parseSize(ev.size);
+      const path = '/procedures/lesions/'+finding.id+'/'+tool;
+      await apiPost(path, tool==='stent' ? {
+        inventoryItemId: itemId, stentDiameterMm: diameter, stentLengthMm: length
+      } : {
+        inventoryItemId: itemId, balloonDiameterMm: diameter, balloonLengthMm: length,
+        isPreDilation: true, isPostDilation: false, maxPressureAtm: 0, inflationDurationSec: 0
+      });
+      ev.device = (window.__reservedItems||[]).find(i=>i.id===itemId)?.productName || ev.device;
+    }
+  } catch(err){
+    errBox.textContent = 'Erreur serveur : '+err.message;
+    errBox.style.display = 'block';
+    return; // don't commit locally if the API call failed
+  }
+
+  if(editEventIndex!=null){ finding.events[editEventIndex] = ev; }
+  else { finding.events.push(ev); if(isNewDraft) findings.push(finding); }
+  closePopover();
+  openId = finding.id;
+  render();
+};
+}
+function validateFields(tool, pop){
+  if(tool === 'ballon' || tool === 'stent'){
+    const device = pop.querySelector('#f-device').value.trim();
+    const size = pop.querySelector('#f-size').value.trim();
+    if(!device) return 'Veuillez indiquer le dispositif utilisé.';
+    if(!size) return 'Veuillez indiquer la taille (Ø x longueur).';
+  }
+  if(tool === 'lesion'){
+    const refDiam = pop.querySelector('#f-refdiam').value.trim();
+    if(!refDiam) return 'Veuillez indiquer le diamètre de référence.';
+  }
+  return null;
+}
+function opt(val, current, def){
+  const sel = (current===val) || (!current && def) ? ' selected' : '';
+  return '<option value="'+val+'"'+sel+'>'+val+'</option>';
+}
+
+function collectEvent(tool, pop){
+  if(tool === 'lesion'){
+    return { type:'lesion', severity: pop.querySelector('#f-severity').value,
+      refDiam: pop.querySelector('#f-refdiam').value || '3.0mm',
+      lesionType: pop.querySelector('#f-lesiontype').value,
+      morphology: pop.querySelector('#f-morpho').value,
+      calcified: pop.querySelector('#f-calc').checked,
+      thrombus: pop.querySelector('#f-thrombus').checked };
+  }
+  if(tool === 'ballon'){
+    return { type:'ballon', device: pop.querySelector('#f-device').value || 'Ballon non précisé',
+      size: pop.querySelector('#f-size').value || '2.5x15mm' };
+  }
+  if(tool === 'stent'){
+    return { type:'stent', device: pop.querySelector('#f-device').value || 'Stent non précisé',
+      size: pop.querySelector('#f-size').value || '3.0x18mm' };
+  }
+  if(tool === 'controle'){
+    return { type:'controle', timi: pop.querySelector('#f-timi').value,
+      residual: pop.querySelector('#f-residual').value || '0%' };
+  }
+}
+function closePopover(){ popoverLayer.innerHTML=''; }
+
+function severityColor(sev){
+  if(sev==='<30%'||sev==='30-49%') return getVar('--mild');
+  if(sev==='50-69%'||sev==='70-89%') return getVar('--moderate');
+  if(sev==='90-99%') return getVar('--severe');
+  return getVar('--critical');
+}
+function getVar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+/* Given a target arc-length `len` and a half-length `half`, returns the
+   start/end arc-lengths clamped to [minLen,maxLen] so the marker never
+   crosses into a neighbouring anatomical segment. */
+function clampedRange(len, half, minLen, maxLen){
+  let a = len - half, b = len + half;
+  if(a < minLen){ b += (minLen - a); a = minLen; }
+  if(b > maxLen){ a -= (b - maxLen); b = maxLen; }
+  a = Math.max(minLen, a);
+  b = Math.min(maxLen, b);
+  return [a, b];
+}
+/* Builds the endpoints for an overlay marker of pixel-length `l` centered on
+   f.percent, following the vessel path itself (so it bends with curved
+   segments) and clamped to the current segment's boundaries. */
+function markerEndpoints(path, total, f, l){
+  const len = f.percent*total;
+  const bounds = segmentBoundsFor(f.vesselId, f.percent);
+  const minLen = bounds.min*total, maxLen = bounds.max*total;
+  const [a,b] = clampedRange(len, l/2, minLen, maxLen);
+  const p1 = path.getPointAtLength(a), p2 = path.getPointAtLength(b);
+  return { x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y };
+}
+function drawOverlay(f){
+  const path = document.getElementById(f.vesselId);
+  if(!path) return '';
+  const total = path.getTotalLength();
+  const stent = f.events.filter(e=>e.type==='stent').pop();
+  const ballon = f.events.filter(e=>e.type==='ballon').pop();
+  const lesion = f.events.find(e=>e.type==='lesion');
+  let out = '';
+  if(lesion){
+    const {diameter} = parseSize(lesion.refDiam+'x1');
+    const w = diameterToWidth(diameter)*0.6, l = 16;
+    const {x1,y1,x2,y2} = markerEndpoints(path, total, f, l);
+    out += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+severityColor(lesion.severity)+'" stroke-width="'+w+'" stroke-linecap="round"/>';
+  }
+  if(ballon){
+    const {diameter,length} = parseSize(ballon.size);
+    const w = diameterToWidth(diameter), l = lengthToPx(length);
+    const {x1,y1,x2,y2} = markerEndpoints(path, total, f, l);
+    out += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--balloon)" stroke-width="'+w+'" stroke-linecap="round" stroke-dasharray="'+(w*0.6)+' '+(w*0.4)+'" opacity="0.85"/>';
+  }
+  if(stent){
+    const {diameter,length} = parseSize(stent.size);
+    const w = diameterToWidth(diameter), l = lengthToPx(length);
+    const {x1,y1,x2,y2} = markerEndpoints(path, total, f, l);
+    out += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--stent-dark)" stroke-width="'+(w+3)+'" stroke-linecap="round"/>';
+    out += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--stent)" stroke-width="'+w+'" stroke-linecap="round"/>';
+    out += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#ffffff" stroke-width="1.6" stroke-dasharray="'+(w*0.4)+' '+(w*0.35)+'" opacity="0.85"/>';
+  }
+  return out;
+}
+
+function bulletText(e){
+  if(e.type==='lesion') return e.lesionType+(e.morphology?' · type '+e.morphology:'')+(e.calcified?' · calcifiée':'')+(e.thrombus?' · thrombus':'');
+  if(e.type==='ballon') return 'Ballon '+e.device+' '+e.size;
+  if(e.type==='stent')  return 'Stent '+e.device+' '+e.size;
+  if(e.type==='controle') return 'Flux TIMI '+e.timi+' · sténose résiduelle '+e.residual;
+}
+
+function render(){
+  overlayLayer.innerHTML = '';
+  markersLayer.innerHTML = '';
+  infoLayer.innerHTML = '';
+
+  findings.forEach(f=>{
+    overlayLayer.innerHTML += drawOverlay(f);
+    const isSel = f.id === selectedId;
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('class','marker-dot'+(isSel?' selected':''));
+    dot.setAttribute('cx', f.x); dot.setAttribute('cy', f.y); dot.setAttribute('r', 8);
+    dot.addEventListener('click', evt=>{
+      evt.stopPropagation();
+      closePopover();
+      selectedId = f.id;
+      openId = (openId === f.id) ? null : f.id;
+      render();
+    });
+    markersLayer.appendChild(dot);
+  });
+
+  const open = findings.find(f=>f.id===openId);
+  if(open) showInfoBox(open);
+
+  document.getElementById('deleteBtn').classList.toggle('disabled', !selectedId);
+  renderFindingsList();
+  renderReport();
+  document.getElementById('countLabel').textContent = findings.length;
+}
+
+function showInfoBox(f){
+  const wrapRect = canvasWrap.getBoundingClientRect();
+  const cw = svg.viewBox.baseVal.width, ch = svg.viewBox.baseVal.height;
+  const scaleX = wrapRect.width / cw, scaleY = wrapRect.height / ch;
+  const goRight = f.x < cw/2;
+  const boxX = f.x + (goRight ? 40 : -260);
+  const boxY = f.y - 80;
+
+  const lesion = f.events.find(e=>e.type==='lesion');
+  const title = f.label + (lesion ? ' '+lesion.severity+' Ø'+lesion.refDiam : '');
+  const rowsHtml = f.events.map((e,i)=>
+    '<div class="ev-row"><span>• '+bulletText(e)+'</span><button class="edit-ic" data-idx="'+i+'" title="Modifier">✎</button></div>'
+  ).join('');
+
+  const div = document.createElement('div');
+  div.className = 'info-box';
+  div.style.left = (boxX*scaleX)+'px';
+  div.style.top = (boxY*scaleY)+'px';
+  div.style.pointerEvents = 'auto';
+  div.innerHTML = '<div class="title">'+title+'</div>'+rowsHtml;
+  div.onclick = e=>e.stopPropagation();
+  div.querySelectorAll('.edit-ic').forEach(btn=>{
+    btn.onclick = evt=>{
+      const idx = parseInt(btn.dataset.idx,10);
+      const type = f.events[idx].type;
+      openPopover(evt, type, f, idx);
+    };
+  });
+  infoLayer.appendChild(div);
+}
+
+function renderFindingsList(){
+  const list = document.getElementById('findingsList');
+  if(findings.length===0){
+    list.innerHTML = '<div class="empty">Sélectionnez un matériel puis cliquez sur une artère.</div>';
+    return;
+  }
+  list.innerHTML = findings.map(f=>
+    '<div class="finding-row'+(f.id===selectedId?' selected':'')+'" data-id="'+f.id+'">' +
+    '<div class="head">'+f.label+'</div><ul>'+f.events.map(e=>'<li>'+bulletText(e)+'</li>').join('')+'</ul></div>'
+  ).join('');
+  list.querySelectorAll('.finding-row').forEach(row=>{
+    row.onclick = ()=>{
+      const id = parseInt(row.dataset.id,10);
+      selectedId = id; openId = (openId===id)?null:id;
+      render();
+    };
+  });
+}
+
+function renderReport(){
+  const box = document.getElementById('report');
+  if(findings.length===0){ box.value=''; return; }
+  const lines = ['CORONAROGRAPHIE — CONSTATATIONS ET GESTE', ''];
+  findings.slice().sort((a,b)=>a.segNum-b.segNum).forEach(f=>{
+    const lesion = f.events.find(e=>e.type==='lesion');
+    const ballons = f.events.filter(e=>e.type==='ballon');
+    const stents  = f.events.filter(e=>e.type==='stent');
+    const controle = f.events.filter(e=>e.type==='controle').pop();
+    let sentence = f.label + ' : ';
+    if(lesion){
+      sentence += 'sténose '+lesion.severity+' ('+lesion.lesionType+'), diamètre de référence '+lesion.refDiam +
+        (lesion.morphology ? ', lésion de type '+lesion.morphology : '') +
+        (lesion.calcified ? ', calcifiée' : '') + (lesion.thrombus ? ', avec thrombus' : '') + '. ';
+    } else {
+      sentence += 'geste réalisé sans caractérisation de sténose enregistrée. ';
+    }
+    ballons.forEach(b=> sentence += 'Prédilatation par ballon '+b.device+' '+b.size+'. ');
+    stents.forEach(s=> sentence += 'Stenting avec '+s.device+' '+s.size+'. ');
+    if(controle) sentence += 'Résultat : flux TIMI '+controle.timi+', sténose résiduelle '+controle.residual+'.';
+    lines.push('• ' + sentence.trim());
+  });
+  box.value = lines.join('\n');
+}
+
+apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
+  .then(items => window.__reservedItems = items)
+  .catch(err => console.error('Could not load reserved items', err));
+
+
+/* --- Resizable Constatations panel --- */
+(function(){
+  const handle = document.getElementById('resizeHandle');
+  const sidePanel = document.querySelector('.side');
+  const STORAGE_KEY = 'coronaryMapping.sideHeight';
+
+  function clamp(px){
+    const min = 120, max = window.innerHeight * 0.75;
+    return Math.min(Math.max(px, min), max);
+  }
+  function applyHeight(px){
+    sidePanel.style.height = clamp(px) + 'px';
+  }
+
+  const saved = parseFloat(localStorage.getItem(STORAGE_KEY));
+  if(!Number.isNaN(saved)) applyHeight(saved);
+
+  let dragging = false, startY = 0, startHeight = 0;
+
+  function onPointerDown(clientY){
+    dragging = true;
+    startY = clientY;
+    startHeight = sidePanel.getBoundingClientRect().height;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  }
+  function onPointerMove(clientY){
+    if(!dragging) return;
+    const delta = startY - clientY; // dragging up increases panel height
+    applyHeight(startHeight + delta);
+    if(svg) render(); // keep info-box/overlay positions in sync as canvas area shrinks/grows
+  }
+  function onPointerUp(){
+    if(!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    localStorage.setItem(STORAGE_KEY, parseFloat(sidePanel.style.height));
+  }
+
+  handle.addEventListener('mousedown', e=> onPointerDown(e.clientY));
+  window.addEventListener('mousemove', e=> onPointerMove(e.clientY));
+  window.addEventListener('mouseup', onPointerUp);
+
+  handle.addEventListener('touchstart', e=> onPointerDown(e.touches[0].clientY), {passive:true});
+  window.addEventListener('touchmove', e=>{ if(dragging){ onPointerMove(e.touches[0].clientY); e.preventDefault(); } }, {passive:false});
+  window.addEventListener('touchend', onPointerUp);
+})();
+</script>
+</body>
+</html>
