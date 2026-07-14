@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CathLab.Application.DTOs.Pharmacy;
 using CathLab.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CathLab.WebApi.Controllers;
@@ -130,17 +131,6 @@ public class PharmacyController : ControllerBase
         return Ok(items);
     }
 
-    // TODO: replace with however your auth actually resolves the current
-    // user once it's wired up (JWT claim, session, etc.) - this assumes
-    // ClaimTypes.NameIdentifier holds the AppUser.Id as a Guid string.
-    private Guid GetCurrentUserId()
-    {
-        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(claim, out var userId))
-            return userId;
-
-        throw new UnauthorizedAccessException("No authenticated user found.");
-    }
     [HttpGet("items/reserved/{cathStudyId:guid}")]
 public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
 {
@@ -149,17 +139,47 @@ public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
 }
 
 [HttpPost("items/receive-batch")]
-public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)
-{
-    try
+    [Authorize(Roles = "Admin,ResponsablePharmacie")] 
+    public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)
     {
-        var items = await _inventory.ReceiveBatchAsync(dto, GetCurrentUserId());
-        return Ok(items);
+        try
+        {
+            // Récupère l'ID directement depuis la propriété User du ControllerBase
+            Guid currentUserId = GetCurrentUserId();
+
+            var items = await _inventory.ReceiveBatchAsync(dto, currentUserId);
+            return Ok(items);
+        }
+        catch (InvalidOperationException ex) 
+        { 
+            return Conflict(new { error = ex.Message }); 
+        }
+        catch (UnauthorizedAccessException ex) 
+        { 
+            return Unauthorized(new { error = ex.Message }); 
+        }
     }
-    catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
-    catch (UnauthorizedAccessException ex) { return Unauthorized(new { error = ex.Message }); }
+    private Guid GetCurrentUserId()
+{
+    var userPrincipal = User;
+
+    if (userPrincipal?.Identity?.IsAuthenticated != true)
+    {
+        throw new UnauthorizedAccessException("No authenticated user found.");
+    }
+
+    var userIdClaim = userPrincipal.FindFirst("nameid")?.Value
+                      ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? userPrincipal.FindFirst("sub")?.Value;
+
+    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+    {
+        throw new UnauthorizedAccessException("User identification token is invalid.");
+    }
+
+    return userId;
 }
-}
+
 
 public class ReserveItemRequest
 {
@@ -169,4 +189,4 @@ public class ReserveItemRequest
 public class MarkWastedRequest
 {
     public string? Note { get; set; }
-}
+}}
