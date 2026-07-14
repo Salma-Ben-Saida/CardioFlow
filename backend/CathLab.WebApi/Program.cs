@@ -5,49 +5,127 @@ using Microsoft.EntityFrameworkCore;
 using CathLab.Infrastructure.Persistence.Repositories;
 using CathLab.Application.Services;
 using CathLab.Infrastructure.BackgroundServices;
+using CathLab.Domain.Repositories;
+using CathLab.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. Database Context Configurations ---
+// --- Configuration d'Authentification JWT ---
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.MapInboundClaims = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(secretKey),
+        ClockSkew = TimeSpan.Zero, // Supprime la tolérance de 5 minutes par défaut
+        
+        // 👈 CORRECTIF CRUCIAL : Indique à .NET de lire la clé "role" brute du JSON de votre Token
+        RoleClaimType = "role" 
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// --- Configuration des Contextes de Base de Données ---
 builder.Services.AddDbContext<CathLabDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("CathLabDb")));
 
 builder.Services.AddDbContext<OrthancPacsContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("OrthancPACS")));
 
-// --- 2. Controller & OpenAPI Explorer Configurations ---
-builder.Services.AddControllers();
+// --- Configuration des Contrôleurs & OpenAPI Swagger ---
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Permet de lire et d'écrire les enums sous forme de texte (ex: "ResponsablePharmacie")
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "CathLab API", Version = "v1" });
+
+    // 1. Définir le schéma de sécurité JWT (Bouton de saisie dans l'interface)
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Title = "CathLab Management API",
-        Version = "v1",
-        Description = "Backend API for Patient Dashboards and Cath Lab Studies"
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Entrez votre jeton JWT sous la forme suivante : Bearer {votre_token}"
     });
 
-    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
-    if (File.Exists(xmlPath))
+    // 2. Appliquer la sécurité globalement à tous les points de terminaison de Swagger
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        options.IncludeXmlComments(xmlPath);
-    }
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
-// --- 3. Dependency Injections (Onion Layers) ---
+// --- Injections de Dépendances (Couches Onion) ---
 builder.Services.AddScoped<IPacsReader, OrthancPacsReader>();
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<ICathStudyRepository, CathStudyRepository>();
 
-// Scoped Service (Must be resolved via IServiceProvider scope inside the Background Worker)
+// Services Web Scoped (Résolus via IServiceProvider à l'intérieur du Background Worker)
 builder.Services.AddScoped<StudyIngestionService>(); 
 builder.Services.AddScoped<PatientService>();
 
-// Singleton Background worker
+// Répertoires (Repositories) - Pharmacie
+builder.Services.AddScoped<IInventoryProductRepository, InventoryProductRepository>();
+builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
+builder.Services.AddScoped<IStockMovementRepository, StockMovementRepository>();
+
+// Répertoires (Repositories) - Procédure / Lésion / Traitement
+builder.Services.AddScoped<IProcedureReportRepository, ProcedureReportRepository>();
+builder.Services.AddScoped<ICoronaryLesionRepository, CoronaryLesionRepository>();
+builder.Services.AddScoped<ILesionTreatmentRepository, LesionTreatmentRepository>();
+
+// Unit of work (Garantit la cohérence transactionnelle entre les services)
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Services applicatifs
+builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<ProcedureService>();
+
+// Worker d'arrière-plan Singleton
 builder.Services.AddHostedService<PacsIngestionWorker>();
 
-// --- 4. Cross-Origin Resource Sharing (CORS) Security Policies ---
+// Services et Répertoires d'utilisateurs
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<UserService>();
+
+// --- Politiques de sécurité Cross-Origin (CORS) ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevFrontend", policy =>
@@ -60,9 +138,7 @@ builder.Services.AddCors(options =>
                 || host == "127.0.0.1"
                 || host.EndsWith(".stackblitz.io")    // Bolt.new Sandbox
                 || host.EndsWith(".webcontainer.io")  // Bolt.new WebContainers
-                || host.EndsWith(":5501")  ;        // Local Vite server for DICOM viewer
-                
-                
+                || host.EndsWith(":5501");           // Serveur Vite local pour le visualiseur DICOM
         })
         .AllowAnyHeader() 
         .AllowAnyMethod());
@@ -72,22 +148,24 @@ builder.Services.AddHttpClient("orthanc");
 
 var app = builder.Build();
 
-// --- 5. HTTP Pipeline Middlewares (Order Matters!) ---
+// --- Middlewares du Pipeline HTTP (L'ordre est d'importance absolue !) ---
 
-// Ensure Swagger is generated and visible when developing locally
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger(); // <--- ADDED: Generates the swagger.json endpoint
+    app.UseSwagger(); 
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "CathLab API v1");
-    }); // <--- ADDED: Generates the actual interactive web dashboard panels
+    }); 
 }
 
 app.UseCors("DevFrontend");
 
-app.UseHttpsRedirection(); // Standard routing fallback
-app.UseAuthorization();   // Standard routing fallback
+app.UseHttpsRedirection(); 
+
+// L'ordre ici est déjà correct dans votre code d'origine :
+app.UseAuthentication(); // 1. Détecte et valide le Token
+app.UseAuthorization();  // 2. Vérifie les permissions d'accès au contrôleur
 
 app.MapControllers();
 
