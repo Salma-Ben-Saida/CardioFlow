@@ -31,9 +31,10 @@ This repository contains the CardioFlow solution. This README summarizes what wa
 	- Added `OrthancPacsContext` to centralize PACS connectivity and configuration.
 	- Implemented background services in `CathLab.Infrastructure/Background_Services` for automatic PACS polling and ingestion.
 - Web API: lightweight REST API in `CathLab.WebApi/` exposing PACS-related, patient-related, and authentication endpoints (see `Controllers/`), with CORS enabled for frontend development and configuration in `appsettings.json` / `appsettings.Development.json`.
-- Services: `StudyIngestionService` (core PACS ingestion logic), `PatientService` (patient queries and filtering), and `UserService` (user authentication and JWT token generation).
+- Services: `StudyIngestionService` (core PACS ingestion logic), `PatientService` (patient queries and filtering), `UserService` (user authentication and JWT token generation), `InventoryService` (device stock management), and `ProcedureService` (procedure and lesion treatment tracking).
 - Authentication: JWT-based authentication system with secure password hashing (PBKDF2 with SHA512), implemented via `UserService`, `AuthController`, and `UserController`.
-- Authorization: Role-based access control (RBAC) for sensitive operations (e.g., Pharmacy inventory updates require `Admin` or `ResponsablePharmacie` roles).
+- Authorization: Role-based access control (RBAC) for sensitive operations: `Admin` and `ResponsablePharmacie` for inventory/pharmacy operations, `Admin` and `Medecin` for procedure documentation.
+- Device Reservation Workflow: Devices are reserved when added to a procedure and remain reserved until the procedure report is confirmed, at which point they transition to consumed (reflecting actual clinical use).
 
 
 **Infrastructure: what was implemented**
@@ -150,6 +151,22 @@ Authorization: Bearer <token>
 ]
 ```
 
+#### Get User by ID (Requires Authentication)
+
+**Endpoint:** `GET /api/user/{id}`
+
+**Response (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "username": "john_doe",
+  "fullName": "John Doe",
+  "role": "ResponsablePharmacie",
+  "isActive": true,
+  "createdAt": "2026-07-14T10:30:00Z"
+}
+```
+
 ---
 
 ### 2. Get Patients List (with filtering & pagination)
@@ -211,7 +228,42 @@ GET http://localhost:5152/api/patients?search=ali&sex=M&status=complete&page=1&p
 
 ---
 
-### 3. Get Pending PACS Studies (Last 30 Days)
+### 3. Get CathStudy by ID
+
+**Endpoint:** `GET /api/cathstudies/{id}`
+
+**Description:** Retrieves study metadata including PatientId (used by coronary mapping UI to resolve patient information from study ID in URL)
+
+**Response (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "patientId": "660e8400-e29b-41d4-a716-446655440000",
+  "accessionNumber": "ACC2026070001",
+  "studyInstanceUid": "1.2.840.113619.2.55",
+  "studyDate": "2026-07-15T09:30:00Z",
+  "status": "Ingested",
+  "operatorName": "Dr. Smith",
+  "createdAt": "2026-07-15T10:00:00Z"
+}
+```
+
+---
+
+### 4. Get Available Inventory Items
+
+**Endpoint:** `GET /api/pharmacy/items/available?deviceType=Stent`
+
+**Query Parameters:**
+- `deviceType` (string, optional) — Filter by device type (e.g., "Stent", "Ballon")
+
+**Response:** Returns in-stock devices available for procedures
+
+**Example:** Used by coronary mapping to populate device picker for stent/balloon selection
+
+---
+
+### 5. Get Pending PACS Studies (Last 30 Days)
 
 **Endpoint:** `GET /api/pacs/studies`
 
@@ -219,7 +271,7 @@ GET http://localhost:5152/api/patients?search=ali&sex=M&status=complete&page=1&p
 
 ---
 
-### 4. Ingest Single Study
+### 6. Ingest Single Study
 
 **Endpoint:** `POST /api/pacs/ingest/{accessionNumber}`
 
@@ -227,11 +279,59 @@ GET http://localhost:5152/api/patients?search=ali&sex=M&status=complete&page=1&p
 
 ---
 
-### 5. Ingest All Pending Studies
+### 7. Ingest All Pending Studies
 
 **Endpoint:** `POST /api/pacs/ingest/all`
 
 **Description:** Manually trigger ingestion of all pending studies from PACS (runs automatically every 15 minutes via background service)
+
+---
+
+### 8. Add Stent Treatment to Lesion
+
+**Endpoint:** `POST /api/procedures/lesions/{lesionId}/stent`
+
+**Request Body:**
+```json
+{
+  "inventoryItemId": "550e8400-e29b-41d4-a716-446655440000",
+  "stentDiameterMm": 3.0,
+  "stentLengthMm": 18.0
+}
+```
+
+**Description:** Reserves an inventory item (stent) for use in this procedure. Device remains Reserved until report is confirmed.
+
+---
+
+### 9. Add Balloon Treatment to Lesion
+
+**Endpoint:** `POST /api/procedures/lesions/{lesionId}/balloon`
+
+**Request Body:**
+```json
+{
+  "inventoryItemId": "550e8400-e29b-41d4-a716-446655440000",
+  "balloonDiameterMm": 2.5,
+  "balloonLengthMm": 15.0,
+  "isPreDilation": true,
+  "isPostDilation": false,
+  "maxPressureAtm": 8,
+  "inflationDurationSec": 30
+}
+```
+
+**Description:** Reserves an inventory item (balloon) for use in this procedure. Device remains Reserved until report is confirmed.
+
+---
+
+### 10. Confirm Procedure Report
+
+**Endpoint:** `POST /api/procedures/reports/{reportId}/confirm`
+
+**Response:** 204 No Content on success
+
+**Description:** **Irreversible** operation that finalizes the report and transitions all Reserved devices to Consumed status. This matches the clinical reality that devices have been used on the patient and should no longer be counted as available inventory.
 
 ---
 
@@ -305,7 +405,10 @@ This section documents, file-by-file and class-by-class, the work implemented un
 	- Properties: `Id`, `PatientId`, `OperatorId`, `AccessionNumber`, `StudyInstanceUid`, `StudyDate`, `Status`, `CreatedAt`.
 	- Navigation: `Patient`, `Operator` (an `AppUser`).
 - `backend/CathLab.Domain/Entities/RiskProfile.cs` — risk profile details tied to a `Patient`.
-- `backend/CathLab.Domain/Entities/AppUser.cs` — basic user entity: `Id`, `Username`, `PasswordHash`, `FullName`, `Role`, `IsActive`, `CreatedAt`.
+- `backend/CathLab.Domain/Entities/AppUser.cs` — basic user entity: `Id`, `Username`, `PasswordHash`, `FullName`, `Role`, `IsActive`, `CreatedAt`. (Removed `Specialty` field in migration)
+- `backend/CathLab.Domain/Entities/ProcedureReport.cs` — updated with confirmation tracking:
+	- `IsConfirmed` (bool) — whether the report has been finalized
+	- `ConfirmedAt` (DateTime?) — timestamp of confirmation (when devices transition from Reserved → Consumed)
 
 
 **CathLab.Application**
@@ -333,9 +436,13 @@ This section documents, file-by-file and class-by-class, the work implemented un
 	- Implements `FindByConquestIdAsync`, `CreateAsync`, `UpdateAsync` with proper Id generation and timestamp handling.
 - `backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs` — concrete `ICathStudyRepository` implementation.
 - `backend/CathLab.Infrastructure/Persistence/Repositories/UserRepository.cs` — concrete `IUserRepository` implementation using `CathLabDbContext`.
-	- Implements `GetByUsernameAsync` for login queries, `AddAsync` for user registration, `SaveChangesAsync` for persistence, and `GetAllAsync` for paginated user listings.
-	- Uses case-insensitive username lookups (ToLower) for consistency.
+	- Implements `GetByUsernameAsync` for login queries, `GetByIdAsync` for individual user retrieval, `AddAsync` for user registration, `SaveChangesAsync` for persistence, and `GetAllAsync` for paginated user listings.
+	- Uses case-insensitive username lookups for consistency.
 	- Applies `AsNoTracking()` in read operations for performance optimization.
+- `backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs` — updated with:
+	- `FindByIdAsync(id)` — retrieves study with Operator relationship loaded (for coronary mapping UI to display physician name)
+- `backend/CathLab.Infrastructure/Persistence/Repositories/InventoryItemRepository.cs` — updated with:
+	- `GetAvailableAsync(deviceType)` — queries items with `Status == InStock` and optional device type filtering
 
 - PACS integration (Orthanc):
 	- `backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs` — EF Core context targeting Orthanc's internal database tables (generated models in `Pacs/Generated/*`).
@@ -368,7 +475,7 @@ This section documents, file-by-file and class-by-class, the work implemented un
 **CathLab.Application — User Management & Authentication**
 
 - `backend/CathLab.Application/Services/UserService.cs` — application service for user authentication and management:
-	- Public methods: `CreateUserAsync(CreateUserDto)` for user registration, `LoginAsync(LoginDto)` for authentication, `GetUsersAsync(page, pageSize)` for pagination of users
+	- Public methods: `CreateUserAsync(CreateUserDto)` for user registration, `LoginAsync(LoginDto)` for authentication, `GetUsersAsync(page, pageSize)` for pagination, `GetUserByIdAsync(id)` for retrieving individual user details
 	- Handles password hashing using PBKDF2 with SHA512 (350,000 iterations for security)
 	- Generates JWT tokens with claims for user identification and role-based authorization
 	- Implements secure password verification using constant-time comparison to prevent timing attacks
@@ -376,7 +483,30 @@ This section documents, file-by-file and class-by-class, the work implemented un
 - `backend/CathLab.Application/DTOs/Users/CreateUserDto.cs` — DTO for user registration with Username, Password, FullName, and Role
 - `backend/CathLab.Application/DTOs/Users/UserDto.cs` — DTO for user responses (excludes PasswordHash for security)
 - `backend/CathLab.Application/Interfaces/IUserRepository.cs` — repository contract for user persistence:
-	- Methods: `GetByUsernameAsync(username)`, `AddAsync(user)`, `SaveChangesAsync()`, `GetAllAsync(page, pageSize)` for pagination
+	- Methods: `GetByUsernameAsync(username)`, `GetByIdAsync(id)`, `AddAsync(user)`, `SaveChangesAsync()`, `GetAllAsync(page, pageSize)` for pagination
+- `backend/CathLab.Application/Interfaces/ICathStudyRepository.cs` — updated with:
+	- `FindByIdAsync(id)` — retrieve study details by ID (used by coronary mapping to resolve patient from study)
+- `backend/CathLab.Application/Interfaces/IInventoryItemRepository.cs` — updated with:
+	- `GetAvailableAsync(deviceType)` — retrieve in-stock devices filtered by type (Stent, Ballon, etc.)
+
+**CathLab.Application — Inventory & Device Management**
+
+- `backend/CathLab.Application/Services/InventoryService.cs` — extended with device availability:
+	- `GetAvailableItemsAsync(deviceType)` — retrieves sorted list of in-stock devices by type
+	- Updated `ConsumeItemAsync()` to enforce Reserved status (devices must be reserved before consumption)
+	- `ReceiveBatchAsync()` — receives new inventory items and records stock movements
+- `backend/CathLab.Application/DTOs/Pharmacy/InventoryItemDto.cs` — updated with:
+	- `DeviceType` property — descriptive device category (Stent, Ballon, Guidewire, etc.)
+
+**CathLab.Application — Procedure & Treatment Management**
+
+- `backend/CathLab.Application/Services/ProcedureService.cs` — completely refactored device flow:
+	- `AddStentTreatmentAsync(dto)` — no longer consumes items immediately; instead **reserves** them for this study
+	- `AddBalloonTreatmentAsync(dto, performedBy)` — same reservation pattern as stents
+	- NEW: `ConfirmReportAsync(reportId, confirmedBy)` — **irreversible** confirmation: transitions all Reserved devices attached to this procedure to Consumed status. This reflects the clinical reality that devices have been used on the patient.
+	- Devices stay Reserved throughout procedure documentation and only become Consumed when the report is confirmed (matching the clinical workflow)
+- `backend/CathLab.Application/DTOs/Patients/CathStudyDto.cs` — updated with:
+	- `PatientId` property — enables coronary mapping UI to resolve patient when only study ID is known
 
 **CathLab.Application — Patient Service**
 
@@ -408,31 +538,22 @@ This section documents, file-by-file and class-by-class, the work implemented un
 		- Registers `StudyIngestionService`, `PatientService`, and `UserService`.
 	- **CORS policy:** Configures for frontend at `http://127.0.0.1:5500` and other development URLs.
 	- **Background Services:** Registers `PacsIngestionWorker` as a hosted service for automatic background polling.
-- `backend/CathLab.WebApi/Controllers/PacsController.cs` — PACS ingestion endpoints:
-	- `GET /api/pacs/studies` — returns pending studies (last 30 days) via `IPacsReader`.
-	- `POST /api/pacs/ingest/{accessionNumber}` — ingests a single study using `StudyIngestionService.IngestStudyAsync`.
-	- `POST /api/pacs/ingest/all` — ingests all pending studies returned by PACS.
-- `backend/CathLab.WebApi/Controllers/PatientsController.cs` — patient management endpoints:
-	- `GET /api/patients` — returns paginated, filtered list of patients using `PatientService.GetListAsync`.
-		- Query parameters: `search` (name/ID), `sex` (M/F), `status` (complete/incomplete), `page`, `pageSize`.
-	- Response: paginated result object with patient summaries (see API Endpoints section above).
-- `backend/CathLab.WebApi/Controllers/AuthController.cs` — user authentication endpoints:
-	- `POST /api/auth/login` — authenticates user and returns JWT token.
-		- Request body: `LoginDto` with Username and Password.
-		- Response: `AuthResponseDto` with Token, Username, and FullName on success, or 401 Unauthorized on failure.
-	- Uses `UserService.LoginAsync()` to validate credentials and generate JWT tokens.
-- `backend/CathLab.WebApi/Controllers/UserController.cs` — user management endpoints:
-	- `POST /api/user` — creates a new user (registration).
-		- Request body: `CreateUserDto` with Username, Password, FullName, and Role.
-		- Response: 201 Created with user details (excluding password) on success, or 400 BadRequest if username already exists.
-	- `GET /api/user` — retrieves paginated list of users (requires authentication).
-		- Query parameters: `page`, `pageSize` for pagination.
-		- Decorated with `[Authorize]` to require valid JWT token.
-		- Response: paginated list of `UserDto` objects (excludes PasswordHash).
 - `backend/CathLab.WebApi/Controllers/PharmacyController.cs` — inventory/pharmacy endpoints:
-	- Updated with `[Authorize(Roles = "Admin,ResponsablePharmacie")]` attribute on protected endpoints (e.g., `ReceiveBatch`).
-	- Improved `GetCurrentUserId()` helper method to safely extract user Id from JWT claims with proper error handling.
-	- Supports role-based access control: only users with Admin or ResponsablePharmacie roles can perform sensitive operations.
+	- `GET /api/pharmacy/items/reserved/{cathStudyId}` — list devices already reserved for a specific study
+	- `GET /api/pharmacy/items/available?deviceType=Stent` — query in-stock devices by type (used by coronary mapping to populate device picker)
+	- `POST /api/pharmacy/items/receive-batch` — receive new inventory (requires `Admin` or `ResponsablePharmacie` role)
+	- Secure `GetCurrentUserId()` extraction from JWT claims with error handling.
+- `backend/CathLab.WebApi/Controllers/ProceduresController.cs` — procedure documentation endpoints:
+	- `[Authorize(Roles = "Admin,Medecin")]` — restricts access to physicians and admins
+	- `POST /api/procedures/lesions/{lesionId}/stent` — adds stent treatment (reserves inventory item)
+	- `POST /api/procedures/lesions/{lesionId}/balloon` — adds balloon treatment (reserves inventory item)
+	- NEW: `POST /api/procedures/reports/{reportId}/confirm` — confirms report and transitions all Reserved devices to Consumed (irreversible, matching clinical reality)
+- `backend/CathLab.WebApi/Controllers/UserController.cs` — updated:
+	- `POST /api/user` — creates new user; CreatedAtAction now properly routes to `GetUserById`
+	- `GET /api/user` — paginated list of users (requires authentication)
+	- `GET /api/user/{id}` — retrieve individual user by ID (requires authentication)
+- `backend/CathLab.WebApi/Controllers/CathStudiesController.cs` — NEW controller:
+	- `GET /api/cathstudies/{id}` — retrieves study with PatientId (allows coronary mapping to resolve patient from study ID in URL)
 
 
 **How the pieces interact (summary)**
@@ -503,21 +624,16 @@ This section documents, file-by-file and class-by-class, the work implemented un
 - Common types: [backend/CathLab.Application/Common/PagedResult.cs](backend/CathLab.Application/Common/PagedResult.cs)
 
 **Application Layer:**
-- DTOs: [backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs](backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs), [backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs](backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs), [backend/CathLab.Application/DTOs/Users/UserDto.cs](backend/CathLab.Application/DTOs/Users/UserDto.cs), [backend/CathLab.Application/DTOs/Users/CreateUserDto.cs](backend/CathLab.Application/DTOs/Users/CreateUserDto.cs)
-- Interfaces: [backend/CathLab.Application/Interfaces/IPacsReader.cs](backend/CathLab.Application/Interfaces/IPacsReader.cs), [backend/CathLab.Application/Interfaces/IPatientRepository.cs](backend/CathLab.Application/Interfaces/IPatientRepository.cs), [backend/CathLab.Application/Interfaces/ICathStudyRepository.cs](backend/CathLab.Application/Interfaces/ICathStudyRepository.cs), [backend/CathLab.Application/Interfaces/IUserRepository.cs](backend/CathLab.Application/Interfaces/IUserRepository.cs)
-- Services: [backend/CathLab.Application/Services/StudyIngestionService.cs](backend/CathLab.Application/Services/StudyIngestionService.cs), [backend/CathLab.Application/Services/PatientService.cs](backend/CathLab.Application/Services/PatientService.cs), [backend/CathLab.Application/Services/UserService.cs](backend/CathLab.Application/Services/UserService.cs)
+- DTOs: [backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs](backend/CathLab.Application/DTOs/Pacs/PacsStudyDto.cs), [backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs](backend/CathLab.Application/DTOs/Patients/PatientListItemDto.cs), [backend/CathLab.Application/DTOs/Patients/CathStudyDto.cs](backend/CathLab.Application/DTOs/Patients/CathStudyDto.cs), [backend/CathLab.Application/DTOs/Users/UserDto.cs](backend/CathLab.Application/DTOs/Users/UserDto.cs), [backend/CathLab.Application/DTOs/Users/CreateUserDto.cs](backend/CathLab.Application/DTOs/Users/CreateUserDto.cs), [backend/CathLab.Application/DTOs/Pharmacy/InventoryItemDto.cs](backend/CathLab.Application/DTOs/Pharmacy/InventoryItemDto.cs)
+- Interfaces: [backend/CathLab.Application/Interfaces/IPacsReader.cs](backend/CathLab.Application/Interfaces/IPacsReader.cs), [backend/CathLab.Application/Interfaces/IPatientRepository.cs](backend/CathLab.Application/Interfaces/IPatientRepository.cs), [backend/CathLab.Application/Interfaces/ICathStudyRepository.cs](backend/CathLab.Application/Interfaces/ICathStudyRepository.cs), [backend/CathLab.Application/Interfaces/IUserRepository.cs](backend/CathLab.Application/Interfaces/IUserRepository.cs), [backend/CathLab.Application/Interfaces/IInventoryItemRepository.cs](backend/CathLab.Application/Interfaces/IInventoryItemRepository.cs)
+- Services: [backend/CathLab.Application/Services/StudyIngestionService.cs](backend/CathLab.Application/Services/StudyIngestionService.cs), [backend/CathLab.Application/Services/PatientService.cs](backend/CathLab.Application/Services/PatientService.cs), [backend/CathLab.Application/Services/UserService.cs](backend/CathLab.Application/Services/UserService.cs), [backend/CathLab.Application/Services/InventoryService.cs](backend/CathLab.Application/Services/InventoryService.cs), [backend/CathLab.Application/Services/ProcedureService.cs](backend/CathLab.Application/Services/ProcedureService.cs)
 
 **Infrastructure Layer:**
-- Persistence: [backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs](backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/UserRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/UserRepository.cs)
+- Persistence: [backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs](backend/CathLab.Infrastructure/Persistence/CathLabDbContext.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/PatientRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/CathStudyRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/UserRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/UserRepository.cs), [backend/CathLab.Infrastructure/Persistence/Repositories/InventoryItemRepository.cs](backend/CathLab.Infrastructure/Persistence/Repositories/InventoryItemRepository.cs)
 - PACS integration: [backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsContext.cs), [backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs](backend/CathLab.Infrastructure/Pacs/OrthancPacsReader.cs)
 - Background services: [backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs](backend/CathLab.Infrastructure/Background_Services/PacsIngestionWorker.cs)
 
 **API Layer:**
-- Controllers: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Controllers/PatientsController.cs](backend/CathLab.WebApi/Controllers/PatientsController.cs), [backend/CathLab.WebApi/Controllers/AuthController.cs](backend/CathLab.WebApi/Controllers/AuthController.cs), [backend/CathLab.WebApi/Controllers/UserController.cs](backend/CathLab.WebApi/Controllers/UserController.cs), [backend/CathLab.WebApi/Controllers/PharmacyController.cs](backend/CathLab.WebApi/Controllers/PharmacyController.cs)
+- Controllers: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Controllers/PatientsController.cs](backend/CathLab.WebApi/Controllers/PatientsController.cs), [backend/CathLab.WebApi/Controllers/AuthController.cs](backend/CathLab.WebApi/Controllers/AuthController.cs), [backend/CathLab.WebApi/Controllers/UserController.cs](backend/CathLab.WebApi/Controllers/UserController.cs), [backend/CathLab.WebApi/Controllers/PharmacyController.cs](backend/CathLab.WebApi/Controllers/PharmacyController.cs), [backend/CathLab.WebApi/Controllers/ProceduresController.cs](backend/CathLab.WebApi/Controllers/ProceduresController.cs), [backend/CathLab.WebApi/Controllers/CathStudiesController.cs](backend/CathLab.WebApi/Controllers/CathStudiesController.cs)
 - Configuration: [backend/CathLab.WebApi/Program.cs](backend/CathLab.WebApi/Program.cs)
 
-
-If you want, I can now:
-
-- Add example `curl` commands for the `/api/pacs` endpoints into this README.
-- Add a compact diagram (ASCII or PlantUML) summarizing the data flow from Orthanc → ingestion → DB.

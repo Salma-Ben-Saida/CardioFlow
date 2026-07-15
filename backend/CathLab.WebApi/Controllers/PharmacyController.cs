@@ -138,6 +138,20 @@ public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
     return Ok(items);
 }
 
+[HttpGet("items/available")]
+public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceType)
+{
+    try
+    {
+        var items = await _inventory.GetAvailableItemsAsync(deviceType);
+        return Ok(items);
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(new { error = ex.Message });
+    }
+}
+
 [HttpPost("items/receive-batch")]
     [Authorize(Roles = "Admin,ResponsablePharmacie")] 
     public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)

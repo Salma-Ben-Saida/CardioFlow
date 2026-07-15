@@ -48,9 +48,6 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("Specialty")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -352,6 +349,9 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<string>("Conclusion")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<decimal?>("ContrastVolumeMl")
                         .HasPrecision(6, 2)
                         .HasColumnType("decimal(6,2)");
@@ -363,6 +363,9 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("DoseAreaProductGycm2")
                         .HasPrecision(8, 2)
                         .HasColumnType("decimal(8,2)");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PdfStoragePath")
                         .HasMaxLength(500)

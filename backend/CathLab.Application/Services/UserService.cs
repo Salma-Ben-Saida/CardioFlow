@@ -153,5 +153,21 @@ public class UserService
     )).ToList();
 }
 
+    public async Task<UserDto> GetUserByIdAsync(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user is null)
+        {
+            throw new KeyNotFoundException($"User with ID '{id}' not found.");
+        }
 
+        return new UserDto(
+            user.Id,
+            user.Username,
+            user.FullName,
+            user.Role,
+            user.IsActive,
+            user.CreatedAt
+        );
+    }
 }

@@ -1,19 +1,23 @@
 using System.Security.Claims;
 using CathLab.Application.DTOs.Procedures;
 using CathLab.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CathLab.WebApi.Controllers;
 
 [ApiController]
 [Route("api/procedures")]
+[Authorize(Roles = "Admin,Medecin")]
 public class ProceduresController : ControllerBase
 {
     private readonly ProcedureService _procedures;
+    private readonly InventoryService _inventory;
 
-    public ProceduresController(ProcedureService procedures)
+    public ProceduresController(ProcedureService procedures, InventoryService inventory)
     {
         _procedures = procedures;
+        _inventory = inventory;
     }
 
     /// <summary>
@@ -47,7 +51,7 @@ public class ProceduresController : ControllerBase
 
         try
         {
-            var treatment = await _procedures.AddStentTreatmentAsync(dto, GetCurrentUserId());
+            var treatment = await _procedures.AddStentTreatmentAsync(dto);
             return Ok(treatment);
         }
         catch (InvalidOperationException ex)
@@ -84,14 +88,44 @@ public class ProceduresController : ControllerBase
         }
     }
 
-    // TODO: replace with however your auth actually resolves the current
-    // user once it's wired up - same assumption as PharmacyController.
     private Guid GetCurrentUserId()
-    {
-        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(claim, out var userId))
-            return userId;
+{
+    var claim = User.FindFirstValue("nameid"); // MapInboundClaims=false → literal JWT claim key, not ClaimTypes.NameIdentifier
+    if (Guid.TryParse(claim, out var userId))
+        return userId;
 
-        throw new UnauthorizedAccessException("No authenticated user found.");
+    throw new UnauthorizedAccessException("No authenticated user found.");
+}
+/// <summary>
+/// POST /api/procedures/reports/{reportId}/confirm - finalizes the report.
+/// Every Reserved device attached to this procedure becomes Consumed.
+/// Irreversible.
+/// </summary>
+[HttpPost("reports/{reportId:guid}/confirm")]
+public async Task<IActionResult> ConfirmReport(Guid reportId)
+{
+    try
+    {
+        await _procedures.ConfirmReportAsync(reportId, GetCurrentUserId());
+        return NoContent();
     }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Unauthorized(new { error = ex.Message });
+    }
+}
+public async Task ConfirmReportAsync(Guid reportId, Guid userId)
+{
+    var report = await _procedures.GetReportByIdAsync(reportId)
+        ?? throw new InvalidOperationException("Report not found");
+
+    if (report.IsConfirmed)
+        throw new InvalidOperationException("Report already confirmed");
+
+    await _procedures.ConfirmReportAsync(report.Id, GetCurrentUserId()) ; // wrap in a transaction with the inventory update
+}
 }

@@ -11,4 +11,5 @@ public interface IInventoryItemRepository
     Task<InventoryItem> CreateAsync(InventoryItem item);
     Task UpdateAsync(InventoryItem item);
     Task<List<InventoryItem>> GetReservedForStudyAsync(Guid cathStudyId);
+    Task<List<InventoryItem>> GetAvailableAsync(DeviceType? deviceType);
 }

@@ -130,10 +130,10 @@ public class InventoryService
     public async Task ConsumeItemAsync(Guid inventoryItemId, Guid consumedBy)
     {
         var item = await _items.FindByIdAsync(inventoryItemId)
-            ?? throw new InvalidOperationException("Inventory item not found.");
+        ?? throw new InvalidOperationException("Inventory item not found.");
 
-        if (item.Status is not (ItemStatus.Reserved or ItemStatus.InStock))
-            throw new InvalidOperationException($"Item is '{item.Status}', it cannot be consumed.");
+    if (item.Status != ItemStatus.Reserved)
+        throw new InvalidOperationException($"Item is '{item.Status}', it must be Reserved to be consumed.");
 
         item.Status = ItemStatus.Consumed;
         item.ConsumedAt = DateTime.UtcNow;
@@ -207,6 +207,7 @@ public class InventoryService
         Id = i.Id,
         ProductId = i.ProductId,
         ProductName = productName ?? i.Product?.ProductName ?? string.Empty,
+        DeviceType = i.Product?.DeviceType.ToString() ?? string.Empty,
         Barcode = i.Barcode,
         LotNumber = i.LotNumber,
         ExpiryDate = i.ExpiryDate,
@@ -246,5 +247,18 @@ public async Task<List<InventoryItemDto>> ReceiveBatchAsync(ReceiveInventoryBatc
         results.Add(item);
     }
     return results;
+}
+public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceType)
+{
+    DeviceType? parsed = null;
+    if (!string.IsNullOrWhiteSpace(deviceType))
+    {
+        if (!Enum.TryParse<DeviceType>(deviceType, ignoreCase: true, out var dt))
+            throw new ArgumentException($"Unknown device type '{deviceType}'.");
+        parsed = dt;
+    }
+
+    var items = await _items.GetAvailableAsync(parsed);
+    return items.Select(i => ToDto(i, productName: null)).ToList();
 }
 }

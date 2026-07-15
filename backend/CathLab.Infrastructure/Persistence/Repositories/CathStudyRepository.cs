@@ -21,4 +21,8 @@ public class CathStudyRepository : ICathStudyRepository
         await _ctx.SaveChangesAsync();
         return study;
     }
+    public async Task<CathStudy?> FindByIdAsync(Guid id) =>
+    await _ctx.CathStudies
+        .Include(s => s.Operator) 
+        .FirstOrDefaultAsync(s => s.Id == id);
 }

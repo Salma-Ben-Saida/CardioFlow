@@ -5,6 +5,7 @@ public class InventoryItemDto
     public Guid Id { get; set; }
     public Guid ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
+    public string DeviceType { get; set; } = string.Empty;
     public string Barcode { get; set; } = string.Empty;
     public string? LotNumber { get; set; }
     public DateOnly ExpiryDate { get; set; }
