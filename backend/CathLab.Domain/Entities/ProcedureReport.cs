@@ -15,6 +15,8 @@ public class ProcedureReport
     public string? Conclusion { get; set; }
     public DateTime ReportGeneratedAt { get; set; }
     public string? PdfStoragePath { get; set; }
+    public bool IsConfirmed { get; set; }
+    public DateTime? ConfirmedAt { get; set; }
 
     // Navigation
     public CathStudy CathStudy { get; set; } = null!;

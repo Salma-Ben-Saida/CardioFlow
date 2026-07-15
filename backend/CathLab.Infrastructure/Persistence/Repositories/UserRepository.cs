@@ -14,10 +14,10 @@ public class UserRepository : IUserRepository
         _context = context;
     }
 
-    public async Task<AppUser?> GetByUsernameAsync(string username)
+    public async Task<AppUser?> GetByIdAsync(Guid id)
     {
         return await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+            .FirstOrDefaultAsync(u => u.Id == id);
     }
 
     public async Task AddAsync(AppUser user)
@@ -39,4 +39,9 @@ public class UserRepository : IUserRepository
         .ToListAsync();
 }
 
+    public async Task<AppUser?> GetByUsernameAsync(string username)
+{
+    return await _context.AppUsers
+        .FirstOrDefaultAsync(u => u.Username == username);
+}
 }

@@ -27,15 +27,15 @@ public class UserController : ControllerBase
             var createdUser = await _userService.CreateUserAsync(dto);
 
             // Retourne un statut 201 Created avec l'objet sans le mot de passe pour des raisons de sécurité
-            return CreatedAtAction(nameof(CreateUser), new { id = createdUser.Id }, new
-            {
-                createdUser.Id,
-                createdUser.Username,
-                createdUser.FullName,
-                createdUser.Role,
-                createdUser.IsActive,
-                createdUser.CreatedAt
-            });
+            return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, new
+                {
+                    createdUser.Id,
+                    createdUser.Username,
+                    createdUser.FullName,
+                    createdUser.Role,
+                    createdUser.IsActive,
+                    createdUser.CreatedAt
+                });
         }
         catch (InvalidOperationException ex)
         {
@@ -57,5 +57,20 @@ public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] 
 {
     var users = await _userService.GetUsersAsync(page, pageSize);
     return Ok(users);
+}
+[HttpGet("{id:guid}")]
+[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
+public async Task<IActionResult> GetUserById(Guid id)
+{
+    try
+    {
+        var user = await _userService.GetUserByIdAsync(id);
+        return Ok(user);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new { message = ex.Message });
+    }
 }
 }

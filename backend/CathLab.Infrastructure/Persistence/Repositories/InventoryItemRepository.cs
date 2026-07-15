@@ -52,4 +52,16 @@ public class InventoryItemRepository : IInventoryItemRepository
     await _db.InventoryItems.Include(i => i.Product)
         .Where(i => i.ReservedForCathStudyId == cathStudyId && i.Status == ItemStatus.Reserved)
         .ToListAsync();
+
+public async Task<List<InventoryItem>> GetAvailableAsync(DeviceType? deviceType)
+{
+    var query = _db.InventoryItems
+        .Include(i => i.Product)
+        .Where(i => i.Status == ItemStatus.InStock);
+
+    if (deviceType.HasValue)
+        query = query.Where(i => i.Product.DeviceType == deviceType.Value);
+
+    return await query.AsNoTracking().ToListAsync();
+}
 }

@@ -98,7 +98,7 @@
 <body>
 
 <header>
-  <div class="patient"><b>MAHIEDINE, Mohammed</b><span>68 ans · Coronarographie · 01/07/2026</span></div>
+  <div class="patient" id="patientInfo"><b>Chargement…</b></div>
   <div class="tag">Schéma Post-PCI — prototype</div>
 </header>
 
@@ -124,6 +124,10 @@
   <div class="side">
     <h3>Constatations (<span id="countLabel">0</span>)</h3>
     <div class="findings-list" id="findingsList"><div class="empty">Sélectionnez un matériel puis cliquez sur une artère.</div></div>
+    <div class="report-wrap" id="reservedPanel">
+      <h3>Déjà réservé pour cette étude</h3>
+      <div id="reservedList" class="findings-list"><div class="empty">Aucun item réservé.</div></div>
+    </div>
     <div class="report-wrap">
       <h3>Compte-rendu généré</h3>
       <textarea id="report" readonly title="Compte-rendu généré" placeholder="Le rapport s’affichera ici." aria-label="Compte-rendu généré"></textarea>
@@ -138,6 +142,7 @@
 
 const API_BASE = 'http://localhost:5152/api';
 const CATH_STUDY_ID = new URLSearchParams(location.search).get('cathStudyId');
+const PATIENT_ID = new URLSearchParams(location.search).get('patientId');
 
 async function apiPost(path, body){
   const res = await fetch(API_BASE + path, {
@@ -159,7 +164,7 @@ const ICONS = {
 };
 const TOOL_LABEL = {lesion:'Lésion', ballon:'Ballon', stent:'Stent', controle:'Contrôle'};
 
-const toolbarEl = document.getElementById('toolbar');
+const toolbarEl = document.getElementById('toolbar'); 
 Object.keys(ICONS).forEach(tool=>{
   const btn = document.createElement('div');
   btn.className = 'tool-btn' + (tool==='lesion' ? ' active' : '');
@@ -410,11 +415,14 @@ function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
       '<label><input type="checkbox" id="f-thrombus" '+(e.thrombus?'checked':'')+'> Thrombus visible</label></div>';
   } else if(tool === 'ballon' || tool === 'stent'){
   const e = existing || {};
-  const options = (window.__reservedItems||[])
-    .filter(i => i.status === 'Reserved')
+  // Source is FREE stock (not yet reserved by anyone). Picking one here and
+  // hitting "Ajouter" is what actually reserves it — see saveBtn handler below,
+  // which moves the chosen item out of the available list once the server call succeeds.
+  const availList = tool === 'stent' ? (window.__availableStents||[]) : (window.__availableBalloons||[]);
+  const options = availList
     .map(i => '<option value="'+i.id+'">'+i.productName+' — Lot '+(i.lotNumber||'?')+'</option>').join('');
-  fieldsHtml = '<label>Dispositif réservé</label><select id="f-item">'+
-      (options || '<option value="">Aucun item réservé pour cette étude</option>')+'</select>' +
+  fieldsHtml = '<label>Dispositif disponible en stock</label><select id="f-item">'+
+      (options || '<option value="">Aucun item disponible en stock</option>')+'</select>' +
     '<label>Taille implantée (Øxlongueur)</label><input id="f-size" value="'+(e.size||(tool==='stent'?'3.0x18mm':'2.5x15mm'))+'">';
 } else if(tool === 'controle'){
     const e = existing || {};
@@ -478,17 +486,45 @@ function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
       });
       finding.id = created.id; // real server GUID replaces the temp idSeq value
     } else if(tool === 'stent' || tool === 'ballon'){
-      const itemId = pop.querySelector('#f-item')?.value;
-      if(!itemId) throw new Error('Sélectionnez un dispositif réservé.');
-      const {diameter, length} = parseSize(ev.size);
-      const path = '/procedures/lesions/'+finding.id+'/'+tool;
-      await apiPost(path, tool==='stent' ? {
+  if(isNewDraft){
+    // No CoronaryLesion exists at this spot yet — create a minimal,
+    // uncharacterized one first so the device has somewhere to attach.
+    // No 'lesion' event is pushed to finding.events, so renderReport()
+    // still (correctly) falls into its "sans caractérisation" branch.
+    const created = await apiPost('/procedures/lesions', {
+      cathStudyId: CATH_STUDY_ID,
+      vessel: finding.label,
+      segmentNumber: finding.segNum,
+      stenosisPercent: stenosisToByte(undefined), // same fallback (60) used elsewhere
+      lesionType: 'TypeB1',                       // same default used in the lesion branch
+      timiFlow: null
+    });
+    finding.id = created.id;
+  }
+  const itemId = pop.querySelector('#f-item')?.value;
+  if(!itemId) throw new Error('Sélectionnez un dispositif disponible en stock.');
+  const {diameter, length} = parseSize(ev.size);
+  // Internal tool key stays 'ballon' (matches UI/report French wording) but the
+  // backend route is English ('balloon') — translate only at the wire boundary.
+  const API_TOOL_PATH = { ballon: 'balloon', stent: 'stent' };
+  const path = '/procedures/lesions/'+finding.id+'/'+API_TOOL_PATH[tool];
+  await apiPost(path, tool==='stent' ? {
         inventoryItemId: itemId, stentDiameterMm: diameter, stentLengthMm: length
       } : {
         inventoryItemId: itemId, balloonDiameterMm: diameter, balloonLengthMm: length,
         isPreDilation: true, isPostDilation: false, maxPressureAtm: 0, inflationDurationSec: 0
       });
-      ev.device = (window.__reservedItems||[]).find(i=>i.id===itemId)?.productName || ev.device;
+      // Server call above is what actually reserves the item. Reflect that locally
+      // right away so it disappears from "available" and can't be picked again in
+      // this session, and shows up in the "Déjà réservé" panel.
+      const availArr = tool === 'stent' ? window.__availableStents : window.__availableBalloons;
+      const idx = (availArr||[]).findIndex(i => i.id === itemId);
+      const usedItem = idx > -1 ? availArr.splice(idx, 1)[0] : null;
+      if(usedItem){
+        window.__reservedItems = (window.__reservedItems||[]).concat([usedItem]);
+        renderReservedPanel(window.__reservedItems);
+      }
+      ev.device = usedItem?.productName || ev.device;
     }
   } catch(err){
     errBox.textContent = 'Erreur serveur : '+err.message;
@@ -505,9 +541,9 @@ function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
 }
 function validateFields(tool, pop){
   if(tool === 'ballon' || tool === 'stent'){
-    const device = pop.querySelector('#f-device').value.trim();
+    const item = pop.querySelector('#f-item').value;
     const size = pop.querySelector('#f-size').value.trim();
-    if(!device) return 'Veuillez indiquer le dispositif utilisé.';
+    if(!item) return 'Veuillez sélectionner un dispositif disponible en stock.';
     if(!size) return 'Veuillez indiquer la taille (Ø x longueur).';
   }
   if(tool === 'lesion'){
@@ -531,11 +567,13 @@ function collectEvent(tool, pop){
       thrombus: pop.querySelector('#f-thrombus').checked };
   }
   if(tool === 'ballon'){
-    return { type:'ballon', device: pop.querySelector('#f-device').value || 'Ballon non précisé',
+    const sel = pop.querySelector('#f-item');
+    return { type:'ballon', device: sel.options[sel.selectedIndex]?.textContent || 'Ballon non précisé',
       size: pop.querySelector('#f-size').value || '2.5x15mm' };
   }
   if(tool === 'stent'){
-    return { type:'stent', device: pop.querySelector('#f-device').value || 'Stent non précisé',
+    const sel = pop.querySelector('#f-item');
+    return { type:'stent', device: sel.options[sel.selectedIndex]?.textContent || 'Stent non précisé',
       size: pop.querySelector('#f-size').value || '3.0x18mm' };
   }
   if(tool === 'controle'){
@@ -625,12 +663,13 @@ function render(){
     dot.setAttribute('class','marker-dot'+(isSel?' selected':''));
     dot.setAttribute('cx', f.x); dot.setAttribute('cy', f.y); dot.setAttribute('r', 8);
     dot.addEventListener('click', evt=>{
-      evt.stopPropagation();
-      closePopover();
-      selectedId = f.id;
-      openId = (openId === f.id) ? null : f.id;
-      render();
-    });
+  evt.stopPropagation();
+  closePopover();
+  selectedId = f.id;
+  // Route through the same add/edit flow as clicking empty vessel —
+  // isNewDraft is false since this finding already exists server-side.
+  openPopover(evt, currentTool, f, null, false);
+});
     markersLayer.appendChild(dot);
   });
 
@@ -718,9 +757,91 @@ function renderReport(){
   box.value = lines.join('\n');
 }
 
-apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
-  .then(items => window.__reservedItems = items)
-  .catch(err => console.error('Could not load reserved items', err));
+function renderReservedPanel(items){
+  const list = document.getElementById('reservedList');
+  if(!list) return;
+  list.innerHTML = items.length ? items.map(i =>
+    '<div class="ev-row"><span>• '+i.productName+' ('+i.deviceType+') — Lot '+(i.lotNumber||'?')+'</span></div>'
+  ).join('') : '<div class="empty">Aucun item réservé.</div>';
+}
+
+function formatFrDate(iso){
+  if(!iso) return '';
+  return new Date(iso).toLocaleDateString('fr-FR');
+}
+function calcAge(birthDateStr){
+  // PatientDetailDto.BirthDate is a DateOnly (yyyy-MM-dd), not a full timestamp.
+  if(!birthDateStr) return '?';
+  const dob = new Date(birthDateStr), now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if(m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+async function loadPatientHeader(){
+  const el = document.getElementById('patientInfo');
+  let patientId = PATIENT_ID;
+
+  if(!patientId && CATH_STUDY_ID){
+    // patientId wasn't passed in the URL - resolve it from the study instead
+    // of just giving up, so this page still works when linked with only ?cathStudyId=.
+    try{
+      const study = await apiGet('/cathstudies/'+CATH_STUDY_ID);
+      patientId = study.patientId;
+    } catch(err){
+      console.error('Could not resolve patientId from cathStudyId', err);
+    }
+  }
+
+  if(!patientId){
+    el.textContent = '';
+    el.appendChild(Object.assign(document.createElement('b'), {textContent:'Aucun patient (patientId introuvable pour cette étude)'}));
+    return;
+  }
+
+  try{
+    const patient = await apiGet('/patients/'+patientId); // PatientDetailDto, includes Studies: CathStudyDto[]
+
+    el.textContent = '';
+    const b = document.createElement('b');
+    b.textContent = patient.fullName || 'Patient';
+
+    const span = document.createElement('span');
+    // CathStudyDto has no procedure-type label field, so that part of the
+    // string stays static for now; only the date comes from the matched study.
+    let procedureDate = '';
+    if(CATH_STUDY_ID && Array.isArray(patient.studies)){
+      const study = patient.studies.find(s => s.id === CATH_STUDY_ID);
+      if(study) procedureDate = study.studyDate;
+    }
+    span.textContent = calcAge(patient.birthDate) + ' ans · Coronarographie' + (procedureDate ? ' · '+formatFrDate(procedureDate) : '');
+
+    el.append(b, span);
+  } catch(err){
+    console.error('Could not load patient info', err);
+    el.textContent = '';
+    el.appendChild(Object.assign(document.createElement('b'), {textContent:'Erreur de chargement des informations patient'}));
+  }
+}
+loadPatientHeader();
+
+if(CATH_STUDY_ID){
+  apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
+    .then(items => { window.__reservedItems = items; renderReservedPanel(items); })
+    .catch(err => console.error('Could not load reserved items', err));
+} else {
+  console.warn('cathStudyId absent de l\'URL — ouvrez cette page avec ?cathStudyId=<id>.');
+  renderReservedPanel([]);
+}
+
+apiGet('/pharmacy/items/available?deviceType=Stent') 
+  .then(items => window.__availableStents = items)
+  .catch(err => console.error('Could not load available stents', err));
+ 
+apiGet('/pharmacy/items/available?deviceType=Ballon')
+  .then(items => window.__availableBalloons = items)
+  .catch(err => console.error('Could not load available balloons', err));
 
 
 /* --- Resizable Constatations panel --- */

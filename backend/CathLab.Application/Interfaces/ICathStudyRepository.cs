@@ -6,4 +6,6 @@ public interface ICathStudyRepository
 {
     Task<CathStudy?> FindByAccessionNumberAsync(string accessionNumber);
     Task<CathStudy> CreateAsync(CathStudy study);
+    Task<CathStudy?> FindByIdAsync(Guid id);
+
 }

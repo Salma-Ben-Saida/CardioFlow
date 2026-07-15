@@ -11,19 +11,22 @@ public class ProcedureService
     private readonly ILesionTreatmentRepository _treatments;
     private readonly InventoryService _inventory;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPdfGenerator _pdfGenerator;
 
     public ProcedureService(
         IProcedureReportRepository reports,
         ICoronaryLesionRepository lesions,
         ILesionTreatmentRepository treatments,
         InventoryService inventory,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPdfGenerator pdfGenerator)
     {
         _reports = reports;
         _lesions = lesions;
         _treatments = treatments;
         _inventory = inventory;
         _unitOfWork = unitOfWork;
+        _pdfGenerator = pdfGenerator;
     }
 
     /// <summary>Placing a Lesion marker. Creates the ProcedureReport on first use for this CathStudy.</summary>
@@ -65,10 +68,12 @@ public class ProcedureService
     /// Consumes the selected InventoryItem before persisting the treatment,
     /// so a treatment is never recorded against stock that wasn't actually used.
     /// </summary>
-    public async Task<LesionTreatmentDto> AddStentTreatmentAsync(CreateStentTreatmentDto dto, Guid performedBy)
+    public async Task<LesionTreatmentDto> AddStentTreatmentAsync(CreateStentTreatmentDto dto)
     {
-        _ = await _lesions.FindByIdAsync(dto.LesionId)
+        var lesion = await _lesions.FindByIdAsync(dto.LesionId)
             ?? throw new InvalidOperationException("Lesion not found. Place a Lesion marker before adding a treatment.");
+        var report = await _reports.FindByIdAsync(lesion.ProcedureReportId)
+            ?? throw new InvalidOperationException("Procedure report not found for this lesion.");
 
         var stent = new StentImplant
         {
@@ -86,11 +91,11 @@ public class ProcedureService
             PerformedAt = DateTime.UtcNow
         };
 
-        // Consuming the item, inserting the treatment, and flagging the
-        // lesion as treated all succeed together or not at all.
+        // Reserving here - the item stays Reserved until the
+        // report is confirmed. See ProcedureService.ConfirmReportAsync.
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            await _inventory.ConsumeItemAsync(dto.InventoryItemId, performedBy);
+            await _inventory.ReserveItemAsync(dto.InventoryItemId, report.CathStudyId);
             await _treatments.CreateStentAsync(stent);
             await MarkLesionTreatedAsync(dto.LesionId);
         });
@@ -106,8 +111,10 @@ public class ProcedureService
     /// </summary>
     public async Task<LesionTreatmentDto> AddBalloonTreatmentAsync(CreateBalloonTreatmentDto dto, Guid performedBy)
     {
-        _ = await _lesions.FindByIdAsync(dto.LesionId)
+        var lesion = await _lesions.FindByIdAsync(dto.LesionId)
             ?? throw new InvalidOperationException("Lesion not found. Place a Lesion marker before adding a treatment.");
+        var report = await _reports.FindByIdAsync(lesion.ProcedureReportId)
+            ?? throw new InvalidOperationException("Procedure report not found for this lesion.");
 
         var balloon = new BalloonDilation
         {
@@ -127,7 +134,7 @@ public class ProcedureService
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            await _inventory.ConsumeItemAsync(dto.InventoryItemId, performedBy);
+            await _inventory.ReserveItemAsync(dto.InventoryItemId, report.CathStudyId);
             await _treatments.CreateBalloonAsync(balloon);
 
             if (!dto.IsPreDilation || dto.IsPostDilation)
@@ -168,4 +175,71 @@ public class ProcedureService
         PerformedAt = t.PerformedAt,
         Notes = t.Notes
     };
+
+    /// <summary>
+    /// Confirming the generated report is the point where every device attached
+    /// to this procedure transitions Reserved -> Consumed, and stock movements
+    /// are recorded. Irreversible - matches the physical reality that the
+    /// devices have been used on the patient.
+    ///
+    /// Order of operations matters here:
+    ///   1. Validate required narrative fields FIRST, before anything is
+    ///      mutated - a report missing a Conclusion shouldn't cause devices
+    ///      to be marked Consumed.
+    ///   2. Only then consume inventory (irreversible against real stock).
+    ///   3. Generate the PDF and store its path.
+    ///   4. Mark the report confirmed.
+    /// </summary>
+    public async Task ConfirmReportAsync(Guid reportId, Guid confirmedBy)
+    {
+        var report = await _reports.FindByIdAsync(reportId)
+            ?? throw new InvalidOperationException("Procedure report not found.");
+
+        if (report.IsConfirmed)
+            throw new InvalidOperationException("Report is already confirmed.");
+
+        var missing = GetMissingRequiredFields(report);
+        if (missing.Any())
+            throw new InvalidOperationException($"Cannot confirm: missing {string.Join(", ", missing)}");
+
+        // FindByIdAsync only Includes Lesions, not their Treatments - pull the
+        // fuller graph via the lesion repo instead, which Includes Treatments.
+        var lesions = await _lesions.GetByProcedureReportAsync(reportId);
+        report.Lesions = lesions;
+
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            foreach (var lesion in lesions)
+                foreach (var treatment in lesion.Treatments)
+                    await _inventory.ConsumeItemAsync(treatment.InventoryItemId, confirmedBy);
+
+            report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report);
+            report.IsConfirmed = true;
+            report.ConfirmedAt = DateTime.UtcNow;
+
+            await _reports.UpdateAsync(report);
+        });
+    }
+
+    /// <summary>
+    /// Fields required before a report can be confirmed. PdfStoragePath is
+    /// intentionally excluded - it's produced *during* confirmation, not a
+    /// precondition of it.
+    /// </summary>
+    public List<string> GetMissingRequiredFields(ProcedureReport report)
+    {
+        var missing = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(report.Approach))
+            missing.Add("Approach");
+        if (string.IsNullOrWhiteSpace(report.Conclusion))
+            missing.Add("Conclusion");
+        if (string.IsNullOrWhiteSpace(report.CatheterUsed))
+            missing.Add("CatheterUsed");
+
+        return missing;
+    }
+
+    public async Task<ProcedureReport?> GetReportByIdAsync(Guid reportId) =>
+        await _reports.FindByIdAsync(reportId);
 }

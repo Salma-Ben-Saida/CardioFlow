@@ -3,6 +3,8 @@ namespace CathLab.Application.DTOs.Patients;
 public class CathStudyDto
 {
     public Guid Id { get; set; }
+    public Guid PatientId { get; set; }
+
     public string AccessionNumber { get; set; } = null!;
     public string? StudyInstanceUid { get; set; }
     public DateTime StudyDate { get; set; }
