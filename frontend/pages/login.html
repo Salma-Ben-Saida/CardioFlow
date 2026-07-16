@@ -85,22 +85,51 @@
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value.trim();
-            const password = passwordInput.value;
-            if (!username || !password) { loginError.textContent = 'Please enter both username and password.'; loginError.classList.add('show'); return; }
+            const Username = document.getElementById('username').value.trim();
+            const Password = passwordInput.value;
+            if (!Username || !Password) { loginError.textContent = 'Please enter both username and Password.'; loginError.classList.add('show'); return; }
             loginBtn.disabled = true;
             loginBtnText.style.display = 'none';
             loginSpinner.style.display = 'inline-block';
             try {
-                await new Promise(resolve => setTimeout(resolve, 800));
-                sessionStorage.setItem('authToken', 'dev-token');
-                sessionStorage.setItem('user', JSON.stringify({ username }));
-                showToast('Login successful! Redirecting...', 'success');
-                setTimeout(() => window.location.href = '/frontend/pages/dashboard/index.html', 1000);
-            } catch (error) {
-                loginError.textContent = error.message || 'Login failed. Please try again.';
-                loginError.classList.add('show');
-            } finally {
+    const response = await fetch('http://localhost:5152/api/Auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Username, Password })
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.message || 'Invalid username or password.');
+    }
+    // petit helper pour décoder le payload d'un JWT (pas besoin de librairie)
+    function decodeJwtPayload(token) {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+        );
+        return JSON.parse(jsonPayload);
+    }
+
+    const result = await response.json();
+sessionStorage.setItem('authToken', result.token);
+
+const payload = decodeJwtPayload(result.token);
+sessionStorage.setItem('user', JSON.stringify({
+    id: payload.nameid,                                    // claim "nameid" = ClaimTypes.NameIdentifier
+    username: result.username,
+    fullName: result.fullName,
+    role: payload.role || payload[Object.keys(payload).find(k => k.endsWith('/role'))]
+}));
+
+showToast('Login successful! Redirecting...', 'success');
+setTimeout(() => window.location.href = '/frontend/pages/dashboard/index.html', 1000);
+} catch (error) {
+    loginError.textContent = error.message || 'Login failed. Please try again.';
+    loginError.classList.add('show');
+}
+            finally {
                 loginBtn.disabled = false;
                 loginBtnText.style.display = 'inline';
                 loginSpinner.style.display = 'none';
