@@ -118,6 +118,7 @@ public async Task<IActionResult> ConfirmReport(Guid reportId)
         return Unauthorized(new { error = ex.Message });
     }
 }
+[HttpPost("confirm/{id}")]
 public async Task ConfirmReportAsync(Guid reportId, Guid userId)
 {
     var report = await _procedures.GetReportByIdAsync(reportId)

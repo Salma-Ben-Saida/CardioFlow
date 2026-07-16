@@ -106,7 +106,6 @@
   <b>Dominance coronaire</b>
   <label><input type="radio" name="dom" value="droite" checked> Droite</label>
   <label><input type="radio" name="dom" value="gauche"> Gauche</label>
-  <label title="En attente d'une image de référence co-dominante"><input type="radio" name="dom" value="co" disabled style="opacity:.4"> Co-dominante</label>
   <span style="margin-left:auto;color:var(--muted)">Cliquez sur un marqueur pour l'ouvrir · sélectionnez-le puis "Effacer" pour le supprimer</span>
 </div>
 
@@ -131,7 +130,7 @@
     <div class="report-wrap">
       <h3>Compte-rendu généré</h3>
       <textarea id="report" readonly title="Compte-rendu généré" placeholder="Le rapport s’affichera ici." aria-label="Compte-rendu généré"></textarea>
-      <div class="hint">Moteur de template déterministe — 0% IA, éditable avant validation.</div>
+      <div class="hint">Moteur de template déterministe — éditable avant validation.</div>
     </div>
   </div>
 </div>
@@ -144,16 +143,42 @@ const API_BASE = 'http://localhost:5152/api';
 const CATH_STUDY_ID = new URLSearchParams(location.search).get('cathStudyId');
 const PATIENT_ID = new URLSearchParams(location.search).get('patientId');
 
+function authHeaders(extra = {}) {
+  const token = sessionStorage.getItem('authToken');
+  if (!token) {
+    // Pas de session valide : inutile d'appeler l'API, ça échouera en 401.
+    // On renvoie vers le login plutôt que de laisser échouer silencieusement.
+    window.location.href = '/frontend/pages/login/index.html';
+    throw new Error('Session expirée, redirection vers le login.');
+  }
+  return { ...extra, 'Authorization': 'Bearer ' + token };
+}
+
 async function apiPost(path, body){
   const res = await fetch(API_BASE + path, {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    method:'POST',
+    headers: authHeaders({ 'Content-Type':'application/json' }),
+    body: JSON.stringify(body)
   });
-  if(!res.ok) throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+  if(!res.ok){
+    if(res.status === 401){
+      sessionStorage.removeItem('authToken');
+      window.location.href = '/frontend/pages/login/index.html';
+    }
+    throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+  }
   return res.status === 204 ? null : res.json();
 }
+
 async function apiGet(path){
-  const res = await fetch(API_BASE + path);
-  if(!res.ok) throw new Error(res.statusText);
+  const res = await fetch(API_BASE + path, { headers: authHeaders() });
+  if(!res.ok){
+    if(res.status === 401){
+      sessionStorage.removeItem('authToken');
+      window.location.href = '/frontend/pages/login/index.html';
+    }
+    throw new Error(res.statusText);
+  }
   return res.json();
 }
 const ICONS = {

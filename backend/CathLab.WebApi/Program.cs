@@ -125,6 +125,8 @@ builder.Services.AddHostedService<PacsIngestionWorker>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 
+builder.Services.AddScoped<IPdfGenerator>(_ =>
+    new QuestPdfProcedureReportGenerator(Path.Combine(builder.Environment.ContentRootPath, "reports")));
 // --- Politiques de sécurité Cross-Origin (CORS) ---
 builder.Services.AddCors(options =>
 {
@@ -138,13 +140,15 @@ builder.Services.AddCors(options =>
                 || host == "127.0.0.1"
                 || host.EndsWith(".stackblitz.io")    // Bolt.new Sandbox
                 || host.EndsWith(".webcontainer.io")  // Bolt.new WebContainers
-                || host.EndsWith(":5501");           // Serveur Vite local pour le visualiseur DICOM
+                || host.EndsWith(":5501")            // Serveur Vite local pour le visualiseur DICOM
+                || host.EndsWith(":5500");
         })
         .AllowAnyHeader() 
         .AllowAnyMethod());
 });
 
 builder.Services.AddHttpClient("orthanc");
+
 
 var app = builder.Build();
 

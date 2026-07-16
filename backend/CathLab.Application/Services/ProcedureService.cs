@@ -242,4 +242,65 @@ public class ProcedureService
 
     public async Task<ProcedureReport?> GetReportByIdAsync(Guid reportId) =>
         await _reports.FindByIdAsync(reportId);
+
+
+    /// <summary>
+    /// Reports for every study this doctor has performed, across all of
+    /// their patients. Admins may pass any doctorId; a Medecin should
+    /// only ever be able to request their own (enforce that in the
+    /// controller by passing GetCurrentUserId(), not a client-supplied id,
+    /// unless the caller is an Admin).
+    /// </summary>
+    public async Task<List<ProcedureReportSummaryDto>> GetReportsForDoctorAsync(Guid doctorId)
+    {
+        var reports = await _reports.GetByDoctorIdAsync(doctorId);
+        return reports.Select(ToSummaryDto).ToList();
+    }
+ 
+    /// <summary>Admin-only: every report in the system.</summary>
+    public async Task<List<ProcedureReportSummaryDto>> GetAllReportsAsync()
+    {
+        var reports = await _reports.GetAllAsync();
+        return reports.Select(ToSummaryDto).ToList();
+    }
+ 
+    /// <summary>
+    /// Reports for a specific patient, from any doctor who has treated
+    /// them. A Medecin may view this only if they have themselves
+    /// performed at least one study on this patient - i.e. the patient is
+    /// "one of theirs" - even though the returned reports may include
+    /// studies performed by other doctors. Admins bypass this check.
+    /// </summary>
+    public async Task<List<ProcedureReportSummaryDto>> GetReportsForPatientAsync(
+        Guid patientId, Guid requestingUserId, bool requesterIsAdmin)
+    {
+        if (!requesterIsAdmin)
+        {
+            var hasTreatedPatient = await _reports.HasDoctorTreatedPatientAsync(requestingUserId, patientId);
+            if (!hasTreatedPatient)
+                throw new UnauthorizedAccessException("You have no procedures recorded for this patient.");
+        }
+ 
+        var reports = await _reports.GetByPatientIdAsync(patientId);
+        return reports.Select(ToSummaryDto).ToList();
+    }
+ 
+    private static ProcedureReportSummaryDto ToSummaryDto(ProcedureReport r) => new()
+    {
+        Id = r.Id,
+        CathStudyId = r.CathStudyId,
+        PatientId = r.CathStudy?.PatientId ?? Guid.Empty,
+        PatientName = r.CathStudy?.Patient?.FullName ?? string.Empty,
+        DoctorId = r.CathStudy?.OperatorId ?? Guid.Empty,
+        DoctorName = r.CathStudy?.Operator?.FullName ?? string.Empty,
+        IsConfirmed = r.IsConfirmed,
+        ReportGeneratedAt = r.ReportGeneratedAt,
+        ConfirmedAt = r.ConfirmedAt,
+        PdfStoragePath = r.PdfStoragePath
+    };
+
+    public async Task GetReportsForPatientAsync(Guid patientId, object value, bool isAdmin)
+    {
+        throw new NotImplementedException();
+    }
 }

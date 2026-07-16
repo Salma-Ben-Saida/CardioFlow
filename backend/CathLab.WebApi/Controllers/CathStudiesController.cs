@@ -25,7 +25,7 @@ public class CathStudiesController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var study = await _cathStudies.FindByIdAsync(id); // TODO: confirm this method name against ICathStudyRepository
+        var study = await _cathStudies.FindByIdAsync(id); 
         if (study is null)
             return NotFound(new { message = $"CathStudy with ID {id} was not found." });
 
@@ -37,7 +37,7 @@ public class CathStudiesController : ControllerBase
             StudyInstanceUid = study.StudyInstanceUid,
             StudyDate = study.StudyDate,
             Status = study.Status.ToString(),
-            OperatorName = study.Operator?.FullName, // adjust if AppUser's name field is called something else
+            OperatorName = study.Operator?.FullName,
             CreatedAt = study.CreatedAt
         });
     }
