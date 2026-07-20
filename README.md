@@ -637,3 +637,70 @@ This section documents, file-by-file and class-by-class, the work implemented un
 - Controllers: [backend/CathLab.WebApi/Controllers/PacsController.cs](backend/CathLab.WebApi/Controllers/PacsController.cs), [backend/CathLab.WebApi/Controllers/PatientsController.cs](backend/CathLab.WebApi/Controllers/PatientsController.cs), [backend/CathLab.WebApi/Controllers/AuthController.cs](backend/CathLab.WebApi/Controllers/AuthController.cs), [backend/CathLab.WebApi/Controllers/UserController.cs](backend/CathLab.WebApi/Controllers/UserController.cs), [backend/CathLab.WebApi/Controllers/PharmacyController.cs](backend/CathLab.WebApi/Controllers/PharmacyController.cs), [backend/CathLab.WebApi/Controllers/ProceduresController.cs](backend/CathLab.WebApi/Controllers/ProceduresController.cs), [backend/CathLab.WebApi/Controllers/CathStudiesController.cs](backend/CathLab.WebApi/Controllers/CathStudiesController.cs)
 - Configuration: [backend/CathLab.WebApi/Program.cs](backend/CathLab.WebApi/Program.cs)
 
+# Updates
+
+## Backend updates
+
+- Added new procedure report DTOs:
+  - `backend/CathLab.Application/DTOs/Procedures/ProcedureReportDetailDto.cs`
+  - `backend/CathLab.Application/DTOs/Procedures/UpdateReportNarrativeDto.cs`
+- Extended `backend/CathLab.Application/DTOs/Procedures/CoronaryLesionDto.cs` with treatment details.
+- Extended `backend/CathLab.Application/DTOs/Procedures/LesionTreatmentDto.cs` with product name, lot number, diameter and length.
+- Added delete methods to procedure persistence interfaces and repositories:
+  - `backend/CathLab.Application/Interfaces/ICoronaryLesionRepository.cs`
+  - `backend/CathLab.Application/Interfaces/ILesionTreatmentRepository.cs`
+  - `backend/CathLab.Infrastructure/Persistence/Repositories/CoronaryLesionRepository.cs`
+  - `backend/CathLab.Infrastructure/Persistence/Repositories/LesionTreatmentRepository.cs`
+- Added internal inventory release support in `backend/CathLab.Application/Services/InventoryService.cs`.
+- Extended `backend/CathLab.Application/Services/ProcedureService.cs` with:
+  - report hydration by cath study id
+  - narrative update support
+  - treatment deletion
+  - lesion deletion
+  - transaction-safe inventory release
+- Added new API endpoints to `backend/CathLab.WebApi/Controllers/ProceduresController.cs`:
+  - GET `/api/procedures/reports/study/{cathStudyId}`
+  - PUT `/api/procedures/reports/{reportId}`
+  - DELETE `/api/procedures/lesions/{lesionId}`
+  - DELETE `/api/procedures/treatments/{treatmentId}`
+  - GET `/api/procedures/reports/{reportId}/pdf`
+- Updated `backend/CathLab.WebApi/Controllers/UserController.cs` to require `Admin` role on the controller and keep GET users authorized.
+
+## Frontend updates
+
+- Added a new Pharmacy Management UI under `frontend/pages/PharmacyManagement`:
+  - `dashboard.html`
+  - `main.js`
+  - `style.css`
+- Implemented REST integration with backend pharmacy API endpoints.
+- Aligned frontend payloads with backend DTOs for:
+  - product creation
+  - item reception
+- Added response normalization for backend paged results and item lists.
+- Added dashboard views for:
+  - products
+  - items in stock
+  - low stock alerts
+  - expiring stock
+  - reservations by study
+- Added modal dialogs for product creation, item reception and waste operations.
+- Added toast notifications, search, filtering, and table loading/error states.
+- Added client-side routing and view switching for the Pharmacy management UI.
+
+## Files created or modified
+
+- `backend/CathLab.Application/DTOs/Procedures/ProcedureReportDetailDto.cs`
+- `backend/CathLab.Application/DTOs/Procedures/UpdateReportNarrativeDto.cs`
+- `backend/CathLab.Application/DTOs/Procedures/CoronaryLesionDto.cs`
+- `backend/CathLab.Application/DTOs/Procedures/LesionTreatmentDto.cs`
+- `backend/CathLab.Application/Interfaces/ICoronaryLesionRepository.cs`
+- `backend/CathLab.Application/Interfaces/ILesionTreatmentRepository.cs`
+- `backend/CathLab.Application/Services/InventoryService.cs`
+- `backend/CathLab.Application/Services/ProcedureService.cs`
+- `backend/CathLab.Infrastructure/Persistence/Repositories/CoronaryLesionRepository.cs`
+- `backend/CathLab.Infrastructure/Persistence/Repositories/LesionTreatmentRepository.cs`
+- `backend/CathLab.WebApi/Controllers/ProceduresController.cs`
+- `backend/CathLab.WebApi/Controllers/UserController.cs`
+- `frontend/pages/PharmacyManagement/dashboard.html`
+- `frontend/pages/PharmacyManagement/main.js`
+- `frontend/pages/PharmacyManagement/style.css`

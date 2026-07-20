@@ -1,0 +1,551 @@
+/* ============================================================
+ * Pharmacie — CathLab  (vanilla JS, no framework)
+ * ============================================================ */
+
+/* ---------- API config (tweak here if routes differ) ---------- */
+const API = {
+  base: 'http://localhost:5152/api',
+  // confirmed
+  itemsAvailable: (deviceType) =>
+    `${API.base}/pharmacy/items/available${deviceType ? `?deviceType=${encodeURIComponent(deviceType)}` : ''}`,
+  itemsReserved: (studyId) =>
+    `${API.base}/pharmacy/items/reserved/${encodeURIComponent(studyId)}`,
+  // assumed — may need route name tweaks
+  products: (page = 1, pageSize = 200) =>
+    `${API.base}/pharmacy/products?page=${page}&pageSize=${pageSize}`,
+  createProduct: `${API.base}/pharmacy/products`,
+  lowStock: `${API.base}/pharmacy/products/low-stock`,
+  receiveItem: `${API.base}/pharmacy/items/receive`,
+  expiring: (withinDays) =>
+    `${API.base}/pharmacy/items/expiring?withinDays=${withinDays}`,
+  waste: (id) => `${API.base}/pharmacy/items/${id}/waste`,
+};
+
+/* ---------- State ---------- */
+const state = {
+  products: [],
+  currentView: 'dashboard',
+  wasteItemId: null,
+};
+
+/* ---------- DOM helpers ---------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+/* ---------- Utils ---------- */
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '—';
+  return dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+function daysUntil(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt)) return null;
+  return Math.ceil((dt - Date.now()) / 86400000);
+}
+
+/* ---------- Status helpers ---------- */
+function statusPill(status) {
+  const map = {
+    InStock: { cls: 'pill-green', label: 'En stock' },
+    Reserved: { cls: 'pill-blue', label: 'Réservé' },
+    Consumed: { cls: 'pill-purple', label: 'Consommé' },
+    Wasted: { cls: 'pill-red', label: 'Rebut' },
+  };
+  const s = map[status] || { cls: 'pill-grey', label: status || '—' };
+  return `<span class="pill ${s.cls}">${escapeHtml(s.label)}</span>`;
+}
+function deviceTypePill(t) {
+  if (t === 'Stent') return `<span class="pill pill-purple">Stent</span>`;
+  if (t === 'Ballon') return `<span class="pill pill-amber">Ballon</span>`;
+  return escapeHtml(t || '—');
+}
+
+/* ---------- Toast ---------- */
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  $('#toast-container').appendChild(el);
+  setTimeout(() => {
+    el.classList.add('fade');
+    setTimeout(() => el.remove(), 200);
+  }, 3000);
+}
+
+/* ---------- Fetch wrapper ---------- */
+async function apiGet(url) {
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+async function apiPost(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const j = await res.json(); detail = j.message || j.title || detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+/* ---------- Table helpers ---------- */
+function setTableLoading(table, colspan, msg = 'Chargement…') {
+  const tb = table.querySelector('tbody');
+  tb.innerHTML = `<tr class="row-loading"><td colspan="${colspan}">${msg}</td></tr>`;
+}
+function setTableError(table, colspan, msg) {
+  const tb = table.querySelector('tbody');
+  tb.innerHTML = `<tr class="row-error"><td colspan="${colspan}">Erreur : ${escapeHtml(msg)}</td></tr>`;
+}
+function setTableEmpty(table, colspan, msg = 'Aucune donnée.') {
+  const tb = table.querySelector('tbody');
+  tb.innerHTML = `<tr class="empty-row"><td colspan="${colspan}">${msg}</td></tr>`;
+}
+
+/* ---------- Navigation ---------- */
+const VIEW_META = {
+  dashboard:    { title: 'Tableau de bord',          sub: "Vue d'ensemble du stock et des alertes" },
+  products:     { title: 'Produits',                 sub: 'Catalogue des produits référencés' },
+  items:         { title: 'Articles en stock',        sub: 'Unités physiques en inventaire' },
+  lowstock:     { title: 'Stock faible',             sub: 'Produits sous le seuil minimum' },
+  expiring:     { title: 'Péremptions proches',       sub: 'Articles expirant sous peu' },
+  reservations: { title: 'Réservations par étude',   sub: 'Articles réservés pour une étude' },
+};
+
+function switchView(view) {
+  state.currentView = view;
+  $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
+  $$('.view').forEach((v) => v.classList.add('hidden'));
+  $(`#view-${view}`).classList.remove('hidden');
+  const meta = VIEW_META[view] || { title: view, sub: '' };
+  $('#page-title').textContent = meta.title;
+  $('#page-subtitle').textContent = meta.sub;
+  // load
+  ({
+    dashboard: loadDashboard,
+    products: loadProducts,
+    items: loadItems,
+    lowstock: loadLowStock,
+    expiring: loadExpiring,
+    reservations: loadReservations,
+  }[view]?.());
+}
+
+/* ---------- Dashboard ---------- */
+async function loadDashboard() {
+  const kpiRow = $('#kpi-row');
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="kpi-icon purple">${iconBox()}</div><div class="kpi-meta"><span class="kpi-value">…</span><span class="kpi-label">Produits référencés</span></div></div>
+    <div class="kpi"><div class="kpi-icon green">${iconCheck()}</div><div class="kpi-meta"><span class="kpi-value">…</span><span class="kpi-label">Articles en stock</span></div></div>
+    <div class="kpi"><div class="kpi-icon amber">${iconWarn()}</div><div class="kpi-meta"><span class="kpi-value">…</span><span class="kpi-label">En stock faible</span></div></div>
+    <div class="kpi"><div class="kpi-icon red">${iconClock()}</div><div class="kpi-meta"><span class="kpi-value">…</span><span class="kpi-label">Péremption ≤30j</span></div></div>
+  `;
+
+  const lsTable = $('#dash-lowstock-table');
+  const exTable = $('#dash-expiring-table');
+  setTableLoading(lsTable, 5);
+  setTableLoading(exTable, 4);
+
+  // KPIs
+  let productsCount = 0, itemsCount = 0, lowCount = 0, expCount = 0;
+
+  // products
+  try {
+    const data = await apiGet(API.products());
+    const arr = Array.isArray(data)
+      ? data
+      : (data.items || data.Items || []);
+    productsCount = data.totalCount ?? data.total ?? arr.length;
+    state.products = arr;
+  } catch (e) { /* keep 0 */ }
+
+  // items available
+  try {
+    const items = await apiGet(API.itemsAvailable());
+    itemsCount = items.length;
+  } catch {}
+
+  // low stock
+  try {
+    const ls = await apiGet(API.lowStock);
+    lowCount = Array.isArray(ls) ? ls.length : (ls.items?.length || 0);
+    renderLowStockPreview(ls);
+    updateBadge('badge-lowstock', lowCount);
+  } catch (e) {
+    setTableError(lsTable, 5, e.message);
+  }
+
+  // expiring
+  try {
+    const ex = await apiGet(API.expiring(30));
+    expCount = Array.isArray(ex) ? ex.length : (ex.items?.length || 0);
+    renderExpiringPreview(ex);
+    updateBadge('badge-expiring', expCount);
+  } catch (e) {
+    setTableError(exTable, 4, e.message);
+  }
+
+  // fill KPIs
+  const vals = kpiRow.querySelectorAll('.kpi-value');
+  vals[0].textContent = productsCount;
+  vals[1].textContent = itemsCount;
+  vals[2].textContent = lowCount;
+  vals[3].textContent = expCount;
+}
+
+function renderLowStockPreview(data) {
+  const arr = normalizeArray(data);
+  const table = $('#dash-lowstock-table');
+  if (!arr.length) return setTableEmpty(table, 5, 'Aucun produit en stock faible.');
+  const rows = arr.slice(0, 5).map((p) => {
+    const cur = p.currentStock ?? 0;
+    const min = p.minimumStockLevel ?? 0;
+    const manque = Math.max(0, min - cur);
+    return `<tr>
+      <td>${escapeHtml(p.productName || p.name)}</td>
+      <td>${deviceTypePill(p.deviceType)}</td>
+      <td>${cur}</td>
+      <td>${min}</td>
+      <td><span class="pill pill-red">${manque}</span></td>
+    </tr>`;
+  }).join('');
+  table.querySelector('tbody').innerHTML = rows;
+}
+function renderExpiringPreview(data) {
+  const arr = normalizeArray(data);
+  const table = $('#dash-expiring-table');
+  if (!arr.length) return setTableEmpty(table, 4, 'Aucune péremption proche.');
+  const rows = arr.slice(0, 5).map((it) => {
+    const d = daysUntil(it.expiryDate);
+    return `<tr>
+      <td>${escapeHtml(it.productName)}</td>
+      <td>${escapeHtml(it.lotNumber || '—')}</td>
+      <td>${fmtDate(it.expiryDate)}</td>
+      <td><span class="pill pill-red">${d != null ? d + ' j' : '—'}</span></td>
+    </tr>`;
+  }).join('');
+  table.querySelector('tbody').innerHTML = rows;
+}
+
+/* ---------- Products ---------- */
+async function loadProducts() {
+  const table = $('#products-table');
+  setTableLoading(table, 7);
+  try {
+    const data = await apiGet(API.products());
+    const arr = normalizeArray(data);
+    state.products = arr;
+    if (!arr.length) return setTableEmpty(table, 7, 'Aucun produit référencé.');
+    const rows = arr.map((p) => `<tr>
+      <td>${escapeHtml(p.productName || p.name)}</td>
+      <td>${escapeHtml(p.reference || '—')}</td>
+      <td>${deviceTypePill(p.deviceType)}</td>
+      <td>${escapeHtml(p.manufacturer || '—')}</td>
+      <td>${p.currentStock ?? 0}</td>
+      <td>${p.minimumStockLevel ?? 0}</td>
+      <td>${escapeHtml(p.unitOfMeasure || '—')}</td>
+    </tr>`).join('');
+    table.querySelector('tbody').innerHTML = rows;
+  } catch (e) {
+    setTableError(table, 7, e.message);
+    toast('Erreur lors du chargement des produits', 'error');
+  }
+}
+
+/* ---------- Items ---------- */
+let currentDeviceFilter = '';
+async function loadItems() {
+  const table = $('#items-table');
+  setTableLoading(table, 8);
+  try {
+    const items = await apiGet(API.itemsAvailable(currentDeviceFilter));
+    const arr = normalizeArray(items);
+    if (!arr.length) return setTableEmpty(table, 8, 'Aucun article en stock.');
+    const rows = arr.map((it) => `<tr>
+      <td>${escapeHtml(it.productName)}</td>
+      <td>${deviceTypePill(it.deviceType)}</td>
+      <td>${escapeHtml(it.lotNumber || '—')}</td>
+      <td>${escapeHtml(it.barcode || '—')}</td>
+      <td>${fmtDate(it.expiryDate)}</td>
+      <td>${statusPill(it.status)}</td>
+      <td>${escapeHtml(it.reservedForCathStudyId || '—')}</td>
+      <td>${it.status === 'InStock' || it.status === 'Reserved' ? `<button class="icon-btn" title="Mettre au rebut" data-waste="${it.id}">${iconTrash()}</button>` : ''}</td>
+    </tr>`).join('');
+    table.querySelector('tbody').innerHTML = rows;
+  } catch (e) {
+    setTableError(table, 8, e.message);
+    toast('Erreur lors du chargement des articles', 'error');
+  }
+}
+
+/* ---------- Low stock ---------- */
+async function loadLowStock() {
+  const table = $('#lowstock-table');
+  setTableLoading(table, 6);
+  try {
+    const data = await apiGet(API.lowStock);
+    const arr = normalizeArray(data);
+    if (!arr.length) return setTableEmpty(table, 6, 'Aucun produit en stock faible.');
+    const rows = arr.map((p) => {
+      const cur = p.currentStock ?? 0;
+      const min = p.minimumStockLevel ?? 0;
+      const manque = Math.max(0, min - cur);
+      return `<tr>
+        <td>${escapeHtml(p.productName || p.name)}</td>
+        <td>${escapeHtml(p.reference || '—')}</td>
+        <td>${deviceTypePill(p.deviceType)}</td>
+        <td>${cur}</td>
+        <td>${min}</td>
+        <td><span class="pill pill-red">${manque}</span></td>
+      </tr>`;
+    }).join('');
+    table.querySelector('tbody').innerHTML = rows;
+  } catch (e) {
+    setTableError(table, 6, e.message);
+    toast('Erreur lors du chargement du stock faible', 'error');
+  }
+}
+
+/* ---------- Expiring ---------- */
+let expiringWindow = 30;
+async function loadExpiring() {
+  const table = $('#expiring-table');
+  setTableLoading(table, 5);
+  try {
+    const data = await apiGet(API.expiring(expiringWindow));
+    const arr = normalizeArray(data);
+    if (!arr.length) return setTableEmpty(table, 5, 'Aucune péremption dans cette fenêtre.');
+    const rows = arr.map((it) => {
+      const d = daysUntil(it.expiryDate);
+      return `<tr>
+        <td>${escapeHtml(it.productName)}</td>
+        <td>${deviceTypePill(it.deviceType)}</td>
+        <td>${escapeHtml(it.lotNumber || '—')}</td>
+        <td>${fmtDate(it.expiryDate)}</td>
+        <td><span class="pill pill-red">${d != null ? d + ' j' : '—'}</span></td>
+      </tr>`;
+    }).join('');
+    table.querySelector('tbody').innerHTML = rows;
+  } catch (e) {
+    setTableError(table, 5, e.message);
+    toast('Erreur lors du chargement des péremptions', 'error');
+  }
+}
+
+/* ---------- Reservations ---------- */
+async function loadReservations() {
+  // do nothing until user searches; keep placeholder
+}
+async function searchReservations() {
+  const input = $('#study-id-input');
+  const table = $('#reservations-table');
+  const id = input.value.trim();
+  if (!id) { toast('Saisissez un identifiant d\'étude', 'error'); return; }
+  setTableLoading(table, 7);
+  try {
+    const data = await apiGet(API.itemsReserved(id));
+    const arr = normalizeArray(data);
+    if (!arr.length) return setTableEmpty(table, 7, 'Aucun article réservé pour cette étude.');
+    const rows = arr.map((it) => `<tr>
+      <td>${escapeHtml(it.productName)}</td>
+      <td>${deviceTypePill(it.deviceType)}</td>
+      <td>${escapeHtml(it.lotNumber || '—')}</td>
+      <td>${escapeHtml(it.barcode || '—')}</td>
+      <td>${fmtDate(it.expiryDate)}</td>
+      <td>${statusPill(it.status)}</td>
+      <td>${fmtDate(it.reservedAt)}</td>
+    </tr>`).join('');
+    table.querySelector('tbody').innerHTML = rows;
+  } catch (e) {
+    setTableError(table, 7, e.message);
+    toast('Erreur lors de la recherche des réservations', 'error');
+  }
+}
+
+/* ---------- Modals ---------- */
+function openModal(id) { $(`#${id}`).classList.remove('hidden'); }
+function closeModal(id) { $(`#${id}`).classList.add('hidden'); }
+
+function openProductModal() {
+  $('#form-product').reset();
+  $('#p-min').value = 5;
+  openModal('modal-product');
+}
+async function saveProduct() {
+  const body = {
+    productName: $('#p-name').value.trim(),
+    reference: $('#p-ref').value.trim(),
+    deviceType: $('#p-type').value,
+    manufacturer: $('#p-manu').value.trim() || null,
+    unitOfMeasure: $('#p-unit').value.trim() || null,
+    minimumStockLevel: parseInt($('#p-min').value, 10) || 0,
+  };
+  try {
+    await apiPost(API.createProduct, body);
+    closeModal('modal-product');
+    toast('Produit créé avec succès');
+    loadProducts();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function openReceiveModal() {
+  $('#form-receive').reset();
+  const sel = $('#r-product');
+  sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+    state.products.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.productName || p.name)} (${escapeHtml(p.deviceType || '')})</option>`).join('');
+  if (!state.products.length) {
+    try {
+      const data = await apiGet(API.products());
+      state.products = normalizeArray(data);
+      sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+        state.products.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.productName || p.name)} (${escapeHtml(p.deviceType || '')})</option>`).join('');
+    } catch {}
+  }
+  openModal('modal-receive');
+}
+async function saveReceive() {
+  const body = {
+    productId: $('#r-product').value,
+    barcode: $('#r-barcode').value.trim(),
+    lotNumber: $('#r-lot').value.trim(),
+    expiryDate: $('#r-expiry').value,
+    serialNumber: $('#r-serial').value.trim() || null,
+  };
+  if (!body.productId) { toast('Sélectionnez un produit', 'error'); return; }
+  try {
+    await apiPost(API.receiveItem, body);
+    closeModal('modal-receive');
+    toast('Article réceptionné avec succès');
+    loadItems();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+function openWasteModal(itemId) {
+  state.wasteItemId = itemId;
+  const item = { productName: '', lotNumber: '' };
+  $('#waste-item-label').textContent = `Article #${itemId}`;
+  $('#w-note').value = '';
+  openModal('modal-waste');
+}
+async function saveWaste() {
+  const note = $('#w-note').value.trim();
+  try {
+    await apiPost(API.waste(state.wasteItemId), { note });
+    closeModal('modal-waste');
+    toast('Article mis au rebut');
+    loadItems();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+/* ---------- Badges ---------- */
+function updateBadge(id, count) {
+  const el = $(`#${id}`);
+  if (!el) return;
+  el.textContent = count;
+  el.classList.toggle('zero', count === 0);
+}
+
+/* ---------- Icons (inline SVG strings) ---------- */
+function iconBox()   { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`; }
+function iconCheck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`; }
+function iconWarn()  { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`; }
+function iconClock() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`; }
+function iconTrash() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`; }
+
+/* ---------- Helpers ---------- */
+function normalizeArray(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  if (data && Array.isArray(data.Items)) return data.Items;
+  return [];
+}
+
+/* ---------- Global search (client-side filter on current view's first table) ---------- */
+function applyGlobalSearch(q) {
+  const view = $(`#view-${state.currentView}`);
+  if (!view) return;
+  const table = view.querySelector('.data-table');
+  if (!table) return;
+  const term = q.toLowerCase().trim();
+  $$('tbody tr', table).forEach((tr) => {
+    if (tr.classList.contains('row-loading') || tr.classList.contains('row-error') || tr.classList.contains('empty-row')) return;
+    tr.style.display = !term || tr.textContent.toLowerCase().includes(term) ? '' : 'none';
+  });
+}
+
+/* ---------- Wire up events ---------- */
+function init() {
+  // nav
+  $$('.nav-item').forEach((n) => n.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchView(n.dataset.view);
+  }));
+  // panel links
+  $$('.panel-link').forEach((l) => l.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchView(l.dataset.goto);
+  }));
+
+  // products
+  $('#btn-new-product').addEventListener('click', openProductModal);
+  $('#btn-save-product').addEventListener('click', saveProduct);
+
+  // items
+  $('#btn-receive').addEventListener('click', openReceiveModal);
+  $('#btn-save-receive').addEventListener('click', saveReceive);
+  $('#items-filter').addEventListener('change', (e) => {
+    currentDeviceFilter = e.target.value;
+    loadItems();
+  });
+  // waste via delegation
+  $('#items-table').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-waste]');
+    if (btn) openWasteModal(btn.dataset.waste);
+  });
+  $('#btn-save-waste').addEventListener('click', saveWaste);
+
+  // expiring window
+  $('#expiring-window').addEventListener('change', (e) => {
+    expiringWindow = parseInt(e.target.value, 10);
+    loadExpiring();
+  });
+
+  // reservations
+  $('#btn-search-study').addEventListener('click', searchReservations);
+  $('#study-id-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); searchReservations(); }
+  });
+
+  // modal close
+  $$('[data-close-modal]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.closeModal)));
+  $$('.modal-overlay').forEach((o) => o.addEventListener('click', (e) => {
+    if (e.target === o) o.classList.add('hidden');
+  }));
+
+  // global search
+  $('#global-search').addEventListener('input', (e) => applyGlobalSearch(e.target.value));
+
+  // initial load
+  switchView('dashboard');
+}
+
+document.addEventListener('DOMContentLoaded', init);

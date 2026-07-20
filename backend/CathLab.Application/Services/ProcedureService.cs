@@ -1,6 +1,7 @@
 using CathLab.Application.DTOs.Procedures;
 using CathLab.Application.Interfaces;
 using CathLab.Domain.Entities;
+using CathLab.Domain.Repositories;
 
 namespace CathLab.Application.Services;
 
@@ -12,6 +13,7 @@ public class ProcedureService
     private readonly InventoryService _inventory;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPdfGenerator _pdfGenerator;
+    private readonly IUserRepository _userRepository;
 
     public ProcedureService(
         IProcedureReportRepository reports,
@@ -19,7 +21,8 @@ public class ProcedureService
         ILesionTreatmentRepository treatments,
         InventoryService inventory,
         IUnitOfWork unitOfWork,
-        IPdfGenerator pdfGenerator)
+        IPdfGenerator pdfGenerator,
+        IUserRepository userRepository)
     {
         _reports = reports;
         _lesions = lesions;
@@ -27,6 +30,7 @@ public class ProcedureService
         _inventory = inventory;
         _unitOfWork = unitOfWork;
         _pdfGenerator = pdfGenerator;
+        _userRepository = userRepository;
     }
 
     /// <summary>Placing a Lesion marker. Creates the ProcedureReport on first use for this CathStudy.</summary>
@@ -54,6 +58,12 @@ public class ProcedureService
             Vessel = dto.Vessel,
             SegmentNumber = dto.SegmentNumber,
             StenosisPercent = dto.StenosisPercent,
+            RefDiam = dto.RefDiam,
+            Calcified = dto.Calcified,
+            Thrombus = dto.Thrombus,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = dto.CreatedByUserId,
+            ResidualStenosis = dto.ResidualStenosis,
             LesionType = lesionType,
             TimiFlow = dto.TimiFlow,
             IsTreated = false
@@ -169,6 +179,8 @@ public class ProcedureService
     {
         Id = t.Id,
         LesionId = t.LesionId,
+        DiameterMm = t is StentImplant si ? si.StentDiameterMm : ((BalloonDilation)t).BalloonDiameterMm,
+        LengthMm = t is StentImplant sl ? sl.StentLengthMm : ((BalloonDilation)t).BalloonLengthMm,
         InventoryItemId = t.InventoryItemId,
         Kind = kind,
         TimiFlowAfter = t.TimiFlowAfter,
@@ -303,4 +315,139 @@ public class ProcedureService
     {
         throw new NotImplementedException();
     }
+
+    // --- Additions to ProcedureService ---
+
+/// <summary>
+/// Full hydration for the coronary mapping UI. Returns null if no report
+/// exists yet for this study (virgin state - not an error, just "nothing
+/// recorded yet").
+/// </summary>
+public async Task<ProcedureReportDetailDto?> GetReportDetailByCathStudyIdAsync(Guid cathStudyId)
+{
+    var report = await _reports.FindByCathStudyIdAsync(cathStudyId);
+    if (report is null) return null;
+
+    var lesions = await _lesions.GetByProcedureReportAsync(report.Id);
+
+    return new ProcedureReportDetailDto
+    {
+        Id = report.Id,
+        CathStudyId = report.CathStudyId,
+        IsConfirmed = report.IsConfirmed,
+        ReportGeneratedAt = report.ReportGeneratedAt,
+        ConfirmedAt = report.ConfirmedAt,
+        Approach = report.Approach,
+        CatheterUsed = report.CatheterUsed,
+        Conclusion = report.Conclusion,
+        DominanceType = report.DominanceType,
+        TimiFlowBaseline = report.TimiFlowBaseline,
+        TimiFlowFinal = report.TimiFlowFinal,
+        ContrastVolumeMl = report.ContrastVolumeMl,
+        DoseAreaProductGycm2 = report.DoseAreaProductGycm2,
+        MissingRequiredFields = report.IsConfirmed ? new() : GetMissingRequiredFields(report),
+        Recommendations = report.Recommendations,
+        ConfirmedByUserId = report.ConfirmedByUserId?.ToString(),
+
+        ConfirmedByUser = (await _userRepository.GetByIdAsync(report.ConfirmedByUserId ?? Guid.Empty))?.FullName ?? string.Empty,
+
+        Lesions = lesions.Select(l => new CoronaryLesionDto
+        {
+            Id = l.Id,
+            Vessel = l.Vessel,
+            SegmentNumber = l.SegmentNumber,
+            StenosisPercent = l.StenosisPercent,
+            LesionType = l.LesionType.ToString(),
+            RefDiam = l.RefDiam,
+            Calcified = l.Calcified,
+            Thrombus = l.Thrombus,
+            ResidualStenosis = l.ResidualStenosis,
+            CreatedAt = l.CreatedAt,
+            CreatedByUserId = l.CreatedByUserId,
+            TimiFlow = l.TimiFlow,
+            IsTreated = l.IsTreated,
+            Treatments = l.Treatments.Select(t => new LesionTreatmentDto
+            {
+                Id = t.Id,
+                Kind = t is StentImplant ? "Stent" : "Balloon",
+                InventoryItemId = t.InventoryItemId,
+                ProductName = t.InventoryItem?.Product?.ProductName ?? "?", 
+                LotNumber = t.InventoryItem?.LotNumber,
+                DiameterMm = t is StentImplant si ? si.StentDiameterMm : ((BalloonDilation)t).BalloonDiameterMm,
+                LengthMm = t is StentImplant sl ? sl.StentLengthMm : ((BalloonDilation)t).BalloonLengthMm,
+                TimiFlowAfter = t.TimiFlowAfter,
+                PerformedAt = t.PerformedAt,
+                Notes = t.Notes
+            }).ToList()
+        }).ToList()
+    };
 }
+
+/// <summary>Update the narrative fields required before confirmation.</summary>
+public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativeDto dto)
+{
+    var report = await _reports.FindByIdAsync(reportId)
+        ?? throw new InvalidOperationException("Procedure report not found.");
+
+    if (report.IsConfirmed)
+        throw new InvalidOperationException("Cannot edit a confirmed report.");
+
+    if (dto.Approach is not null) report.Approach = dto.Approach;
+    if (dto.CatheterUsed is not null) report.CatheterUsed = dto.CatheterUsed;
+    if (dto.Conclusion is not null) report.Conclusion = dto.Conclusion;
+    if (dto.DominanceType is not null) report.DominanceType = dto.DominanceType;
+    if (dto.TimiFlowBaseline.HasValue) report.TimiFlowBaseline = dto.TimiFlowBaseline;
+    if (dto.TimiFlowFinal.HasValue) report.TimiFlowFinal = dto.TimiFlowFinal;
+    if (dto.ContrastVolumeMl.HasValue) report.ContrastVolumeMl = dto.ContrastVolumeMl;
+    if (dto.DoseAreaProductGycm2.HasValue) report.DoseAreaProductGycm2 = dto.DoseAreaProductGycm2;
+    if (dto.Recommendations is not null) report.Recommendations = dto.Recommendations;
+
+    await _reports.UpdateAsync(report);
+}
+
+/// <summary>Deletes a single treatment and releases its reserved device back to stock.</summary>
+public async Task DeleteTreatmentAsync(Guid treatmentId)
+{
+    var treatment = await _treatments.FindByIdAsync(treatmentId)
+        ?? throw new InvalidOperationException("Treatment not found.");
+    var lesion = await _lesions.FindByIdAsync(treatment.LesionId)
+        ?? throw new InvalidOperationException("Lesion not found for this treatment.");
+    var report = await _reports.FindByIdAsync(lesion.ProcedureReportId)
+        ?? throw new InvalidOperationException("Report not found.");
+
+    if (report.IsConfirmed)
+        throw new InvalidOperationException("Cannot delete a treatment from a confirmed report.");
+
+    await _unitOfWork.ExecuteInTransactionAsync(async () =>
+    {
+        await _inventory.ReleaseItemAsync(treatment.InventoryItemId);
+        await _treatments.DeleteAsync(treatmentId);
+
+        var remaining = await _treatments.GetByLesionIdAsync(lesion.Id);
+        lesion.IsTreated = remaining.Any(t => t is StentImplant
+            || (t is BalloonDilation b && (b.IsPostDilation || !b.IsPreDilation)));
+        await _lesions.UpdateAsync(lesion);
+    });
+}
+
+/// <summary>Deletes a lesion marker and every treatment/device reservation attached to it.</summary>
+public async Task DeleteLesionAsync(Guid lesionId)
+{
+    var lesion = await _lesions.FindByIdAsync(lesionId)
+        ?? throw new InvalidOperationException("Lesion not found.");
+    var report = await _reports.FindByIdAsync(lesion.ProcedureReportId)
+        ?? throw new InvalidOperationException("Report not found.");
+
+    if (report.IsConfirmed)
+        throw new InvalidOperationException("Cannot delete a lesion from a confirmed report.");
+
+    var treatments = await _treatments.GetByLesionIdAsync(lesionId);
+
+    await _unitOfWork.ExecuteInTransactionAsync(async () =>
+    {
+        foreach (var t in treatments)
+            await _inventory.ReleaseItemAsync(t.InventoryItemId);
+
+        await _lesions.DeleteAsync(lesionId);
+    });
+}}

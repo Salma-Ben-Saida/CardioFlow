@@ -12,4 +12,10 @@ public class CreateLesionDto
     public byte StenosisPercent { get; set; }
     public string LesionType { get; set; } = string.Empty;
     public byte? TimiFlow { get; set; }
+    public string? RefDiam { get; set; }
+    public bool Calcified { get; set; }
+    public bool Thrombus { get; set; }
+    public string? ResidualStenosis { get; set; }
+    public string? CreatedByUserId { get; set; }
+
 }

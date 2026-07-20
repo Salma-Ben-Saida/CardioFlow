@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin")]
 public class UserController : ControllerBase
 {
     private readonly UserService _userService;
@@ -49,8 +50,7 @@ public class UserController : ControllerBase
                 new { message = "Une erreur interne est survenue lors de la création de l'utilisateur." });
         }
     }
-    [HttpGet]
-[Authorize] // Optionnel : [Authorize(Roles = "Admin,ResponsablePharmacie")] pour restreindre l'accès
+[HttpGet]
 [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<UserDto>))]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 20)

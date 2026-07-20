@@ -118,15 +118,81 @@ public async Task<IActionResult> ConfirmReport(Guid reportId)
         return Unauthorized(new { error = ex.Message });
     }
 }
-[HttpPost("confirm/{id}")]
-public async Task ConfirmReportAsync(Guid reportId, Guid userId)
+/// <summary>
+/// GET /api/procedures/reports/study/{cathStudyId} - hydrates the
+/// coronary mapping UI with everything already recorded for this study.
+/// Returns 204 (not 404) when no report exists yet - "nothing recorded"
+/// is a normal state, not an error.
+/// </summary>
+[HttpGet("reports/study/{cathStudyId:guid}")]
+public async Task<IActionResult> GetReportByCathStudy(Guid cathStudyId)
 {
-    var report = await _procedures.GetReportByIdAsync(reportId)
-        ?? throw new InvalidOperationException("Report not found");
-
-    if (report.IsConfirmed)
-        throw new InvalidOperationException("Report already confirmed");
-
-    await _procedures.ConfirmReportAsync(report.Id, GetCurrentUserId()) ; // wrap in a transaction with the inventory update
+    var detail = await _procedures.GetReportDetailByCathStudyIdAsync(cathStudyId);
+    return detail is null ? NoContent() : Ok(detail);
 }
+
+/// <summary>
+/// PUT /api/procedures/reports/{reportId} - sets narrative fields
+/// (Approach, CatheterUsed, Conclusion...) required before confirmation.
+/// </summary>
+[HttpPut("reports/{reportId:guid}")]
+public async Task<IActionResult> UpdateReportNarrative(Guid reportId, [FromBody] UpdateReportNarrativeDto dto)
+{
+    try
+    {
+        await _procedures.UpdateReportNarrativeAsync(reportId, dto);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+}
+
+/// <summary>DELETE /api/procedures/lesions/{lesionId} - removes a marker entirely.</summary>
+[HttpDelete("lesions/{lesionId:guid}")]
+public async Task<IActionResult> DeleteLesion(Guid lesionId)
+{
+    try
+    {
+        await _procedures.DeleteLesionAsync(lesionId);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+}
+
+/// <summary>DELETE /api/procedures/treatments/{treatmentId} - removes one stent/balloon.</summary>
+[HttpDelete("treatments/{treatmentId:guid}")]
+public async Task<IActionResult> DeleteTreatment(Guid treatmentId)
+{
+    try
+    {
+        await _procedures.DeleteTreatmentAsync(treatmentId);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+}
+
+/// <summary>
+/// GET /api/procedures/reports/{reportId}/pdf - streams the generated PDF.
+/// Only available after confirmation, since PdfStoragePath is set at that point.
+/// </summary>
+[HttpGet("reports/{reportId:guid}/pdf")]
+public async Task<IActionResult> DownloadReportPdf(Guid reportId)
+{
+    var report = await _procedures.GetReportByIdAsync(reportId);
+    if (report is null) return NotFound();
+    if (!report.IsConfirmed || string.IsNullOrEmpty(report.PdfStoragePath))
+        return Conflict(new { error = "Le rapport doit être confirmé avant de pouvoir être téléchargé en PDF." });
+
+    var bytes = await System.IO.File.ReadAllBytesAsync(report.PdfStoragePath);
+    return File(bytes, "application/pdf", $"rapport-{reportId}.pdf");
+}
+
 }

@@ -4,7 +4,6 @@ public class ProcedureReport
 {
     public Guid Id { get; set; }
     public Guid CathStudyId { get; set; }
-
     public string? Approach { get; set; }
     public string? CatheterUsed { get; set; }
     public decimal? ContrastVolumeMl { get; set; }
@@ -17,8 +16,12 @@ public class ProcedureReport
     public string? PdfStoragePath { get; set; }
     public bool IsConfirmed { get; set; }
     public DateTime? ConfirmedAt { get; set; }
-
-    // Navigation
+    
+    public string? Recommendations { get; set; }
     public CathStudy CathStudy { get; set; } = null!;
     public ICollection<CoronaryLesion> Lesions { get; set; } = new List<CoronaryLesion>();
+
+    //navigation to the user who confirmed the report
+    public Guid? ConfirmedByUserId { get; set; } 
+    
 }

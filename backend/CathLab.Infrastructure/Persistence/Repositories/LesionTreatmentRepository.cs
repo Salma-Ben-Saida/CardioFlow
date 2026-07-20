@@ -32,4 +32,20 @@ public class LesionTreatmentRepository : ILesionTreatmentRepository
         await _db.SaveChangesAsync();
         return balloon;
     }
+
+    public Task<List<LesionTreatment>> GetByLesionIdAsync(Guid lesionId)
+    {
+        return _db.Set<LesionTreatment>()
+            .Where(t => t.LesionId == lesionId)
+            .ToListAsync();
+    }
+
+    public async Task DeleteAsync(Guid id)
+    {
+         var entity = await _db.Set<LesionTreatment>().FindAsync(id);
+        if (entity == null) return;
+        _db.Set<LesionTreatment>().Remove(entity);
+        await _db.SaveChangesAsync();
+    }
+
 }

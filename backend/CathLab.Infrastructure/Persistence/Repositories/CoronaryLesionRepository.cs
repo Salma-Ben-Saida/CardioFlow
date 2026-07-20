@@ -34,4 +34,14 @@ public class CoronaryLesionRepository : ICoronaryLesionRepository
         _db.CoronaryLesions.Update(lesion);
         await _db.SaveChangesAsync();
     }
+
+    public async Task DeleteAsync(Guid id)
+    {
+        var lesion = await _db.CoronaryLesions.FindAsync(id);
+        if (lesion != null)
+        {
+            _db.CoronaryLesions.Remove(lesion);
+            await _db.SaveChangesAsync();
+        }
+    }
 }

@@ -8,4 +8,5 @@ public interface ICoronaryLesionRepository
     Task<List<CoronaryLesion>> GetByProcedureReportAsync(Guid procedureReportId);
     Task<CoronaryLesion> CreateAsync(CoronaryLesion lesion);
     Task UpdateAsync(CoronaryLesion lesion);
+    Task DeleteAsync(Guid id);
 }
