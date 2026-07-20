@@ -11,6 +11,13 @@ public class CoronaryLesion
     public LesionType LesionType { get; set; }
     public byte? TimiFlow { get; set; }
     public bool IsTreated { get; set; }
+    public string? RefDiam { get; set; }
+    public bool Calcified { get; set; }
+    public bool Thrombus { get; set; }
+    public string? ResidualStenosis { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+
 
     // Navigation
     public ProcedureReport ProcedureReport { get; set; } = null!;

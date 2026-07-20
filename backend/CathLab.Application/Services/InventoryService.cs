@@ -261,4 +261,23 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
     var items = await _items.GetAvailableAsync(parsed);
     return items.Select(i => ToDto(i, productName: null)).ToList();
 }
+
+    /// <summary>
+    /// Releases a reserved inventory item back to stock without recording a
+    /// stock movement. Used when a planned treatment or lesion is deleted.
+    /// </summary>
+    internal async Task ReleaseItemAsync(Guid inventoryItemId)
+    {
+        var item = await _items.FindByIdAsync(inventoryItemId)
+            ?? throw new InvalidOperationException("Inventory item not found.");
+
+        if (item.Status != ItemStatus.Reserved)
+            throw new InvalidOperationException($"Item is '{item.Status}', only Reserved items can be released.");
+
+        item.Status = ItemStatus.InStock;
+        item.ReservedForCathStudyId = null;
+        item.ReservedAt = null;
+
+        await _items.UpdateAsync(item);
+    }
 }

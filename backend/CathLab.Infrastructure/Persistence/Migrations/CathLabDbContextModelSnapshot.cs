@@ -105,6 +105,15 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("Calcified")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsTreated")
                         .HasColumnType("bit");
 
@@ -116,11 +125,20 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProcedureReportId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("RefDiam")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResidualStenosis")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<byte>("SegmentNumber")
                         .HasColumnType("tinyint");
 
                     b.Property<byte>("StenosisPercent")
                         .HasColumnType("tinyint");
+
+                    b.Property<bool>("Thrombus")
+                        .HasColumnType("bit");
 
                     b.Property<byte?>("TimiFlow")
                         .HasColumnType("tinyint");
@@ -352,6 +370,9 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<decimal?>("ContrastVolumeMl")
                         .HasPrecision(6, 2)
                         .HasColumnType("decimal(6,2)");
@@ -370,6 +391,9 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<string>("PdfStoragePath")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Recommendations")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("ReportGeneratedAt")
                         .HasColumnType("datetime2");

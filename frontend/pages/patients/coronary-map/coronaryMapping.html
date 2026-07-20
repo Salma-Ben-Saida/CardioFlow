@@ -10,20 +10,33 @@
     --vessel:#B3352F; --vessel-deco:#C97873; --accent:#2C5F82; --accent-dark:#204A66;
     --mild:#F2C86D; --moderate:#E8823C; --severe:#C0392B; --critical:#7A1F1F;
     --stent:#2E9E5B; --stent-dark:#1F7A45; --balloon:#D99B1F;
+    --success:#2E9E5B; --error:#C0392B; --warning:#E8823C;
   }
   *{box-sizing:border-box;}
   body{ margin:0; background:var(--bg-app); color:var(--ink); font-family:'Segoe UI', Inter, system-ui, sans-serif;
     height:100vh; display:flex; flex-direction:column; overflow:hidden; }
   header{ background:var(--surface); border-bottom:1px solid var(--border); padding:9px 18px;
-    display:flex; align-items:center; justify-content:space-between; }
-  header .patient{ font-size:14px; } header .patient b{ font-size:15px; }
+    display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header .patient{ font-size:14px; display:flex; align-items:center; gap:10px; }
+  header .patient b{ font-size:15px; }
   header .patient span{ color:var(--muted); font-family:'Consolas', monospace; margin-left:10px; }
+  .header-right{ display:flex; align-items:center; gap:10px; }
   .tag{ background:var(--accent); color:#fff; font-size:11px; padding:3px 9px; border-radius:3px; }
+  .back-btn{ background:none; border:1px solid var(--border); border-radius:5px; padding:4px 12px;
+    font-size:12.5px; cursor:pointer; color:var(--accent-dark); white-space:nowrap; }
+  .back-btn:hover{ background:#F0F6FA; border-color:var(--accent); }
+  .status-badge{ font-size:11px; padding:3px 10px; border-radius:12px; font-weight:600; white-space:nowrap; }
+  .status-badge.draft{ background:#FEF3C7; color:#92400E; }
+  .status-badge.confirmed{ background:#D1FAE5; color:#065F46; }
 
   .subbar{ background:#F7F9FA; border-bottom:1px solid var(--border); padding:7px 18px;
     display:flex; align-items:center; gap:14px; font-size:12.5px; }
   .subbar label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
   .subbar b{ color:var(--muted); font-weight:600; margin-right:2px; }
+
+  .conflict-banner{ background:#FEE2E2; border-bottom:1px solid #FCA5A5; padding:8px 18px;
+    font-size:12.5px; color:#991B1B; display:none; align-items:center; gap:8px; }
+  .conflict-banner.show{ display:flex; }
 
 .main{ flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .workspace{ flex:1; display:flex; overflow:hidden; min-height:0; }
@@ -54,6 +67,7 @@
   .info-box .title{ font-weight:700; margin-bottom:2px; }
   .info-box .ev-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .info-box .edit-ic{ border:none; background:none; cursor:pointer; color:var(--accent-dark); font-size:12px; padding:0 2px; }
+  .info-box .audit{ font-size:10.5px; color:var(--muted); margin-top:4px; border-top:1px solid #ccc; padding-top:3px; }
 
   .popover{ position:absolute; background:var(--surface); border:1px solid var(--border);
     border-radius:8px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.18); width:252px; z-index:30; font-size:13px; }
@@ -65,13 +79,16 @@
   .popover .actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
   .btn{ padding:6px 13px; border-radius:5px; border:1px solid var(--border); background:#F5F6F7; cursor:pointer; font-size:12.5px; }
   .btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent-dark); }
+  .btn.primary:disabled{ opacity:.4; cursor:not-allowed; }
   .btn.danger{ background:#C0392B; color:#fff; border-color:#8f2a1f; }
+  .btn.success{ background:var(--success); color:#fff; border-color:#1F7A45; }
 
   .modal-overlay{ position:fixed; inset:0; background:rgba(20,25,30,.4); z-index:100;
     display:flex; align-items:center; justify-content:center; }
-  .modal-box{ background:#fff; border-radius:10px; padding:20px 22px; width:320px; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+  .modal-box{ background:#fff; border-radius:10px; padding:20px 22px; width:380px; max-width:90vw; max-height:80vh; overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,.3); }
   .modal-box h4{ margin:0 0 10px; font-size:14.5px; }
-  .modal-box p{ margin:0 0 16px; font-size:13px; color:var(--muted); }
+  .modal-box p{ margin:0 0 16px; font-size:13px; color:var(--muted); line-height:1.5; }
+  .modal-box .warning-list{ margin:0 0 16px; padding-left:18px; color:var(--severe); font-size:12.5px; }
   .modal-box .actions{ display:flex; justify-content:flex-end; gap:10px; }
 
   .resize-handle{ height:7px; background:#F0F2F3; border-top:1px solid var(--border); border-bottom:1px solid var(--border);
@@ -89,17 +106,74 @@
   .finding-row.selected{ border-color:var(--accent); background:#F0F6FA; }
   .finding-row .head{ font-weight:700; }
   .finding-row ul{ margin:5px 0 0; padding-left:15px; color:var(--muted); }
-  .empty{ color:var(--muted); font-size:12px; padding:14px; text-align:center; }
-  .report-wrap{ flex:1; display:flex; flex-direction:column; min-height:0; }
-  #report{ flex:1; resize:none; border:none; padding:12px 14px; font-family:'Consolas',monospace; font-size:12px; line-height:1.55; color:var(--ink); outline:none; }
-  .hint{ font-size:11px; color:var(--muted); padding:6px 16px 10px; background:#F7F9FA; border-top:1px solid var(--border); }
+  .finding-row .audit-row{ font-size:10px; color:var(--muted); margin-top:4px; }
+.empty{ color:var(--muted); font-size:12px; padding:14px; text-align:center; }
+.report-wrap{ flex:1; display:flex; flex-direction:column; min-height:0; }
+#report{ flex:1; resize:none; border:none; padding:12px 14px; font-family:'Consolas',monospace; font-size:12px; line-height:1.55; color:var(--ink); outline:none; }
+.hint{ font-size:11px; color:var(--muted); padding:6px 16px 10px; background:#F7F9FA; border-top:1px solid var(--border); }
+
+  .conclusion-section{ padding:8px 14px; }
+  .conclusion-section label{ display:block; font-size:11px; color:var(--muted); margin:6px 0 3px; }
+  .conclusion-section textarea, .conclusion-section input[type="text"]{ width:100%; border:1px solid var(--border); border-radius:4px; padding:5px 7px;
+    font-size:12px; font-family:inherit; resize:vertical; min-height:32px; }
+  .conclusion-section textarea:disabled, .conclusion-section input[type="text"]:disabled{ background:#F5F6F7; color:var(--muted); }
+
+  .report-actions{ display:flex; gap:8px; padding:8px 14px; border-top:1px solid var(--border); background:#F7F9FA; }
+  .report-actions .btn{ flex:1; text-align:center; }
+
+  .save-toast{ position:fixed; bottom:20px; right:20px; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:10px 18px; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,.15);
+    z-index:200; opacity:0; transform:translateY(10px); transition:opacity .25s, transform .25s; pointer-events:none; }
+  .save-toast.show{ opacity:1; transform:translateY(0); }
+  .save-toast.success{ border-color:var(--success); color:var(--success); }
+  .save-toast.error{ border-color:var(--error); color:var(--error); }
+  .save-toast.info{ border-color:var(--accent); color:var(--accent-dark); }
+
+  .report-modal-overlay{ position:fixed; inset:0; background:rgba(20,25,30,.5); z-index:150;
+    display:flex; align-items:center; justify-content:center; }
+  .report-modal-box{ background:#fff; border-radius:10px; width:800px; max-width:92vw; max-height:90vh;
+    display:flex; flex-direction:column; box-shadow:0 16px 48px rgba(0,0,0,.3); }
+  .report-modal-header{ display:flex; align-items:center; justify-content:space-between; padding:16px 22px;
+    border-bottom:1px solid var(--border); }
+  .report-modal-header h2{ margin:0; font-size:18px; color:var(--accent-dark); }
+  .report-modal-body{ flex:1; overflow-y:auto; padding:22px; }
+  .report-modal-body h3{ font-size:14px; color:var(--accent-dark); margin:18px 0 8px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+  .report-modal-body h3:first-child{ margin-top:0; }
+  .report-modal-body p{ margin:4px 0; font-size:13px; line-height:1.6; }
+  .report-patient-header{ background:#F7F9FA; border-radius:8px; padding:12px 16px; margin-bottom:12px; }
+  .report-patient-header p{ margin:2px 0; }
+  .report-finding{ margin-bottom:12px; padding:10px 14px; border:1px solid var(--border); border-radius:6px; }
+  .report-finding h4{ margin:0 0 6px; font-size:13px; }
+  .report-finding .audit{ font-size:10.5px; color:var(--muted); margin-top:6px; }
+  .report-status-line{ font-size:12px; color:var(--muted); margin-bottom:12px; font-style:italic; }
+  .report-modal-footer{ display:flex; justify-content:flex-end; gap:10px; padding:12px 22px; border-top:1px solid var(--border); }
+
+  body.locked .tool-btn{ pointer-events:none; opacity:.35; }
+  body.locked .vessel{ cursor:default; }
+  body.locked .vessel:hover{ stroke:rgba(255,210,0,0); }
+  body.locked .marker-dot{ cursor:default; }
+  body.locked .edit-ic{ display:none; }
+  body.locked #confirmReportBtn{ display:none; }
+
+  @media print{
+    body * { visibility:hidden; }
+    .report-modal-overlay, .report-modal-overlay *{ visibility:visible; }
+    .report-modal-overlay{ position:absolute; inset:0; background:none; }
+    .report-modal-header button, .report-modal-footer{ display:none !important; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="patient" id="patientInfo"><b>Chargement…</b></div>
-  <div class="tag">Schéma Post-PCI — prototype</div>
+  <div class="patient" id="patientInfo">
+    <button class="back-btn" id="backBtn" title="Retour">&#8592; Retour</button>
+    <b>Chargement…</b>
+  </div>
+  <div class="header-right">
+    <span class="status-badge draft" id="statusBadge">Brouillon</span>
+    <div class="tag">Schéma Post-PCI — prototype</div>
+  </div>
 </header>
 
 <div class="subbar">
@@ -109,8 +183,10 @@
   <span style="margin-left:auto;color:var(--muted)">Cliquez sur un marqueur pour l'ouvrir · sélectionnez-le puis "Effacer" pour le supprimer</span>
 </div>
 
+<div class="conflict-banner" id="conflictBanner"></div>
+
 <div class="main">
-  <div class="workspace"> 
+  <div class="workspace">
   <div class="toolbar" id="toolbar"></div>
 
   <div class="canvas-wrap" id="canvasWrap">
@@ -129,13 +205,30 @@
     </div>
     <div class="report-wrap">
       <h3>Compte-rendu généré</h3>
-      <textarea id="report" readonly title="Compte-rendu généré" placeholder="Le rapport s’affichera ici." aria-label="Compte-rendu généré"></textarea>
-      <div class="hint">Moteur de template déterministe — éditable avant validation.</div>
+      <textarea id="report" readonly title="Compte-rendu généré" placeholder="Le rapport s'affichera ici." aria-label="Compte-rendu généré"></textarea>
+      <div class="conclusion-section">
+        <label>Approche</label>
+        <input type="text" id="f-approach" placeholder="Ex : radiale droite">
+        <label>Cathéter utilisé</label>
+        <input type="text" id="f-catheter" placeholder="Ex : JL4 6F">
+        <label>Conclusion (auto-générée, modifiable)</label>
+        <textarea id="f-conclusion" rows="2" placeholder="Conclusion du rapport..."></textarea>
+        <label>Recommandations de suivi</label>
+        <textarea id="f-recommendations" rows="2" placeholder="Recommandations..."></textarea>
+      </div>
+      <div class="report-actions">
+        <button class="btn" id="viewReportBtn">Voir le rapport</button>
+        <button class="btn" id="downloadPdfBtn">Télécharger PDF</button>
+        <button class="btn primary" id="confirmReportBtn">Confirmer le rapport</button>
+      </div>
+      <div class="hint">Moteur de template déterministe — sauvegarde automatique à chaque action.</div>
     </div>
   </div>
 </div>
 
 <div id="modalLayer"></div>
+<div id="toastLayer"></div>
+<div id="reportModalLayer"></div>
 
 <script>
 
@@ -146,12 +239,17 @@ const PATIENT_ID = new URLSearchParams(location.search).get('patientId');
 function authHeaders(extra = {}) {
   const token = sessionStorage.getItem('authToken');
   if (!token) {
-    // Pas de session valide : inutile d'appeler l'API, ça échouera en 401.
-    // On renvoie vers le login plutôt que de laisser échouer silencieusement.
     window.location.href = '/frontend/pages/login/index.html';
     throw new Error('Session expirée, redirection vers le login.');
   }
   return { ...extra, 'Authorization': 'Bearer ' + token };
+}
+
+function handleHttpError(res){
+  if(res.status === 401){
+    sessionStorage.removeItem('authToken');
+    window.location.href = '/frontend/pages/login/index.html';
+  }
 }
 
 async function apiPost(path, body){
@@ -161,11 +259,10 @@ async function apiPost(path, body){
     body: JSON.stringify(body)
   });
   if(!res.ok){
-    if(res.status === 401){
-      sessionStorage.removeItem('authToken');
-      window.location.href = '/frontend/pages/login/index.html';
-    }
-    throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+    handleHttpError(res);
+    const err = new Error((await res.json().catch(()=>({}))).error || res.statusText);
+    err.status = res.status;
+    throw err;
   }
   return res.status === 204 ? null : res.json();
 }
@@ -173,14 +270,67 @@ async function apiPost(path, body){
 async function apiGet(path){
   const res = await fetch(API_BASE + path, { headers: authHeaders() });
   if(!res.ok){
-    if(res.status === 401){
-      sessionStorage.removeItem('authToken');
-      window.location.href = '/frontend/pages/login/index.html';
-    }
-    throw new Error(res.statusText);
+    handleHttpError(res);
+    const err = new Error(res.statusText);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
+
+async function apiPut(path, body){
+  const res = await fetch(API_BASE + path, {
+    method:'PUT',
+    headers: authHeaders({ 'Content-Type':'application/json' }),
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    handleHttpError(res);
+    const err = new Error((await res.json().catch(()=>({}))).error || res.statusText);
+    err.status = res.status;
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function apiDelete(path){
+  const res = await fetch(API_BASE + path, {
+    method:'DELETE',
+    headers: authHeaders()
+  });
+  if(!res.ok){
+    handleHttpError(res);
+    const err = new Error((await res.json().catch(()=>({}))).error || res.statusText);
+    err.status = res.status;
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function apiGetBlob(path){
+  const res = await fetch(API_BASE + path, { headers: authHeaders() });
+  if(!res.ok){
+    handleHttpError(res);
+    const err = new Error(res.statusText);
+    err.status = res.status;
+    throw err;
+  }
+  return res.blob();
+}
+
+/* --- D. Toast / save indicator --- */
+function showToast(msg, type='info', duration=2200){
+  const toast = document.createElement('div');
+  toast.className = 'save-toast ' + type;
+  toast.textContent = msg;
+  toastLayer.appendChild(toast);
+  requestAnimationFrame(()=> toast.classList.add('show'));
+  setTimeout(()=>{
+    toast.classList.remove('show');
+    setTimeout(()=> toast.remove(), 300);
+  }, duration);
+}
+
 const ICONS = {
   lesion: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="#C0392B" stroke-width="3"/><circle cx="20" cy="20" r="8" fill="none" stroke="#C0392B" stroke-width="3"/><circle cx="20" cy="20" r="2.5" fill="#C0392B"/></svg>',
   ballon: '<svg viewBox="0 0 40 40"><line x1="2" y1="20" x2="12" y2="20" stroke="#333" stroke-width="2.5"/><ellipse cx="24" cy="20" rx="13" ry="7" fill="#FBD98A" stroke="#B9860B" stroke-width="2.5"/></svg>',
@@ -189,7 +339,7 @@ const ICONS = {
 };
 const TOOL_LABEL = {lesion:'Lésion', ballon:'Ballon', stent:'Stent', controle:'Contrôle'};
 
-const toolbarEl = document.getElementById('toolbar'); 
+const toolbarEl = document.getElementById('toolbar');
 Object.keys(ICONS).forEach(tool=>{
   const btn = document.createElement('div');
   btn.className = 'tool-btn' + (tool==='lesion' ? ' active' : '');
@@ -253,6 +403,7 @@ const VESSELS = {
 document.querySelectorAll('input[name="dom"]').forEach(r=>{
   r.addEventListener('change', e=>{
     const v = e.target.value;
+    currentDominance = v;
     document.querySelectorAll('.dom-rca').forEach(el=> el.style.display = (v==='droite'||v==='co') ? '' : 'none');
     document.querySelectorAll('.dom-cx').forEach(el=> el.style.display = (v==='gauche'||v==='co') ? '' : 'none');
     const svgEl = document.getElementById('tree');
@@ -268,14 +419,19 @@ document.querySelectorAll('input[name="dom"]').forEach(r=>{
       svgEl.setAttribute('viewBox', '0 0 611 408');
     }
     attachVesselHandlers();
+    render();
   });
 });
 
 let currentTool = 'lesion';
 let findings = [];
 let idSeq = 1;
-let selectedId = null;   // finding currently selected (via marker/list click) — eligible for delete
-let openId = null;       // finding whose info box is currently shown
+let selectedId = null;
+let openId = null;
+let reportStatus = { reportId:null, status:'Draft', confirmedAt:null, confirmedByUserName:null };
+let isLocked = false;
+let patientData = null;
+let currentDominance = 'droite';
 
 const canvasWrap = document.getElementById('canvasWrap');
 let svg, overlayLayer, markersLayer;
@@ -284,13 +440,14 @@ async function loadVesselTree(){
   const res = await fetch('vessel-tree.html');
   if(!res.ok) throw new Error('Impossible de charger le schéma vasculaire: ' + res.statusText);
   const html = await res.text();
-  document.getElementById('treeMount').outerHTML = html; // becomes the real <svg id="tree">...
+  document.getElementById('treeMount').outerHTML = html;
 
   svg = document.getElementById('tree');
   overlayLayer = document.getElementById('overlayLayer');
   markersLayer = document.getElementById('markers');
 
-  attachVesselHandlers(); // only meaningful once .vessel paths actually exist
+  attachVesselHandlers();
+  await hydrateFromServer();
   render();
 }
 
@@ -305,6 +462,7 @@ canvasWrap.addEventListener('scroll', ()=>{ if(svg) render(); });
 toolbarEl.addEventListener('click', e=>{
   const btn = e.target.closest('.tool-btn');
   if(!btn) return;
+  if(isLocked) return;
   if(btn.id === 'deleteBtn'){
     if(!selectedId) return;
     askDeleteConfirmation(selectedId);
@@ -315,22 +473,44 @@ toolbarEl.addEventListener('click', e=>{
   currentTool = btn.dataset.tool;
 });
 
-function askDeleteConfirmation(id){
+/* --- A. Persistent delete with item release --- */
+async function askDeleteConfirmation(id){
   const f = findings.find(x=>x.id===id);
   if(!f) return;
+  if(isLocked){
+    showToast('Rapport confirmé — suppression désactivée', 'error');
+    return;
+  }
   modalLayer.innerHTML = '';
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  const deviceCount = f.events.filter(e=>e.type==='stent'||e.type==='ballon').length;
+  let warning = f.label + ' — cette action est irréversible et retirera cet élément du compte-rendu.';
+  if(deviceCount > 0) warning += ' Les ' + deviceCount + ' dispositif(s) réservé(s) seront libérés.';
   overlay.innerHTML = '<div class="modal-box"><h4>Supprimer cette intervention ?</h4>' +
-    '<p>'+f.label+' — cette action est irréversible et retirera cet élément du compte-rendu.</p>' +
+    '<p>'+warning+'</p>' +
     '<div class="actions"><button class="btn" id="cancelDel">Annuler</button><button class="btn danger" id="confirmDel">Supprimer</button></div></div>';
   modalLayer.appendChild(overlay);
   document.getElementById('cancelDel').onclick = ()=>{ modalLayer.innerHTML=''; };
-  document.getElementById('confirmDel').onclick = ()=>{
-    findings = findings.filter(x=>x.id!==id);
-    selectedId = null; openId = null;
-    modalLayer.innerHTML = '';
-    render();
+  document.getElementById('confirmDel').onclick = async ()=>{
+    try{
+      showToast('Suppression...', 'info');
+      await apiDelete('/procedures/lesions/' + f.id);
+      findings = findings.filter(x=>x.id!==id);
+      selectedId = null; openId = null;
+      modalLayer.innerHTML = '';
+      await syncInventory();
+      showToast('Supprimé', 'success');
+      render();
+    } catch(err){
+      if(err.status === 409){
+        await refreshReportStatus();
+        showConflictBanner('Ce rapport a été confirmé par un autre utilisateur. Suppression refusée.');
+        applyLockState();
+      } else {
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
   };
 }
 
@@ -351,20 +531,11 @@ function nearestPointOnPath(path, target){
   }
   return { point: best.point, percent: best.len/total };
 }
-function tangentAngle(path, len, total){
-  const eps = Math.min(6, total*0.02);
-  const p1 = path.getPointAtLength(Math.max(0,len-eps));
-  const p2 = path.getPointAtLength(Math.min(total,len+eps));
-  return Math.atan2(p2.y-p1.y, p2.x-p1.x);
-}
 function segmentInfoFor(vesselId, percent){
   const cfg = VESSELS[vesselId];
   for(const seg of cfg.segments){ if(percent <= seg.max) return seg; }
   return cfg.segments[cfg.segments.length-1];
 }
-/* Returns the [min,max] percent-of-length range that belongs to the same
-   anatomical segment as `percent`, so overlay markers can be clamped to it
-   and never bleed across a segment boundary (the dashed guide lines). */
 function segmentBoundsFor(vesselId, percent){
   const cfg = VESSELS[vesselId];
   let prevMax = 0;
@@ -380,11 +551,37 @@ function displayLabel(vesselId, seg){
   return cfg.code + (seg.roman ? ' '+seg.roman : '');
 }
 
+/* --- A. Vessel lookup for hydration --- */
+function findVesselIdByLabel(label, dominance){
+  const isLeft = dominance === 'gauche';
+  for(const [id, cfg] of Object.entries(VESSELS)){
+    const vesselIsLeft = id.endsWith('-L');
+    if(vesselIsLeft !== isLeft) continue;
+    for(const seg of cfg.segments){
+      if(displayLabel(id, seg) === label) return id;
+    }
+  }
+  for(const [id, cfg] of Object.entries(VESSELS)){
+    for(const seg of cfg.segments){
+      if(displayLabel(id, seg) === label) return id;
+    }
+  }
+  return null;
+}
+
 const MORPHOLOGY_MAP = {A:'TypeA', B1:'TypeB1', B2:'TypeB2', C:'TypeC'};
+const MORPHOLOGY_REVERSE = {TypeA:'A', TypeB1:'B1', TypeB2:'B2', TypeC:'C'};
 function stenosisToByte(sev){
-  // Backend StenosisPercent is a single byte - collapse the range to its midpoint.
   const map = {'<30%':20,'30-49%':40,'50-69%':60,'70-89%':80,'90-99%':95,'Occlusion (100%)':100};
   return map[sev] ?? 60;
+}
+function byteToStenosis(byte){
+  if(byte >= 100) return 'Occlusion (100%)';
+  if(byte >= 90) return '90-99%';
+  if(byte >= 70) return '70-89%';
+  if(byte >= 50) return '50-69%';
+  if(byte >= 30) return '30-49%';
+  return '<30%';
 }
 
 function parseSize(str){
@@ -398,6 +595,7 @@ function lengthToPx(l){ return Math.max(9, Math.min(50, 7 + (l-8)*0.95)); }
 function attachVesselHandlers(){
   document.querySelectorAll('.vessel').forEach(path=>{
     path.onclick = evt=>{
+      if(isLocked) return;
       if(getComputedStyle(path).display === 'none') return;
       evt.stopPropagation();
       closePopover();
@@ -410,7 +608,7 @@ function attachVesselHandlers(){
         const seg = segmentInfoFor(path.id, percent);
         target = { id: idSeq++, vesselId: path.id, percent, x: point.x, y: point.y,
           segNum: seg.num, label: displayLabel(path.id, seg), events: [] };
-        isNewDraft = true; // not added to findings[] until "Ajouter" is confirmed
+        isNewDraft = true;
       }
       openPopover(evt, currentTool, target, null, isNewDraft);
     };
@@ -418,11 +616,10 @@ function attachVesselHandlers(){
 }
 attachVesselHandlers();
 
-/* click on empty canvas closes any open (read-only) info box, but never touches
-   an in-progress add/edit popover — that only closes via Annuler or Ajouter/Enregistrer */
 canvasWrap.addEventListener('click', ()=>{ openId = null; render(); });
 
 function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
+  if(isLocked && editEventIndex == null) return;
   const wrapRect = canvasWrap.getBoundingClientRect();
   const left = evt.clientX - wrapRect.left + canvasWrap.scrollLeft + 14;
   const top  = evt.clientY - wrapRect.top + canvasWrap.scrollTop - 10;
@@ -439,17 +636,14 @@ function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
       '<div class="checks"><label><input type="checkbox" id="f-calc" '+(e.calcified?'checked':'')+'> Calcification sévère</label>' +
       '<label><input type="checkbox" id="f-thrombus" '+(e.thrombus?'checked':'')+'> Thrombus visible</label></div>';
   } else if(tool === 'ballon' || tool === 'stent'){
-  const e = existing || {};
-  // Source is FREE stock (not yet reserved by anyone). Picking one here and
-  // hitting "Ajouter" is what actually reserves it — see saveBtn handler below,
-  // which moves the chosen item out of the available list once the server call succeeds.
-  const availList = tool === 'stent' ? (window.__availableStents||[]) : (window.__availableBalloons||[]);
-  const options = availList
-    .map(i => '<option value="'+i.id+'">'+i.productName+' — Lot '+(i.lotNumber||'?')+'</option>').join('');
-  fieldsHtml = '<label>Dispositif disponible en stock</label><select id="f-item">'+
+    const e = existing || {};
+    const availList = tool === 'stent' ? (window.__availableStents||[]) : (window.__availableBalloons||[]);
+    const options = availList
+      .map(i => '<option value="'+i.id+'">'+i.productName+' — Lot '+(i.lotNumber||'?')+'</option>').join('');
+    fieldsHtml = '<label>Dispositif disponible en stock</label><select id="f-item">'+
       (options || '<option value="">Aucun item disponible en stock</option>')+'</select>' +
     '<label>Taille implantée (Øxlongueur)</label><input id="f-size" value="'+(e.size||(tool==='stent'?'3.0x18mm':'2.5x15mm'))+'">';
-} else if(tool === 'controle'){
+  } else if(tool === 'controle'){
     const e = existing || {};
     fieldsHtml = '<label>Flux TIMI</label><select id="f-timi">'+opt('0',e.timi)+opt('1',e.timi)+opt('2',e.timi)+opt('3',e.timi,true)+'</select>' +
       '<label>Sténose résiduelle</label><input id="f-residual" value="'+(e.residual||'0%')+'">';
@@ -465,105 +659,144 @@ function openPopover(evt, tool, finding, editEventIndex, isNewDraft){
   popoverLayer.appendChild(pop);
   pop.onclick = e=>e.stopPropagation();
 
-  // Clamp the popover so it always stays fully inside the visible (scrolled)
-  // viewport of canvas-wrap — prevents it rendering off-screen near edges.
   requestAnimationFrame(()=>{
     const popW = pop.offsetWidth, popH = pop.offsetHeight;
     const viewLeft = canvasWrap.scrollLeft, viewTop = canvasWrap.scrollTop;
     const viewRight = viewLeft + canvasWrap.clientWidth;
     const viewBottom = viewTop + canvasWrap.clientHeight;
     const margin = 8;
-
     let curLeft = parseFloat(pop.style.left);
     let curTop = parseFloat(pop.style.top);
-
     if(curLeft + popW > viewRight - margin) curLeft = viewRight - popW - margin;
     if(curTop + popH > viewBottom - margin) curTop = viewBottom - popH - margin;
     if(curLeft < viewLeft + margin) curLeft = viewLeft + margin;
     if(curTop < viewTop + margin) curTop = viewTop + margin;
-
     pop.style.left = curLeft + 'px';
     pop.style.top = curTop + 'px';
   });
 
-  /* Annuler never mutates findings[] — a new intervention is only ever added
-     to the array below, inside the validated "Ajouter" handler. */
   pop.querySelector('#cancelBtn').onclick = ()=>{
     closePopover(); render();
   };
   pop.querySelector('#saveBtn').onclick = async ()=>{
-  const errMsg = validateFields(tool, pop);
-  const errBox = pop.querySelector('#popError');
-  if(errMsg){ errBox.textContent = errMsg; errBox.style.display = 'block'; return; }
+    const errMsg = validateFields(tool, pop);
+    const errBox = pop.querySelector('#popError');
+    if(errMsg){ errBox.textContent = errMsg; errBox.style.display = 'block'; return; }
 
-  const ev = collectEvent(tool, pop);
-  try{
-    if(tool === 'lesion' && isNewDraft){
-      const created = await apiPost('/procedures/lesions', {
-        cathStudyId: CATH_STUDY_ID,
-        vessel: finding.label,
-        segmentNumber: finding.segNum,
-        stenosisPercent: stenosisToByte(ev.severity),
-        lesionType: MORPHOLOGY_MAP[ev.morphology] || 'TypeB1',
-        timiFlow: null
-        // refDiam / calcified / thrombus / ev.lesionType (De Novo etc.) aren't
-        // persisted yet - CoronaryLesion needs those columns added first.
-      });
-      finding.id = created.id; // real server GUID replaces the temp idSeq value
-    } else if(tool === 'stent' || tool === 'ballon'){
-  if(isNewDraft){
-    // No CoronaryLesion exists at this spot yet — create a minimal,
-    // uncharacterized one first so the device has somewhere to attach.
-    // No 'lesion' event is pushed to finding.events, so renderReport()
-    // still (correctly) falls into its "sans caractérisation" branch.
-    const created = await apiPost('/procedures/lesions', {
-      cathStudyId: CATH_STUDY_ID,
-      vessel: finding.label,
-      segmentNumber: finding.segNum,
-      stenosisPercent: stenosisToByte(undefined), // same fallback (60) used elsewhere
-      lesionType: 'TypeB1',                       // same default used in the lesion branch
+    const ev = collectEvent(tool, pop);
+    const isEdit = editEventIndex != null;
+    try{
+      showToast('Enregistrement...', 'info', 1000);
+
+      if(isEdit){
+        await persistEdit(tool, finding, ev, finding.events[editEventIndex], pop);
+      } else if(tool === 'lesion' && isNewDraft){
+        const created = await apiPost('/procedures/lesions', {
+          cathStudyId: CATH_STUDY_ID,
+          vessel: finding.label,
+          segmentNumber: finding.segNum,
+          stenosisPercent: stenosisToByte(ev.severity),
+          lesionType: MORPHOLOGY_MAP[ev.morphology] || 'TypeB1',
+          timiFlow: null
+        });
+        finding.id = created.id;
+        if(created.createdAt) finding.createdAt = created.createdAt;
+        if(created.createdByName) finding.createdByName = created.createdByName;
+      } else if(tool === 'stent' || tool === 'ballon'){
+        if(isNewDraft){
+          
+          const created = await apiPost('/procedures/lesions', {
+            cathStudyId: CATH_STUDY_ID,
+            vessel: finding.label,
+            segmentNumber: finding.segNum,
+            stenosisPercent: stenosisToByte(undefined),
+            lesionType: 'TypeB1',
+            timiFlow: null,
+            refDiam: pop.querySelector('#f-refdiam')?.value || null,
+            calcified: pop.querySelector('#f-calcified')?.checked || false,
+            thrombus: pop.querySelector('#f-thrombus')?.checked || false
+          });
+
+          finding.id = created.id;
+          if(created.createdAt) finding.createdAt = created.createdAt;
+          if(created.createdByName) finding.createdByName = created.createdByName;
+        }
+        const itemId = pop.querySelector('#f-item')?.value;
+        if(!itemId) throw new Error('Sélectionnez un dispositif disponible en stock.');
+        const {diameter, length} = parseSize(ev.size);
+        const API_TOOL_PATH = { ballon: 'balloon', stent: 'stent' };
+        const path = '/procedures/lesions/'+finding.id+'/'+API_TOOL_PATH[tool];
+        const treatmentRes = await apiPost(path, tool==='stent' ? {
+          inventoryItemId: itemId, stentDiameterMm: diameter, stentLengthMm: length
+        } : {
+          inventoryItemId: itemId, balloonDiameterMm: diameter, balloonLengthMm: length,
+          isPreDilation: true, isPostDilation: false, maxPressureAtm: 0, inflationDurationSec: 0
+        });
+        ev.treatmentId = treatmentRes?.id || treatmentRes?.treatmentId;
+        const availArr = tool === 'stent' ? window.__availableStents : window.__availableBalloons;
+        const idx = (availArr||[]).findIndex(i => i.id === itemId);
+        const usedItem = idx > -1 ? availArr.splice(idx, 1)[0] : null;
+        if(usedItem){
+          window.__reservedItems = (window.__reservedItems||[]).concat([usedItem]);
+          renderReservedPanel(window.__reservedItems);
+        }
+        ev.device = usedItem?.productName || ev.device;
+      }
+      showToast('Enregistré', 'success', 1200);
+    } catch(err){
+      if(err.status === 409){
+        await refreshReportStatus();
+        showConflictBanner('Conflit : ' + (err.message || 'action refusée par le serveur.'));
+        applyLockState();
+        closePopover();
+        render();
+        return;
+      }
+      errBox.textContent = 'Erreur serveur : '+err.message;
+      errBox.style.display = 'block';
+      return;
+    }
+
+    if(isEdit){ finding.events[editEventIndex] = ev; }
+    else { finding.events.push(ev); if(isNewDraft) findings.push(finding); }
+    closePopover();
+    openId = finding.id;
+    render();
+  };
+}
+
+/* --- A. Persistent edit (PUT) --- */
+async function persistEdit(tool, finding, ev, oldEvent, pop){
+  if(tool === 'lesion'){
+    await apiPut('/procedures/lesions/' + finding.id, {
+      stenosisPercent: stenosisToByte(ev.severity),
+      lesionType: MORPHOLOGY_MAP[ev.morphology] || 'TypeB1',
       timiFlow: null
     });
-    finding.id = created.id;
-  }
-  const itemId = pop.querySelector('#f-item')?.value;
-  if(!itemId) throw new Error('Sélectionnez un dispositif disponible en stock.');
-  const {diameter, length} = parseSize(ev.size);
-  // Internal tool key stays 'ballon' (matches UI/report French wording) but the
-  // backend route is English ('balloon') — translate only at the wire boundary.
-  const API_TOOL_PATH = { ballon: 'balloon', stent: 'stent' };
-  const path = '/procedures/lesions/'+finding.id+'/'+API_TOOL_PATH[tool];
-  await apiPost(path, tool==='stent' ? {
-        inventoryItemId: itemId, stentDiameterMm: diameter, stentLengthMm: length
-      } : {
-        inventoryItemId: itemId, balloonDiameterMm: diameter, balloonLengthMm: length,
-        isPreDilation: true, isPostDilation: false, maxPressureAtm: 0, inflationDurationSec: 0
-      });
-      // Server call above is what actually reserves the item. Reflect that locally
-      // right away so it disappears from "available" and can't be picked again in
-      // this session, and shows up in the "Déjà réservé" panel.
-      const availArr = tool === 'stent' ? window.__availableStents : window.__availableBalloons;
-      const idx = (availArr||[]).findIndex(i => i.id === itemId);
-      const usedItem = idx > -1 ? availArr.splice(idx, 1)[0] : null;
-      if(usedItem){
-        window.__reservedItems = (window.__reservedItems||[]).concat([usedItem]);
-        renderReservedPanel(window.__reservedItems);
-      }
-      ev.device = usedItem?.productName || ev.device;
+  } else if(tool === 'ballon' || tool === 'stent'){
+    const {diameter, length} = parseSize(ev.size);
+    const itemId = pop.querySelector('#f-item')?.value;
+    const API_TOOL_PATH = { ballon: 'balloon', stent: 'stent' };
+    const treatmentId = oldEvent.treatmentId;
+    if(treatmentId){
+      await apiPut('/procedures/lesions/'+finding.id+'/'+API_TOOL_PATH[tool]+'/'+treatmentId,
+        tool==='stent' ? {
+          inventoryItemId: itemId, stentDiameterMm: diameter, stentLengthMm: length
+        } : {
+          inventoryItemId: itemId, balloonDiameterMm: diameter, balloonLengthMm: length,
+          isPreDilation: true, isPostDilation: false, maxPressureAtm: 0, inflationDurationSec: 0
+        }
+      );
+      await syncInventory();
     }
-  } catch(err){
-    errBox.textContent = 'Erreur serveur : '+err.message;
-    errBox.style.display = 'block';
-    return; // don't commit locally if the API call failed
+  } else if(tool === 'controle'){
+    await apiPut('/procedures/lesions/' + finding.id + '/controle', {
+      timiFlow: parseInt(ev.timi),
+      residualStenosis: ev.residual
+    });
   }
-
-  if(editEventIndex!=null){ finding.events[editEventIndex] = ev; }
-  else { finding.events.push(ev); if(isNewDraft) findings.push(finding); }
-  closePopover();
-  openId = finding.id;
-  render();
-};
 }
+
 function validateFields(tool, pop){
   if(tool === 'ballon' || tool === 'stent'){
     const item = pop.querySelector('#f-item').value;
@@ -616,9 +849,6 @@ function severityColor(sev){
 }
 function getVar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
-/* Given a target arc-length `len` and a half-length `half`, returns the
-   start/end arc-lengths clamped to [minLen,maxLen] so the marker never
-   crosses into a neighbouring anatomical segment. */
 function clampedRange(len, half, minLen, maxLen){
   let a = len - half, b = len + half;
   if(a < minLen){ b += (minLen - a); a = minLen; }
@@ -627,9 +857,6 @@ function clampedRange(len, half, minLen, maxLen){
   b = Math.min(maxLen, b);
   return [a, b];
 }
-/* Builds the endpoints for an overlay marker of pixel-length `l` centered on
-   f.percent, following the vessel path itself (so it bends with curved
-   segments) and clamped to the current segment's boundaries. */
 function markerEndpoints(path, total, f, l){
   const len = f.percent*total;
   const bounds = segmentBoundsFor(f.vesselId, f.percent);
@@ -688,22 +915,27 @@ function render(){
     dot.setAttribute('class','marker-dot'+(isSel?' selected':''));
     dot.setAttribute('cx', f.x); dot.setAttribute('cy', f.y); dot.setAttribute('r', 8);
     dot.addEventListener('click', evt=>{
-  evt.stopPropagation();
-  closePopover();
-  selectedId = f.id;
-  // Route through the same add/edit flow as clicking empty vessel —
-  // isNewDraft is false since this finding already exists server-side.
-  openPopover(evt, currentTool, f, null, false);
-});
+      evt.stopPropagation();
+      closePopover();
+      selectedId = f.id;
+      if(!isLocked){
+        openPopover(evt, currentTool, f, null, false);
+      } else {
+        openId = f.id;
+        render();
+      }
+    });
     markersLayer.appendChild(dot);
   });
 
   const open = findings.find(f=>f.id===openId);
   if(open) showInfoBox(open);
 
-  document.getElementById('deleteBtn').classList.toggle('disabled', !selectedId);
+  document.getElementById('deleteBtn').classList.toggle('disabled', !selectedId || isLocked);
   renderFindingsList();
   renderReport();
+  updateAutoConclusion();
+  updateConfirmButton();
   document.getElementById('countLabel').textContent = findings.length;
 }
 
@@ -718,23 +950,29 @@ function showInfoBox(f){
   const lesion = f.events.find(e=>e.type==='lesion');
   const title = f.label + (lesion ? ' '+lesion.severity+' Ø'+lesion.refDiam : '');
   const rowsHtml = f.events.map((e,i)=>
-    '<div class="ev-row"><span>• '+bulletText(e)+'</span><button class="edit-ic" data-idx="'+i+'" title="Modifier">✎</button></div>'
+    '<div class="ev-row"><span>• '+bulletText(e)+'</span>' +
+    (isLocked ? '' : '<button class="edit-ic" data-idx="'+i+'" title="Modifier">✎</button>') + '</div>'
   ).join('');
+
+  const auditHtml = (f.createdAt && f.createdByName) ?
+    '<div class="audit">Ajouté par ' + f.createdByName + ' le ' + formatFrDateTime(f.createdAt) + '</div>' : '';
 
   const div = document.createElement('div');
   div.className = 'info-box';
   div.style.left = (boxX*scaleX)+'px';
   div.style.top = (boxY*scaleY)+'px';
   div.style.pointerEvents = 'auto';
-  div.innerHTML = '<div class="title">'+title+'</div>'+rowsHtml;
+  div.innerHTML = '<div class="title">'+title+'</div>'+rowsHtml+auditHtml;
   div.onclick = e=>e.stopPropagation();
-  div.querySelectorAll('.edit-ic').forEach(btn=>{
-    btn.onclick = evt=>{
-      const idx = parseInt(btn.dataset.idx,10);
-      const type = f.events[idx].type;
-      openPopover(evt, type, f, idx);
-    };
-  });
+  if(!isLocked){
+    div.querySelectorAll('.edit-ic').forEach(btn=>{
+      btn.onclick = evt=>{
+        const idx = parseInt(btn.dataset.idx,10);
+        const type = f.events[idx].type;
+        openPopover(evt, type, f, idx);
+      };
+    });
+  }
   infoLayer.appendChild(div);
 }
 
@@ -744,10 +982,12 @@ function renderFindingsList(){
     list.innerHTML = '<div class="empty">Sélectionnez un matériel puis cliquez sur une artère.</div>';
     return;
   }
-  list.innerHTML = findings.map(f=>
-    '<div class="finding-row'+(f.id===selectedId?' selected':'')+'" data-id="'+f.id+'">' +
-    '<div class="head">'+f.label+'</div><ul>'+f.events.map(e=>'<li>'+bulletText(e)+'</li>').join('')+'</ul></div>'
-  ).join('');
+  list.innerHTML = findings.map(f=>{
+    const audit = (f.createdAt && f.createdByName) ?
+      '<div class="audit-row">Par ' + f.createdByName + ' · ' + formatFrDateTime(f.createdAt) + '</div>' : '';
+    return '<div class="finding-row'+(f.id===selectedId?' selected':'')+'" data-id="'+f.id+'">' +
+    '<div class="head">'+f.label+'</div><ul>'+f.events.map(e=>'<li>'+bulletText(e)+'</li>').join('')+'</ul>'+audit+'</div>';
+  }).join('');
   list.querySelectorAll('.finding-row').forEach(row=>{
     row.onclick = ()=>{
       const id = parseInt(row.dataset.id,10);
@@ -779,6 +1019,10 @@ function renderReport(){
     if(controle) sentence += 'Résultat : flux TIMI '+controle.timi+', sténose résiduelle '+controle.residual+'.';
     lines.push('• ' + sentence.trim());
   });
+  const conclusion = document.getElementById('f-conclusion')?.value || '';
+  if(conclusion){ lines.push('', 'Conclusion : ' + conclusion); }
+  const reco = document.getElementById('f-recommendations')?.value || '';
+  if(reco){ lines.push('', 'Recommandations : ' + reco); }
   box.value = lines.join('\n');
 }
 
@@ -790,12 +1034,387 @@ function renderReservedPanel(items){
   ).join('') : '<div class="empty">Aucun item réservé.</div>';
 }
 
+/* --- C. Auto conclusion --- */
+function generateAutoConclusion(){
+  if(findings.length === 0) return '';
+  const treated = findings.filter(f => f.events.some(e => e.type === 'stent' || e.type === 'ballon'));
+  const vesselCount = treated.length;
+  const controles = findings.map(f => f.events.filter(e => e.type === 'controle').pop()).filter(Boolean);
+  const finalTimi = controles.length ? controles[controles.length - 1].timi : null;
+  let c;
+  if(vesselCount === 0) c = 'Aucun geste d\'angioplastie réalisé';
+  else c = 'PCI réussie sur ' + vesselCount + ' vaisseau' + (vesselCount > 1 ? 'x' : '');
+  if(finalTimi) c += ', flux TIMI ' + finalTimi + ' final';
+  c += '.';
+  return c;
+}
+function updateAutoConclusion(){
+  if(isLocked) return;
+  const box = document.getElementById('f-conclusion');
+  if(!box) return;
+  const auto = generateAutoConclusion();
+  if(!box.value.trim() || box.dataset.auto === 'true'){
+    box.value = auto;
+    box.dataset.auto = auto ? 'true' : '';
+  }
+}
+
+/* --- B. Report lifecycle --- */
+function updateConfirmButton(){
+  const btn = document.getElementById('confirmReportBtn');
+  if(!btn) return;
+  btn.disabled = findings.length === 0 || isLocked;
+}
+
+function updateStatusBadge(){
+  const badge = document.getElementById('statusBadge');
+  if(!badge) return;
+  if(reportStatus?.status === 'Confirmed'){
+    badge.className = 'status-badge confirmed';
+    badge.textContent = 'Confirmé le ' + formatFrDate(reportStatus.confirmedAt) + ' par ' + (reportStatus.confirmedByUserName || '?');
+  } else {
+    badge.className = 'status-badge draft';
+    badge.textContent = 'Brouillon — modifiable';
+  }
+}
+
+function applyLockState(){
+  isLocked = reportStatus?.status === 'Confirmed';
+  document.body.classList.toggle('locked', isLocked);
+  updateStatusBadge();
+  const conc = document.getElementById('f-conclusion');
+  const reco = document.getElementById('f-recommendations');
+  if(conc) conc.disabled = isLocked;
+  if(reco) reco.disabled = isLocked;
+  if(isLocked) showToast('Rapport verrouillé — lecture seule', 'info');
+}
+
+function showConflictBanner(msg){
+  const banner = document.getElementById('conflictBanner');
+  banner.textContent = '⚠ ' + msg;
+  banner.classList.add('show');
+}
+
+async function refreshReportStatus(){
+  if(!CATH_STUDY_ID) return;
+  try{
+    const dto = await apiGet('/procedures/reports/study/' + CATH_STUDY_ID);
+    const wasLocked = isLocked;
+    reportStatus = mapReportStatus(dto);
+    applyLockState();
+    if(isLocked && !wasLocked){
+      showConflictBanner('Ce rapport a été confirmé' +
+        (reportStatus.confirmedByUserName ? ' par ' + reportStatus.confirmedByUserName : '') +
+        ' le ' + formatFrDateTime(reportStatus.confirmedAt) + '. Modifications désactivées.');
+    }
+  } catch(err){
+    console.error('Could not refresh report status', err);
+    showToast('Erreur de vérification du statut du rapport', 'error');
+  }
+}
+
+/* --- B. Confirm report --- */
+async function confirmReport(){
+  if(findings.length === 0){ showToast('Aucune constatation à confirmer', 'error'); return; }
+  if(isLocked){ showToast('Rapport déjà confirmé', 'error'); return; }
+  if(!reportStatus?.reportId){
+    showToast('Identifiant du rapport introuvable', 'error');
+    return;
+  }
+  const approachVal = document.getElementById('f-approach')?.value?.trim();
+  const catheterVal = document.getElementById('f-catheter')?.value?.trim();
+  const conclusionVal = document.getElementById('f-conclusion')?.value?.trim();
+  if(!approachVal || !catheterVal || !conclusionVal){
+    showToast('Renseignez Approche, Cathéter et Conclusion avant de confirmer', 'error');
+    return;
+  }
+
+  const untreated = validateBeforeConfirm();
+
+  modalLayer.innerHTML = '';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  let warningHtml = '<p>Cette action est <strong>irréversible</strong>. Les dispositifs passeront en "Consommé" et le rapport sera verrouillé en lecture seule.</p>';
+  if(untreated.length > 0){
+    warningHtml += '<p style="color:var(--severe);font-weight:600;">Attention : ' + untreated.length + ' lésion(s) sévère(s) sans traitement :</p>' +
+      '<ul class="warning-list">' + untreated.map(f => '<li>' + f.label + '</li>').join('') + '</ul>' +
+      '<p>Confirmer quand même ?</p>';
+  }
+  overlay.innerHTML = '<div class="modal-box"><h4>Confirmer le rapport ?</h4>' + warningHtml +
+    '<div class="actions"><button class="btn" id="cancelConfirm">Annuler</button><button class="btn success" id="confirmBtn">Confirmer</button></div></div>';
+  modalLayer.appendChild(overlay);
+
+  document.getElementById('cancelConfirm').onclick = ()=>{ modalLayer.innerHTML=''; };
+  document.getElementById('confirmBtn').onclick = async ()=>{
+    try{
+      showToast('Confirmation en cours...', 'info');
+      await saveReportMeta();
+      await refreshReportStatus();
+      if(reportStatus?.status === 'Confirmed'){
+        modalLayer.innerHTML = '';
+        showToast('Rapport déjà confirmé par un autre utilisateur', 'error');
+        applyLockState();
+        render();
+        return;
+      }
+      await apiPost('/procedures/reports/' + reportStatus.reportId + '/confirm', {});
+      modalLayer.innerHTML = '';
+      showToast('Rapport confirmé', 'success');
+      await refreshReportStatus();
+      applyLockState();
+      render();
+    } catch(err){
+      if(err.status === 409){
+        modalLayer.innerHTML = '';
+        showToast('Conflit : le rapport a déjà été confirmé', 'error');
+        await refreshReportStatus();
+        applyLockState();
+        render();
+      } else {
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+  };
+}
+
+/* --- D. Validation before confirm --- */
+function validateBeforeConfirm(){
+  return findings.filter(f => {
+    const lesion = f.events.find(e => e.type === 'lesion');
+    if(!lesion) return false;
+    const severe = ['70-89%', '90-99%', 'Occlusion (100%)'].includes(lesion.severity);
+    const hasTreatment = f.events.some(e => e.type === 'stent' || e.type === 'ballon');
+    return severe && !hasTreatment;
+  });
+}
+
+/* --- B/C. Save report metadata --- */
+async function saveReportMeta(){
+  if(!reportStatus?.reportId || isLocked) return;
+  const conclusion = document.getElementById('f-conclusion')?.value || '';
+  const recommendations = document.getElementById('f-recommendations')?.value || '';
+  const approach = document.getElementById('f-approach')?.value || '';
+  const catheterUsed = document.getElementById('f-catheter')?.value || '';
+  try{
+    await apiPut('/procedures/reports/' + reportStatus.reportId, {
+      conclusion, recommendations, approach, catheterUsed
+    });
+  } catch(err){
+    if(err.status !== 409) console.error('Could not save report metadata', err);
+  }
+}
+
+/* --- C. Full report modal --- */
+function openFullReport(){
+  const modal = document.createElement('div');
+  modal.className = 'report-modal-overlay';
+  const patient = patientData || {};
+  const dominance = document.querySelector('input[name="dom"]:checked')?.value || 'droite';
+  const dominanceLabel = dominance === 'droite' ? 'Dominance droite' : 'Dominance gauche';
+
+  let findingsHtml = findings.slice().sort((a,b)=>a.segNum-b.segNum).map(f => {
+    const lesion = f.events.find(e=>e.type==='lesion');
+    const ballons = f.events.filter(e=>e.type==='ballon');
+    const stents = f.events.filter(e=>e.type==='stent');
+    const controle = f.events.filter(e=>e.type==='controle').pop();
+    let html = '<div class="report-finding"><h4>'+f.label+'</h4>';
+    if(lesion){
+      html += '<p>Sténose '+lesion.severity+' ('+lesion.lesionType+'), diamètre de référence '+lesion.refDiam;
+      if(lesion.morphology) html += ', type '+lesion.morphology;
+      if(lesion.calcified) html += ', calcifiée';
+      if(lesion.thrombus) html += ', thrombus';
+      html += '.</p>';
+    } else {
+      html += '<p>Geste réalisé sans caractérisation de sténose enregistrée.</p>';
+    }
+    ballons.forEach(b=> html += '<p>Prédilatation : ballon '+b.device+' '+b.size+'.</p>');
+    stents.forEach(s=> html += '<p>Stenting : '+s.device+' '+s.size+'.</p>');
+    if(controle) html += '<p>Résultat : flux TIMI '+controle.timi+', sténose résiduelle '+controle.residual+'.</p>';
+    if(f.createdAt && f.createdByName){
+      html += '<p class="audit">Ajouté par '+f.createdByName+' le '+formatFrDateTime(f.createdAt)+'</p>';
+    }
+    html += '</div>';
+    return html;
+  }).join('');
+
+  const conclusion = document.getElementById('f-conclusion')?.value || generateAutoConclusion();
+  const recommendations = document.getElementById('f-recommendations')?.value || '';
+  const statusLine = reportStatus?.status === 'Confirmed'
+    ? 'Rapport confirmé le ' + formatFrDateTime(reportStatus.confirmedAt) + ' par ' + (reportStatus.confirmedByUserName || '?')
+    : 'Brouillon — modifiable';
+
+  const devicesHtml = (window.__reservedItems||[]).map(i =>
+    '<p>• '+i.productName+' ('+i.deviceType+') — Lot '+(i.lotNumber||'?')+'</p>'
+  ).join('') || '<p>Aucun dispositif utilisé.</p>';
+
+  modal.innerHTML =
+    '<div class="report-modal-box">' +
+      '<div class="report-modal-header">' +
+        '<h2>Compte-rendu de coronarographie</h2>' +
+        '<button class="btn" id="closeReportModal">Fermer</button>' +
+      '</div>' +
+      '<div class="report-modal-body">' +
+        '<div class="report-patient-header">' +
+          '<p><strong>'+(patient.fullName || 'Patient')+'</strong> · '+calcAge(patient.birthDate)+' ans'+(patient.sex ? ' · '+patient.sex : '')+'</p>' +
+          '<p>N° accession : '+(patient.accessionNumber || CATH_STUDY_ID || '')+'</p>' +
+          '<p>Date : '+(formatFrDate(patient.procedureDate) || '')+' · '+dominanceLabel+'</p>' +
+          '<p>Opérateur : '+(patient.operatorName || '')+'</p>' +
+        '</div>' +
+        '<div class="report-status-line">'+statusLine+'</div>' +
+        '<h3>Constatations</h3>' +
+        (findingsHtml || '<p>Aucune constatation enregistrée.</p>') +
+        '<h3>Conclusion</h3><p>'+conclusion+'</p>' +
+        (recommendations ? '<h3>Recommandations de suivi</h3><p>'+recommendations+'</p>' : '') +
+        '<h3>Dispositifs utilisés</h3>'+devicesHtml +
+      '</div>' +
+      '<div class="report-modal-footer">' +
+        '<button class="btn" id="printReport">Imprimer</button>' +
+        '<button class="btn primary" id="downloadPdfBtnModal">Télécharger PDF</button>' +
+      '</div>' +
+    '</div>';
+
+  reportModalLayer.appendChild(modal);
+  document.getElementById('closeReportModal').onclick = ()=>{ reportModalLayer.innerHTML=''; };
+  document.getElementById('printReport').onclick = ()=> window.print();
+  document.getElementById('downloadPdfBtnModal').onclick = downloadPdf;
+}
+
+/* --- C. PDF download --- */
+async function downloadPdf(){
+  if(!reportStatus?.reportId){ showToast('Aucun rapport à exporter', 'error'); return; }
+  try{
+    showToast('Génération du PDF...', 'info');
+    const blob = await apiGetBlob('/procedures/reports/' + reportStatus.reportId + '/pdf');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'compte-rendu-' + (CATH_STUDY_ID || '') + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('PDF téléchargé', 'success');
+  } catch(err){
+    if(err.status === 409){
+      showToast('Le rapport doit être confirmé avant de générer le PDF', 'error');
+    } else {
+      showToast('Erreur PDF : ' + err.message, 'error');
+    }
+  }
+}
+
+/* --- Adapter: backend ProcedureReportDetailDto -> frontend reportStatus shape --- */
+function mapReportStatus(dto){
+  return {
+    reportId: dto.id,
+    status: dto.isConfirmed ? 'Confirmed' : 'Draft',
+    confirmedAt: dto.confirmedAt,
+    // backend DTO exposes ConfirmedByUser (mapped to JSON as confirmedByUser);
+    // keep backward compatibility with confirmedByUserName if present.
+    confirmedByUserName: dto.confirmedByUser || dto.confirmedByUserName || null
+  };
+}
+
+/* --- A. Hydration from server --- */
+async function hydrateFromServer(){
+  if(!CATH_STUDY_ID) return;
+  try{
+    const dto = await apiGet('/procedures/reports/study/' + CATH_STUDY_ID);
+
+    reportStatus = mapReportStatus(dto);
+    applyLockState();
+
+    if(dto.conclusion) document.getElementById('f-conclusion').value = dto.conclusion;
+    if(dto.recommendations) document.getElementById('f-recommendations').value = dto.recommendations;
+    if(dto.approach) document.getElementById('f-approach').value = dto.approach;
+    if(dto.catheterUsed) document.getElementById('f-catheter').value = dto.catheterUsed;
+
+    if(Array.isArray(dto.lesions)){
+      findings = dto.lesions.map(l => {
+        const vesselId = findVesselIdByLabel(l.vessel, currentDominance) || l.vesselId;
+        const seg = VESSELS[vesselId]?.segments[0] || {num:l.segmentNumber, roman:''};
+        let events = [];
+        if(l.stenosisPercent != null || l.lesionType){
+          events.push({
+            type:'lesion',
+            severity: byteToStenosis(l.stenosisPercent),
+            refDiam: l.refDiam || '3.0mm',
+            lesionType: l.lesionTypeLabel || 'De Novo',
+            morphology: MORPHOLOGY_REVERSE[l.lesionType] || 'B1',
+            calcified: l.calcified || false,
+            thrombus: l.thrombus || false
+          });
+        }
+        if(Array.isArray(l.treatments)){
+          l.treatments.forEach(t => {
+            const kind = (t.kind || '').toLowerCase();
+            if(kind === 'stent'){
+              events.push({ type:'stent', device:t.productName||'Stent',
+                size:(t.diameterMm||3)+'x'+(t.lengthMm||18)+'mm', treatmentId:t.id });
+            } else if(kind === 'balloon' || kind === 'ballon'){
+              events.push({ type:'ballon', device:t.productName||'Ballon',
+                size:(t.diameterMm||2.5)+'x'+(t.lengthMm||15)+'mm', treatmentId:t.id });
+            }
+          });
+        }
+        if(l.timiFlow != null){
+          events.push({ type:'controle', timi:String(l.timiFlow), residual:(l.residualStenosis||'0%') });
+        }
+
+        const path = document.getElementById(vesselId);
+        let pos = { x:0, y:0, percent:0.5 };
+        if(path){
+          const total = path.getTotalLength();
+          const p = path.getPointAtLength(total * 0.5);
+          pos = { x:p.x, y:p.y, percent:0.5 };
+        }
+
+        return {
+          id: l.id,
+          vesselId,
+          percent: pos.percent,
+          x: pos.x, y: pos.y,
+          segNum: l.segmentNumber || seg.num,
+          label: l.vessel || displayLabel(vesselId, seg),
+          events,
+          createdAt: l.createdAt,
+          createdByName: l.createdByName
+        };
+      });
+    }
+    render();
+  } catch(err){
+    console.error('Hydration failed', err);
+    showToast('Erreur de chargement des constatations', 'error');
+  }
+}
+/* --- Inventory sync --- */
+async function syncInventory(){
+  if(!CATH_STUDY_ID) return;
+  try{
+    const [reserved, stents, balloons] = await Promise.all([
+      apiGet('/pharmacy/items/reserved/' + CATH_STUDY_ID),
+      apiGet('/pharmacy/items/available?deviceType=Stent'),
+      apiGet('/pharmacy/items/available?deviceType=Ballon')
+    ]);
+    window.__reservedItems = reserved;
+    window.__availableStents = stents;
+    window.__availableBalloons = balloons;
+    renderReservedPanel(reserved);
+  } catch(err){
+    console.error('Could not sync inventory', err);
+  }
+}
+
 function formatFrDate(iso){
   if(!iso) return '';
   return new Date(iso).toLocaleDateString('fr-FR');
 }
+function formatFrDateTime(iso){
+  if(!iso) return '';
+  return new Date(iso).toLocaleString('fr-FR', { dateStyle:'long', timeStyle:'short' });
+}
 function calcAge(birthDateStr){
-  // PatientDetailDto.BirthDate is a DateOnly (yyyy-MM-dd), not a full timestamp.
   if(!birthDateStr) return '?';
   const dob = new Date(birthDateStr), now = new Date();
   let age = now.getFullYear() - dob.getFullYear();
@@ -807,15 +1426,19 @@ function calcAge(birthDateStr){
 async function loadPatientHeader(){
   const el = document.getElementById('patientInfo');
   let patientId = PATIENT_ID;
+  let studyOperatorName = '';
 
-  if(!patientId && CATH_STUDY_ID){
-    // patientId wasn't passed in the URL - resolve it from the study instead
-    // of just giving up, so this page still works when linked with only ?cathStudyId=.
+  // Always resolve the CathStudy record when we have its id — it's the only
+  // place OperatorName lives (the report DTO doesn't carry it). Previously
+  // this call only ran when patientId was missing from the URL, so the
+  // operator name was never fetched at all in the common case.
+  if(CATH_STUDY_ID){
     try{
       const study = await apiGet('/cathstudies/'+CATH_STUDY_ID);
-      patientId = study.patientId;
+      if(!patientId) patientId = study.patientId;
+      studyOperatorName = study.operatorName || '';
     } catch(err){
-      console.error('Could not resolve patientId from cathStudyId', err);
+      console.error('Could not resolve cath study info', err);
     }
   }
 
@@ -826,23 +1449,36 @@ async function loadPatientHeader(){
   }
 
   try{
-    const patient = await apiGet('/patients/'+patientId); // PatientDetailDto, includes Studies: CathStudyDto[]
+    const patient = await apiGet('/patients/'+patientId);
+    patientData = patient;
+    // Kept on patientData (not reportStatus) on purpose: refreshReportStatus()
+    // fully replaces reportStatus on every call (e.g. after each save/edit,
+    // or on window focus), which was wiping out the operator name as soon as
+    // the report was edited. patientData isn't touched by those refreshes.
+    patientData.operatorName = studyOperatorName;
 
-    el.textContent = '';
+    el.innerHTML = '';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'back-btn'; backBtn.id = 'backBtn';
+    backBtn.innerHTML = '&#8592; Retour'; backBtn.title = 'Retour à la fiche patient';
+    backBtn.onclick = handleBack;
+
     const b = document.createElement('b');
     b.textContent = patient.fullName || 'Patient';
 
     const span = document.createElement('span');
-    // CathStudyDto has no procedure-type label field, so that part of the
-    // string stays static for now; only the date comes from the matched study.
     let procedureDate = '';
     if(CATH_STUDY_ID && Array.isArray(patient.studies)){
       const study = patient.studies.find(s => s.id === CATH_STUDY_ID);
-      if(study) procedureDate = study.studyDate;
+      if(study){
+        procedureDate = study.studyDate;
+        patientData.procedureDate = procedureDate;
+        patientData.accessionNumber = study.accessionNumber;
+      }
     }
     span.textContent = calcAge(patient.birthDate) + ' ans · Coronarographie' + (procedureDate ? ' · '+formatFrDate(procedureDate) : '');
 
-    el.append(b, span);
+    el.append(backBtn, b, span);
   } catch(err){
     console.error('Could not load patient info', err);
     el.textContent = '';
@@ -851,6 +1487,49 @@ async function loadPatientHeader(){
 }
 loadPatientHeader();
 
+/* --- E. Back button --- */
+function handleBack(){
+  if(popoverLayer.children.length > 0){
+    if(!confirm('Un ajout est en cours. Quitter la page ?')) return;
+  }
+  if(PATIENT_ID){
+    window.location.href = '/frontend/pages/patients/detail.html?id=' + PATIENT_ID;
+  } else {
+    history.back();
+  }
+}
+
+/* --- E. Escape key --- */
+document.addEventListener('keydown', e=>{
+  if(e.key !== 'Escape') return;
+  if(popoverLayer.children.length > 0){ closePopover(); render(); }
+  else if(reportModalLayer.children.length > 0){ reportModalLayer.innerHTML = ''; }
+  else if(modalLayer.children.length > 0){ modalLayer.innerHTML = ''; }
+});
+
+/* --- E. beforeunload guard --- */
+window.addEventListener('beforeunload', e=>{
+  if(popoverLayer.children.length > 0){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+/* --- Report action buttons --- */
+document.getElementById('viewReportBtn').onclick = openFullReport;
+document.getElementById('downloadPdfBtn').onclick = downloadPdf;
+document.getElementById('confirmReportBtn').onclick = confirmReport;
+
+/* --- Conclusion/recommendations save on blur --- */
+document.getElementById('f-conclusion').addEventListener('blur', ()=>{
+  document.getElementById('f-conclusion').dataset.auto = '';
+  saveReportMeta();
+});
+document.getElementById('f-recommendations').addEventListener('blur', saveReportMeta);
+document.getElementById('f-approach').addEventListener('blur', saveReportMeta);
+document.getElementById('f-catheter').addEventListener('blur', saveReportMeta);
+
+/* --- Initial loads --- */
 if(CATH_STUDY_ID){
   apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
     .then(items => { window.__reservedItems = items; renderReservedPanel(items); })
@@ -860,13 +1539,18 @@ if(CATH_STUDY_ID){
   renderReservedPanel([]);
 }
 
-apiGet('/pharmacy/items/available?deviceType=Stent') 
+apiGet('/pharmacy/items/available?deviceType=Stent')
   .then(items => window.__availableStents = items)
   .catch(err => console.error('Could not load available stents', err));
- 
+
 apiGet('/pharmacy/items/available?deviceType=Ballon')
   .then(items => window.__availableBalloons = items)
   .catch(err => console.error('Could not load available balloons', err));
+
+/* --- Re-fetch status on focus (guard against concurrent confirmation) --- */
+document.addEventListener('focus', ()=>{
+  if(CATH_STUDY_ID && !isLocked) refreshReportStatus();
+});
 
 
 /* --- Resizable Constatations panel --- */
@@ -897,9 +1581,9 @@ apiGet('/pharmacy/items/available?deviceType=Ballon')
   }
   function onPointerMove(clientY){
     if(!dragging) return;
-    const delta = startY - clientY; // dragging up increases panel height
+    const delta = startY - clientY;
     applyHeight(startHeight + delta);
-    if(svg) render(); // keep info-box/overlay positions in sync as canvas area shrinks/grows
+    if(svg) render();
   }
   function onPointerUp(){
     if(!dragging) return;
