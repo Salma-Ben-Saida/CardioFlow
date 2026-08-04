@@ -8,6 +8,7 @@ namespace CathLab.WebApi.Controllers;
 
 [ApiController]
 [Route("api/pharmacy")]
+[Authorize(Roles = "Admin,ResponsablePharmacie")]
 public class PharmacyController : ControllerBase
 {
     private readonly InventoryService _inventory;
@@ -153,7 +154,6 @@ public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceTyp
 }
 
 [HttpPost("items/receive-batch")]
-    [Authorize(Roles = "Admin,ResponsablePharmacie")] 
     public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)
     {
         try

@@ -1071,7 +1071,7 @@ function updateStatusBadge(){
   if(!badge) return;
   if(reportStatus?.status === 'Confirmed'){
     badge.className = 'status-badge confirmed';
-    badge.textContent = 'Confirmé le ' + formatFrDate(reportStatus.confirmedAt) + ' par ' + (reportStatus.confirmedByUserName || '?');
+    badge.textContent = 'Confirmé le ' + formatFrDate(reportStatus.confirmedAt) + ' par D.' + (reportStatus.confirmedByUserName || '?');
   } else {
     badge.className = 'status-badge draft';
     badge.textContent = 'Brouillon — modifiable';

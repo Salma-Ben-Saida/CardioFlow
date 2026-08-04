@@ -219,18 +219,22 @@ public class ProcedureService
         var lesions = await _lesions.GetByProcedureReportAsync(reportId);
         report.Lesions = lesions;
 
-        await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            foreach (var lesion in lesions)
-                foreach (var treatment in lesion.Treatments)
-                    await _inventory.ConsumeItemAsync(treatment.InventoryItemId, confirmedBy);
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                Console.WriteLine($"ConfirmReportAsync: reportId={reportId} confirmedBy={confirmedBy}");
 
-            report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report);
-            report.IsConfirmed = true;
-            report.ConfirmedAt = DateTime.UtcNow;
+                foreach (var lesion in lesions)
+                    foreach (var treatment in lesion.Treatments)
+                        await _inventory.ConsumeItemAsync(treatment.InventoryItemId, confirmedBy);
 
-            await _reports.UpdateAsync(report);
-        });
+                report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report);
+                report.IsConfirmed = true;
+                report.ConfirmedAt = DateTime.UtcNow;
+                // Persist the user who confirmed the report
+                report.ConfirmedByUserId = confirmedBy;
+
+                await _reports.UpdateAsync(report);
+            });
     }
 
     /// <summary>
