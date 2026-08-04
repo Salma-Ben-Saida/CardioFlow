@@ -72,6 +72,16 @@
         const eyeIcon = document.getElementById('eyeIcon');
         const eyeOffIcon = document.getElementById('eyeOffIcon');
 
+        const ROLE_DASHBOARDS = {
+    Admin: '/frontend/pages/dashboard/index.html',
+    ResponsablePharmacie: '/frontend/pages/PharmacyManagement/dashboard.html',
+    Doctor: '/frontend/pages/dashboard/index.html'
+};
+
+function getDashboardForRole(role) {
+    return ROLE_DASHBOARDS[role] || '/frontend/pages/dashboard/index.html'; // fallback default
+}
+
         togglePassword.addEventListener('click', () => {
             const type = passwordInput.type === 'password' ? 'text' : 'password';
             passwordInput.type = type;
@@ -116,15 +126,16 @@
 sessionStorage.setItem('authToken', result.token);
 
 const payload = decodeJwtPayload(result.token);
-sessionStorage.setItem('user', JSON.stringify({
-    id: payload.nameid,                                    // claim "nameid" = ClaimTypes.NameIdentifier
+const user = {
+    id: payload.nameid,
     username: result.username,
     fullName: result.fullName,
     role: payload.role || payload[Object.keys(payload).find(k => k.endsWith('/role'))]
-}));
+};
+sessionStorage.setItem('user', JSON.stringify(user));
 
 showToast('Login successful! Redirecting...', 'success');
-setTimeout(() => window.location.href = '/frontend/pages/dashboard/index.html', 1000);
+setTimeout(() => window.location.href = getDashboardForRole(user.role), 1000);
 } catch (error) {
     loginError.textContent = error.message || 'Login failed. Please try again.';
     loginError.classList.add('show');
@@ -136,7 +147,10 @@ setTimeout(() => window.location.href = '/frontend/pages/dashboard/index.html', 
             }
         });
 
-        if (sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/dashboard/index.html';
+        if (sessionStorage.getItem('authToken')) {
+    const stored = JSON.parse(sessionStorage.getItem('user') || 'null');
+    window.location.href = getDashboardForRole(stored?.role);
+}
     </script>
 </body>
 </html>

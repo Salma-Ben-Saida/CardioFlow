@@ -2,23 +2,25 @@
  * Pharmacie — CathLab  (vanilla JS, no framework)
  * ============================================================ */
 
-/* ---------- API config (tweak here if routes differ) ---------- */
+import { get as apiGetClient, post as apiPostClient } from '../../assets/js/api/client.js';
+
+/* ---------- API config ---------- */
+const API_BASE = 'http://localhost:5152/api';
+
 const API = {
-  base: 'http://localhost:5152/api',
-  // confirmed
+  base: API_BASE,
   itemsAvailable: (deviceType) =>
-    `${API.base}/pharmacy/items/available${deviceType ? `?deviceType=${encodeURIComponent(deviceType)}` : ''}`,
+    `${API_BASE}/pharmacy/items/available${deviceType ? `?deviceType=${encodeURIComponent(deviceType)}` : ''}`,
   itemsReserved: (studyId) =>
-    `${API.base}/pharmacy/items/reserved/${encodeURIComponent(studyId)}`,
-  // assumed — may need route name tweaks
+    `${API_BASE}/pharmacy/items/reserved/${encodeURIComponent(studyId)}`,
   products: (page = 1, pageSize = 200) =>
-    `${API.base}/pharmacy/products?page=${page}&pageSize=${pageSize}`,
-  createProduct: `${API.base}/pharmacy/products`,
-  lowStock: `${API.base}/pharmacy/products/low-stock`,
-  receiveItem: `${API.base}/pharmacy/items/receive`,
+    `${API_BASE}/pharmacy/products?page=${page}&pageSize=${pageSize}`,
+  createProduct: `${API_BASE}/pharmacy/products`,
+  lowStock: `${API_BASE}/pharmacy/products/low-stock`,
+  receiveItem: `${API_BASE}/pharmacy/items/receive`,
   expiring: (withinDays) =>
-    `${API.base}/pharmacy/items/expiring?withinDays=${withinDays}`,
-  waste: (id) => `${API.base}/pharmacy/items/${id}/waste`,
+    `${API_BASE}/pharmacy/items/expiring?withinDays=${withinDays}`,
+  waste: (id) => `${API_BASE}/pharmacy/items/${id}/waste`,
 };
 
 /* ---------- State ---------- */
@@ -82,23 +84,17 @@ function toast(msg, type = 'success') {
 }
 
 /* ---------- Fetch wrapper ---------- */
+function toApiEndpoint(url) {
+  const origin = 'http://localhost:5152';
+  if (url.startsWith(origin)) return url.slice(origin.length);
+  return url;
+}
+
 async function apiGet(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return apiGetClient(toApiEndpoint(url));
 }
 async function apiPost(url, body) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try { const j = await res.json(); detail = j.message || j.title || detail; } catch {}
-    throw new Error(detail);
-  }
-  return res.status === 204 ? null : res.json();
+  return apiPostClient(toApiEndpoint(url), body);
 }
 
 /* ---------- Table helpers ---------- */
@@ -547,5 +543,25 @@ function init() {
   // initial load
   switchView('dashboard');
 }
+/* ---------- Access control ---------- */
+const ALLOWED_ROLES = ['Admin', 'ResponsablePharmacie'];
 
-document.addEventListener('DOMContentLoaded', init);
+function getCurrentUser() {
+  try {
+    return JSON.parse(sessionStorage.getItem('user'));
+  } catch {
+    return null;
+  }
+}
+
+function guardAccess() {
+  const user = getCurrentUser();
+  if (!user || !ALLOWED_ROLES.includes(user.role)) {
+    window.location.href = '/frontend/pages/login.html';
+    return false;
+  }
+  return true;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (guardAccess()) init();
+});
