@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administration — CathLab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../assets/css/main.css" />
+    <link rel="stylesheet" href="../../assets/css/components.css" />
+    <link rel="stylesheet" href="../../assets/css/layout.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">Administration</span>
+            <span class="brand-sub">CathLab</span>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <div class="nav-group">
+            <span class="nav-group-label">Pilotage</span>
+            <a href="#" class="nav-item active" data-view="dashboard">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+              </span>
+              <span class="nav-label">Tableau de bord</span>
+            </a>
+            <a href="#" class="nav-item" data-view="movements">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M6 7v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 12l4 4"/><path d="M14 12l-4 4"/></svg>
+              </span>
+              <span class="nav-label">Mouvements stock</span>
+            </a>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-group-label">Gestion</span>
+            <a href="#" class="nav-item" data-view="users">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </span>
+              <span class="nav-label">Utilisateurs</span>
+            </a>
+            <a href="#" class="nav-item" data-view="reports">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+              </span>
+              <span class="nav-label">Rapports</span>
+            </a>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-group-label">Sécurité</span>
+            <a href="#" class="nav-item" data-view="audits">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 2L4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5z"/></svg>
+              </span>
+              <span class="nav-label">Audits</span>
+            </a>
+            <a href="#" class="nav-item" data-view="logs">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+              </span>
+              <span class="nav-label">Logs utilisateur</span>
+            </a>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-group-label">Modules</span>
+            <a href="/frontend/pages/PharmacyManagement/dashboard.html" class="nav-item">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5 12 22l1.5-1.5"/><path d="M12 22V8"/><path d="M12 8c0-3.5 2.5-6 6-6 0 3.5-2.5 6-6 6Z"/><path d="M12 8c0-3.5-2.5-6-6-6 0 3.5 2.5 6 6 6Z"/></svg>
+              </span>
+              <span class="nav-label">Gestion pharmacie</span>
+            </a>
+            <a href="/frontend/pages/patients/list.html" class="nav-item">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+              </span>
+              <span class="nav-label">Patients</span>
+            </a>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          </span>
+          <span class="nav-label">API: localhost:5152</span>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1 class="page-title" id="page-title">Tableau de bord</h1>
+            <span class="page-subtitle" id="page-subtitle">Vue d'ensemble administrateur</span>
+          </div>
+          <div class="topbar-right">
+            <div class="user-chip">
+              <div class="avatar" id="user-avatar">--</div>
+              <div class="user-meta">
+                <span class="user-name" id="user-name">—</span>
+                <span class="user-role">Administrateur</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main class="content" id="content">
+          <!-- Dashboard -->
+          <section class="view" id="view-dashboard">
+            <div class="kpi-row" id="kpi-row">
+              <div class="kpi"><div class="kpi-icon purple">📦</div><div class="kpi-meta"><span class="kpi-value" id="kpi-movements">…</span><span class="kpi-label">Mouvements récents</span></div></div>
+              <div class="kpi"><div class="kpi-icon green">👥</div><div class="kpi-meta"><span class="kpi-value" id="kpi-users">…</span><span class="kpi-label">Utilisateurs actifs</span></div></div>
+              <div class="kpi"><div class="kpi-icon amber">📄</div><div class="kpi-meta"><span class="kpi-value" id="kpi-reports-pending">…</span><span class="kpi-label">Rapports en attente</span></div></div>
+              <div class="kpi"><div class="kpi-icon red">🛡️</div><div class="kpi-meta"><span class="kpi-value" id="kpi-audits">…</span><span class="kpi-label">Audits enregistrés</span></div></div>
+            </div>
+
+            <div class="panels">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Derniers mouvements de stock</h2>
+                  <a href="#" class="panel-link" data-goto="movements">Tout voir →</a>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table" id="dash-movements-table">
+                    <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Par</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Derniers rapports</h2>
+                  <a href="#" class="panel-link" data-goto="reports">Tout voir →</a>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table" id="dash-reports-table">
+                    <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Derniers audits</h2>
+                  <a href="#" class="panel-link" data-goto="audits">Tout voir →</a>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table" id="dash-audits-table">
+                    <thead><tr><th>Date</th><th>Acteur</th><th>Action</th><th>Entité</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Dernières connexions</h2>
+                  <a href="#" class="panel-link" data-goto="logs">Tout voir →</a>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table" id="dash-logs-table">
+                    <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="panels" style="margin-top:16px;">
+              <a href="/frontend/pages/PharmacyManagement/dashboard.html" class="panel" style="display:flex;align-items:center;gap:14px;text-decoration:none;">
+                <div class="kpi-icon purple" style="width:46px;height:46px;">💊</div>
+                <div>
+                  <h2 class="panel-title" style="margin-bottom:2px;">Gestion pharmacie</h2>
+                  <span class="page-subtitle" id="module-pharmacy-stat">Chargement…</span>
+                </div>
+              </a>
+              <a href="/frontend/pages/patients/list.html" class="panel" style="display:flex;align-items:center;gap:14px;text-decoration:none;">
+                <div class="kpi-icon green" style="width:46px;height:46px;">🧑‍⚕️</div>
+                <div>
+                  <h2 class="panel-title" style="margin-bottom:2px;">Patients</h2>
+                  <span class="page-subtitle" id="module-patients-stat">Chargement…</span>
+                </div>
+              </a>
+            </div>
+          </section>
+
+          <!-- Stock movements -->
+          <section class="view hidden" id="view-movements">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Mouvements de stock</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="movements-table">
+                  <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Note</th><th>Par</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Users -->
+          <section class="view hidden" id="view-users">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Utilisateurs</h2>
+                <button class="btn btn-primary" id="btn-new-user">+ Nouvel utilisateur</button>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="users-table">
+                  <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Statut</th><th>Créé le</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Reports -->
+          <section class="view hidden" id="view-reports">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Rapports</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="reports-table">
+                  <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Audits -->
+          <section class="view hidden" id="view-audits">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Audits</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="audits-table">
+                  <thead><tr><th>Date</th><th>Acteur</th><th>Action</th><th>Entité</th><th>Détail</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- User activity logs -->
+          <section class="view hidden" id="view-logs">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Logs utilisateur</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="logs-table">
+                  <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>IP</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- New User Modal -->
+    <div class="modal-overlay hidden" id="modal-user">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 class="modal-title">Nouvel utilisateur</h3>
+          <button class="modal-close" data-close-modal="modal-user">×</button>
+        </div>
+        <form id="form-user" class="modal-body">
+          <div class="field">
+            <label for="u-fullname">Nom complet</label>
+            <input type="text" id="u-fullname" required />
+          </div>
+          <div class="field">
+            <label for="u-name">Identifiant (username)</label>
+            <input type="text" id="u-name" required />
+          </div>
+          <div class="field">
+            <label for="u-password">Mot de passe</label>
+            <input type="password" id="u-password" required />
+          </div>
+          <div class="field">
+            <label for="u-role">Rôle</label>
+            <select id="u-role" required>
+              <option value="Admin">Admin</option>
+              <option value="Medecin">Médecin</option>
+              <option value="ResponsablePharmacie">Responsable Pharmacie</option>
+              <option value="Secretaire">Secrétaire</option>
+            </select>
+          </div>
+        </form>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-user">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-user">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

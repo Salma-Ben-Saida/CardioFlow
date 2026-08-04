@@ -25,6 +25,9 @@ public class CathLabDbContext : DbContext
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<UserActivityLog> UserActivityLogs { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Patient>(e =>

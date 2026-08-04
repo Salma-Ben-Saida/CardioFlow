@@ -32,13 +32,19 @@ public class ProcedureReportRepository : IProcedureReportRepository
         await _db.SaveChangesAsync();
     }
 
-
+    /// <summary>
+    /// A report belongs to a doctor if they were assigned as CathStudy
+    /// Operator (from PACS/DICOM metadata - often empty in practice) OR if
+    /// they're the one who confirmed it. Checking OperatorId alone misses
+    /// every report where that DICOM field was never populated, even
+    /// though the doctor genuinely confirmed it.
+    /// </summary>
     public async Task<List<ProcedureReport>> GetByDoctorIdAsync(Guid doctorId)
     {
         return await _db.ProcedureReports
             .Include(r => r.CathStudy).ThenInclude(s => s.Patient)
-            .Include(r => r.CathStudy).ThenInclude(s => s.Operator)
-            .Where(r => r.CathStudy.OperatorId == doctorId)
+            .Include(r => r.ConfirmedByUser)
+            .Where(r => r.CathStudy.OperatorId == doctorId || r.ConfirmedByUserId == doctorId)
             .OrderByDescending(r => r.ReportGeneratedAt)
             .ToListAsync();
     }
@@ -47,23 +53,25 @@ public class ProcedureReportRepository : IProcedureReportRepository
     {
         return await _db.ProcedureReports
             .Include(r => r.CathStudy).ThenInclude(s => s.Patient)
-            .Include(r => r.CathStudy).ThenInclude(s => s.Operator)
+            .Include(r => r.ConfirmedByUser)
             .Where(r => r.CathStudy.PatientId == patientId)
             .OrderByDescending(r => r.ReportGeneratedAt)
             .ToListAsync();
     }
  
+    /// <summary>Same OperatorId-or-ConfirmedByUserId matching as GetByDoctorIdAsync - see note there.</summary>
     public async Task<bool> HasDoctorTreatedPatientAsync(Guid doctorId, Guid patientId)
     {
         return await _db.ProcedureReports
-            .AnyAsync(r => r.CathStudy.OperatorId == doctorId && r.CathStudy.PatientId == patientId);
+            .AnyAsync(r => (r.CathStudy.OperatorId == doctorId || r.ConfirmedByUserId == doctorId)
+                        && r.CathStudy.PatientId == patientId);
     }
  
     public async Task<List<ProcedureReport>> GetAllAsync()
     {
         return await _db.ProcedureReports
             .Include(r => r.CathStudy).ThenInclude(s => s.Patient)
-            .Include(r => r.CathStudy).ThenInclude(s => s.Operator)
+            .Include(r => r.ConfirmedByUser)
             .OrderByDescending(r => r.ReportGeneratedAt)
             .ToListAsync();
     }

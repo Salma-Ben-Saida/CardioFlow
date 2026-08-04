@@ -58,6 +58,39 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.ToTable("AppUsers");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.CathStudy", b =>
                 {
                     b.Property<Guid>("Id")
@@ -409,6 +442,8 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.HasIndex("CathStudyId")
                         .IsUnique();
 
+                    b.HasIndex("ConfirmedByUserId");
+
                     b.ToTable("ProcedureReports");
                 });
 
@@ -503,6 +538,39 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.ToTable("StockMovements");
                 });
 
+            modelBuilder.Entity("CathLab.Domain.Entities.UserActivityLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserActivityLogs");
+                });
+
             modelBuilder.Entity("CathLab.Domain.Entities.BalloonDilation", b =>
                 {
                     b.HasBaseType("CathLab.Domain.Entities.LesionTreatment");
@@ -557,6 +625,17 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(5,2)");
 
                     b.ToTable("StentImplants", (string)null);
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.AppUser", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActorUser");
                 });
 
             modelBuilder.Entity("CathLab.Domain.Entities.CathStudy", b =>
@@ -641,7 +720,13 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CathLab.Domain.Entities.AppUser", "ConfirmedByUser")
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByUserId");
+
                     b.Navigation("CathStudy");
+
+                    b.Navigation("ConfirmedByUser");
                 });
 
             modelBuilder.Entity("CathLab.Domain.Entities.RiskProfile", b =>
@@ -672,6 +757,15 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("CathLab.Domain.Entities.UserActivityLog", b =>
+                {
+                    b.HasOne("CathLab.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CathLab.Domain.Entities.BalloonDilation", b =>

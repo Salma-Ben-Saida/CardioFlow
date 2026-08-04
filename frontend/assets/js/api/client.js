@@ -47,7 +47,10 @@ export async function apiRequest(endpoint, options = {}) {
 }
 
 export async function get(endpoint, params = {}) {
-    const queryString = new URLSearchParams(params).toString();
+    const cleanParams = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const queryString = new URLSearchParams(cleanParams).toString();
     const url = queryString ? `${endpoint}?${queryString}` : endpoint;
     return apiRequest(url, { method: 'GET' });
 }
@@ -56,4 +59,8 @@ export async function post(endpoint, data = {}) {
     return apiRequest(endpoint, { method: 'POST', body: JSON.stringify(data) });
 }
 
-export default { get, post, setToken, getToken, clearToken };
+export async function put(endpoint, data = {}) {
+    return apiRequest(endpoint, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export default { get, post, put, setToken, getToken, clearToken };

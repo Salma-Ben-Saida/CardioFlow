@@ -36,25 +36,27 @@
                         </div>
                         <div class="panel-body" id="pacsStudiesList"></div>
                     </div>
-                    <div class="card" style="display:flex;flex-direction:column;">
-                        <div class="card-header"><h3 class="card-title">Patient Information</h3><span class="card-subtitle" id="formSubtitle">Select a PACS study to populate</span></div>
-                        <div class="card-body" style="flex:1;overflow-y:auto;padding:var(--spacing-6);">
+                    <div class="panel">
+                        <div class="panel-header" style="display:flex;align-items:center;gap:var(--spacing-3);">
+                            <div class="avatar-circle" id="formAvatar" style="background:var(--color-gray-200);color:var(--color-gray-400);">?</div>
+                            <div style="min-width:0;">
+                                <h3 class="panel-title">Patient Information</h3>
+                                <span class="card-subtitle" id="formSubtitle" style="margin-top:0;display:block;">Select a PACS study to populate</span>
+                            </div>
+                        </div>
+                        <div class="panel-body">
                             <form id="admissionForm">
-                                <div class="form-row" style="margin-bottom:var(--spacing-4);">
-                                    <div class="form-group"><label class="form-label required" for="patientName">Full Name</label><input type="text" class="form-control" id="patientName" name="fullName" placeholder="Enter full name" required disabled></div>
-                                </div>
-                                <div class="form-row" style="margin-bottom:var(--spacing-4);">
+                                <div class="form-group"><label class="form-label required" for="patientName">Full Name</label><input type="text" class="form-control" id="patientName" name="fullName" placeholder="Enter full name" required disabled></div>
+                                <div class="form-row">
                                     <div class="form-group"><label class="form-label" for="nationalId">National ID</label><input type="text" class="form-control" id="nationalId" name="nationalId" placeholder="Enter national ID" disabled></div>
+                                    <div class="form-group"><label class="form-label" for="phone">Phone Number</label><input type="tel" class="form-control" id="phone" name="phoneNumber" placeholder="Enter phone number" disabled></div>
                                 </div>
-                                <div class="form-row" style="margin-bottom:var(--spacing-4);">
+                                <div class="form-row">
                                     <div class="form-group"><label class="form-label" for="birthDate">Birth Date</label><input type="date" class="form-control" id="birthDate" name="birthDate" disabled></div>
                                     <div class="form-group"><label class="form-label" for="sex">Sex</label><select class="form-control" id="sex" name="sex" disabled><option value="">Select...</option><option value="M">Male</option><option value="F">Female</option></select></div>
-                                </div>
-                                <div class="form-row" style="margin-bottom:var(--spacing-4);">
-                                    <div class="form-group"><label class="form-label" for="phone">Phone Number</label><input type="tel" class="form-control" id="phone" name="phoneNumber" placeholder="Enter phone number" disabled></div>
                                     <div class="form-group"><label class="form-label" for="bloodGroup">Blood Group</label><select class="form-control" id="bloodGroup" name="bloodGroup" disabled><option value="">Select...</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
                                 </div>
-                                <div class="form-group"><label class="form-label" for="address">Address</label><textarea class="form-control" id="address" name="address" rows="2" placeholder="Enter address" disabled></textarea></div>
+                                <div class="form-group" style="margin-bottom:0;"><label class="form-label" for="address">Address</label><textarea class="form-control" id="address" name="address" rows="2" placeholder="Enter address" disabled></textarea></div>
                                 <input type="hidden" id="accessionNumber" name="accessionNumber">
                             </form>
                         </div>
@@ -116,7 +118,13 @@
             setFormEnabled(true);
             formSubtitle.textContent = `Importing from: ${study.accessionNumber}`;
             selectedStudyInfo.textContent = `Study: ${study.accessionNumber} | ${study.patientName || 'Unknown'}`;
+            const avatar = document.getElementById('formAvatar');
+            avatar.textContent = getInitials(study.patientName);
+            avatar.style.background = 'linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%)';
+            avatar.style.color = 'var(--color-white)';
         };
+
+        function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
 
         admissionForm.addEventListener('submit', async (e) => {
             e.preventDefault();

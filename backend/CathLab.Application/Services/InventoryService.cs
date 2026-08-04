@@ -2,6 +2,7 @@ using CathLab.Application.Common;
 using CathLab.Application.DTOs.Pharmacy;
 using CathLab.Application.Interfaces;
 using CathLab.Domain.Entities;
+using CathLab.Domain.Repositories;
 
 namespace CathLab.Application.Services;
 
@@ -10,15 +11,19 @@ public class InventoryService
     private readonly IInventoryProductRepository _products;
     private readonly IInventoryItemRepository _items;
     private readonly IStockMovementRepository _movements;
+    private readonly IUserRepository _users;
 
     public InventoryService(
         IInventoryProductRepository products,
         IInventoryItemRepository items,
-        IStockMovementRepository movements)
+        IStockMovementRepository movements,
+        IUserRepository users
+    )
     {
         _products = products;
         _items = items;
         _movements = movements;
+        _users = users;
     }
 
     public async Task<InventoryProductDto> CreateProductAsync(CreateInventoryProductDto dto)
@@ -279,5 +284,38 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
         item.ReservedAt = null;
 
         await _items.UpdateAsync(item);
+    }
+
+    public async Task<PagedResult<StockMovementDto>> GetStockMovementsAsync(int page, int pageSize)
+    {
+        var (items, total) = await _movements.GetListAsync(page, pageSize);
+        var dtos = new List<StockMovementDto>();
+
+        foreach (var m in items)
+        {
+            var user = await _users.GetByIdAsync(m.CreatedBy);
+            var fullName = user?.FullName ?? string.Empty;
+            var roleName = user?.Role.ToString();
+            var displayName = string.IsNullOrWhiteSpace(fullName)
+                ? roleName ?? string.Empty
+                : string.IsNullOrWhiteSpace(roleName)
+                    ? fullName
+                    : $"{fullName} ({roleName})";
+
+            dtos.Add(new StockMovementDto
+            {
+                Id = m.Id,
+                ProductId = m.ProductId,
+                ProductName = m.Product?.ProductName ?? string.Empty,
+                MovementType = m.MovementType.ToString(),
+                Quantity = m.Quantity,
+                ReferenceNote = m.ReferenceNote,
+                MovedAt = m.MovedAt,
+                CreatedBy = m.CreatedBy,
+                actorName = displayName
+            });
+        }
+
+        return new PagedResult<StockMovementDto>(dtos, total, page, pageSize);
     }
 }

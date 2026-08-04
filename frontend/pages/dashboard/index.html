@@ -29,10 +29,11 @@
             <div class="page-content">
                 <div class="page-header">
                     <div class="page-header-left">
-                        <h1 class="page-header-title">Dashboard</h1>
+                        <h1 class="page-header-title" id="pageWelcome">Dashboard</h1>
                         <p class="page-header-subtitle">Welcome back! Here's your overview.</p>
                     </div>
                 </div>
+
                 <!-- KPI Cards -->
                 <div class="content-grid content-grid-cols-4" style="margin-bottom: var(--spacing-6);" id="kpiCards">
                     <div class="card stat-card stat-card-primary">
@@ -41,22 +42,24 @@
                     </div>
                     <div class="card stat-card stat-card-success">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="studiesThisMonth">-</div><div class="stat-label">Studies This Month</div></div>
+                        <div class="stat-content"><div class="stat-value" id="studiesThisMonth">-</div><div class="stat-label">Reports This Month</div></div>
                     </div>
                     <div class="card stat-card stat-card-warning">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
                         <div class="stat-content"><div class="stat-value" id="incompleteRecords">-</div><div class="stat-label">Incomplete Records</div></div>
                     </div>
                     <div class="card stat-card stat-card-danger">
-                        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+                        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg></div>
+                        <div class="stat-content"><div class="stat-value" id="pendingReports">-</div><div class="stat-label">Pending Reports</div></div>
                     </div>
                 </div>
+
                 <!-- Content Grid -->
                 <div class="content-grid" style="grid-template-columns: 2fr 1fr;">
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">Recent Studies</h3><span class="card-subtitle">Last 10 procedures</span></div>
+                        <div class="card-header"><h3 class="card-title">Recent Reports</h3><span class="card-subtitle">Last 10 procedures</span></div>
                         <div class="table-container">
-                            <table class="table"><thead><tr><th>Patient</th><th>Accession #</th><th>Date</th><th>Status</th><th>Operator</th></tr></thead><tbody id="recentStudiesBody"></tbody></table>
+                            <table class="table"><thead><tr><th>Patient</th><th>Date</th><th>Status</th></tr></thead><tbody id="recentReportsBody"></tbody></table>
                         </div>
                     </div>
                     <div class="card">
@@ -72,18 +75,36 @@
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
         import { showToast } from '../../assets/js/components/toast.js';
         import { getPatients } from '../../assets/js/api/patients.js';
+        import { getReports } from '../../assets/js/api/reports.js';
         import { formatDate, formatStatusBadge, showEmptyState } from '../../assets/js/utils.js';
 
-        if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
+        const ALLOWED_ROLES = ['Medecin', 'Admin'];
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+        if (!sessionStorage.getItem('authToken') || !currentUser || !ALLOWED_ROLES.includes(currentUser.role)) {
+            window.location.href = '/frontend/pages/login.html';
+        }
+
         renderSidebar('sidebar-container');
+        document.getElementById('pageWelcome').textContent =
+            currentUser?.fullName ? `Welcome back, ${currentUser.fullName}` : 'Dashboard';
 
         async function initDashboard() {
             const loadingOverlay = document.getElementById('loadingOverlay');
             loadingOverlay.style.display = 'flex';
             try {
-                await Promise.all([loadKPIs(), loadRecentStudies(), loadIncompletePatients()]);
+                await Promise.all([loadKPIs(), loadRecentReports(), loadIncompletePatients()]);
             } catch (error) { showToast.error('Failed to load dashboard data. ' + error.message); }
             finally { loadingOverlay.style.display = 'none'; }
+        }
+
+        // Reports are fetched once and reused across the reports-this-month
+        // KPI, the pending-reports KPI, and the recent-reports panel, rather
+        // than hitting /api/reports three separate times.
+        let reportsCache = null;
+        async function getReportsCached() {
+            if (reportsCache) return reportsCache;
+            reportsCache = await getReports();
+            return reportsCache;
         }
 
         async function loadKPIs() {
@@ -91,25 +112,40 @@
                 const patientsData = await getPatients({ page: 1, pageSize: 1 });
                 const totalPatients = patientsData.totalCount || patientsData.total || patientsData.items?.length || 0;
                 document.getElementById('totalPatients').textContent = totalPatients;
+
                 let incompleteCount = 0;
                 try {
                     const allPatients = await getPatients({ page: 1, pageSize: 100, status: 'incomplete' });
                     incompleteCount = allPatients.totalCount || allPatients.total || allPatients.items?.length || 0;
                 } catch { if (patientsData.items) incompleteCount = patientsData.items.filter(p => p.isIncomplete).length; }
                 document.getElementById('incompleteRecords').textContent = incompleteCount;
-                document.getElementById('studiesThisMonth').textContent = '-';
-                document.getElementById('lowStockAlerts').textContent = '-';
             } catch (error) { throw error; }
+
+            try {
+                const reports = await getReportsCached();
+                const now = new Date();
+                const thisMonth = reports.filter(r => {
+                    const d = new Date(r.reportGeneratedAt);
+                    return !isNaN(d) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                }).length;
+                document.getElementById('studiesThisMonth').textContent = thisMonth;
+                document.getElementById('pendingReports').textContent = reports.filter(r => !r.isConfirmed).length;
+            } catch {
+                document.getElementById('studiesThisMonth').textContent = '-';
+                document.getElementById('pendingReports').textContent = '-';
+            }
         }
 
-        async function loadRecentStudies() {
-            const tbody = document.getElementById('recentStudiesBody');
+        async function loadRecentReports() {
+            const tbody = document.getElementById('recentReportsBody');
             try {
-                const patientsData = await getPatients({ page: 1, pageSize: 10, sortBy: 'updatedAt', sortDir: 'desc' });
-                const patients = patientsData.items || patientsData.patients || [];
-                if (patients.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="table-empty"><p>No recent studies found</p></td></tr>'; return; }
-                tbody.innerHTML = patients.map(p => `<tr class="clickable ${p.isIncomplete ? 'row-highlight' : ''}" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><td><div style="font-weight:500;">${escapeHtml(p.fullName)}</div><div style="font-size:12px;color:#6b7280;">${escapeHtml(p.conquestPatientID || p.nationalId || '-')}</div></td><td>-</td><td>${formatDate(p.updatedAt)}</td><td>${formatStatusBadge(p.isIncomplete)}</td><td>-</td></tr>`).join('');
-            } catch { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ef4444;">Failed to load recent studies</td></tr>'; }
+                const reports = await getReportsCached();
+                const recent = [...reports]
+                    .sort((a, b) => new Date(b.reportGeneratedAt) - new Date(a.reportGeneratedAt))
+                    .slice(0, 10);
+                if (recent.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="table-empty"><p>No recent reports found</p></td></tr>'; return; }
+                tbody.innerHTML = recent.map(r => `<tr class="clickable" onclick="window.location.href='/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${r.cathStudyId}&patientId=${r.patientId}'"><td><div style="font-weight:500;">${escapeHtml(r.patientName)}</div></td><td>${formatDate(r.reportGeneratedAt)}</td><td>${r.isConfirmed ? '<span class="badge badge-success">Confirmed</span>' : '<span class="badge badge-warning">Draft</span>'}</td></tr>`).join('');
+            } catch { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#ef4444;">Failed to load recent reports</td></tr>'; }
         }
 
         async function loadIncompletePatients() {

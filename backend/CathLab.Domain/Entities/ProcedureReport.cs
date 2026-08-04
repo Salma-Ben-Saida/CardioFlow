@@ -23,5 +23,6 @@ public class ProcedureReport
 
     //navigation to the user who confirmed the report
     public Guid? ConfirmedByUserId { get; set; } 
+    public AppUser? ConfirmedByUser { get; set; }
     
 }

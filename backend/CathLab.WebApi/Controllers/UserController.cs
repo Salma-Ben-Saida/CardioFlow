@@ -1,5 +1,6 @@
 namespace CathLab.Api.Controllers;
 
+using System.Security.Claims;
 using CathLab.Application.Dtos;
 using CathLab.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -11,10 +12,12 @@ using Microsoft.AspNetCore.Mvc;
 public class UserController : ControllerBase
 {
     private readonly UserService _userService;
+    private readonly AuditService _audit;
 
-    public UserController(UserService userService)
+    public UserController(UserService userService, AuditService audit)
     {
         _userService = userService;
+        _audit = audit;
     }
 
     [HttpPost]
@@ -26,6 +29,9 @@ public class UserController : ControllerBase
         {
             // Appelle le service pour valider, hacher et enregistrer l'utilisateur
             var createdUser = await _userService.CreateUserAsync(dto);
+
+            await _audit.LogActionAsync(GetCurrentUserId(), "Create", "AppUser", createdUser.Id,
+                $"Created user {createdUser.Username} ({createdUser.Role})");
 
             // Retourne un statut 201 Created avec l'objet sans le mot de passe pour des raisons de sécurité
             return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, new
@@ -72,5 +78,25 @@ public async Task<IActionResult> GetUserById(Guid id)
     {
         return NotFound(new { message = ex.Message });
     }
+}
+private Guid GetCurrentUserId()
+{
+    var userPrincipal = User;
+
+    if (userPrincipal?.Identity?.IsAuthenticated != true)
+    {
+        throw new UnauthorizedAccessException("No authenticated user found.");
+    }
+
+    var userIdClaim = userPrincipal.FindFirst("nameid")?.Value
+                      ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? userPrincipal.FindFirst("sub")?.Value;
+
+    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+    {
+        throw new UnauthorizedAccessException("User identification token is invalid.");
+    }
+
+    return userId;
 }
 }

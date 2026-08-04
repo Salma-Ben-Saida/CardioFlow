@@ -13,11 +13,14 @@ public class ProceduresController : ControllerBase
 {
     private readonly ProcedureService _procedures;
     private readonly InventoryService _inventory;
+    private readonly AuditService _audit;
 
-    public ProceduresController(ProcedureService procedures, InventoryService inventory)
+
+    public ProceduresController(ProcedureService procedures, InventoryService inventory, AuditService audit)
     {
         _procedures = procedures;
         _inventory = inventory;
+        _audit = audit;
     }
 
     /// <summary>
@@ -107,6 +110,8 @@ public async Task<IActionResult> ConfirmReport(Guid reportId)
     try
     {
         await _procedures.ConfirmReportAsync(reportId, GetCurrentUserId());
+        await _audit.LogActionAsync(GetCurrentUserId(), "Confirm", "ProcedureReport", reportId, null);
+
         return NoContent();
     }
     catch (InvalidOperationException ex)

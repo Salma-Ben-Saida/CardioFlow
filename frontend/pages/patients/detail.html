@@ -19,7 +19,13 @@
             <div class="page-content">
                 <div style="margin-bottom:var(--spacing-4);"><a href="/frontend/pages/patients/list.html" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back to List</a></div>
                 <div class="detail-header-card" id="patientHeader">
-                    <div class="detail-header-top"><div><h1 class="detail-header-name" id="patientName">Loading...</h1><p class="detail-header-id" id="patientIdDisplay">-</p></div><span id="patientStatus"></span></div>
+                    <div class="detail-header-top">
+                        <div style="display:flex;align-items:center;gap:var(--spacing-4);">
+                            <div class="avatar-circle avatar-circle-lg" id="headerAvatar" style="background:rgba(255,255,255,0.15);">?</div>
+                            <div><h1 class="detail-header-name" id="patientName">Loading...</h1><p class="detail-header-id" id="patientIdDisplay">-</p></div>
+                        </div>
+                        <span id="patientStatus"></span>
+                    </div>
                     <div class="detail-header-meta" id="patientMeta"></div>
                 </div>
                 <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
@@ -30,25 +36,45 @@
                     </div>
                     <div class="card-body">
                         <div class="tab-panel active" id="overviewPanel">
-                            <div class="form-row" style="margin-bottom:var(--spacing-6);">
-                                <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-control form-control-readonly" id="viewFullName" placeholder="Full Name" readonly></div>
-                                <div class="form-group"><label class="form-label">Patient ID (Conquest)</label><input type="text" class="form-control form-control-readonly" id="viewConquestId" placeholder="Patient ID (Conquest)" readonly></div>
-                                <div class="form-group"><label class="form-label">National ID</label><input type="text" class="form-control form-control-readonly" id="viewNationalId" placeholder="National ID" readonly></div>
+                            <div style="display:flex;justify-content:flex-end;margin-bottom:var(--spacing-4);">
+                                <button class="btn btn-secondary btn-sm" id="editPatientBtn" style="display:none;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Edit Info
+                                </button>
                             </div>
-                            <div class="form-row" style="margin-bottom:var(--spacing-6);">
-                                <div class="form-group"><label class="form-label">Birth Date</label><input type="text" class="form-control form-control-readonly" id="viewBirthDate" placeholder="Birth Date" readonly></div>
-                                <div class="form-group"><label class="form-label">Age</label><input type="text" class="form-control form-control-readonly" id="viewAge" placeholder="Age" readonly></div>
-                                <div class="form-group"><label class="form-label">Sex</label><input type="text" class="form-control form-control-readonly" id="viewSex" placeholder="Sex" readonly></div>
+                            <div class="info-grid" id="overviewView">
+                                <div class="info-item"><span class="info-item-label">Full Name</span><span class="info-item-value" id="viewFullName">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Patient ID (Conquest)</span><span class="info-item-value" id="viewConquestId">-</span></div>
+                                <div class="info-item"><span class="info-item-label">National ID</span><span class="info-item-value" id="viewNationalId">-</span></div>
+                                <hr class="info-divider">
+                                <div class="info-item"><span class="info-item-label">Birth Date</span><span class="info-item-value" id="viewBirthDate">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Age</span><span class="info-item-value" id="viewAge">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Sex</span><span class="info-item-value" id="viewSex">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Blood Group</span><span class="info-item-value" id="viewBloodGroup">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Phone Number</span><span class="info-item-value" id="viewPhone">-</span></div>
+                                <hr class="info-divider">
+                                <div class="info-item" style="grid-column:1 / -1;"><span class="info-item-label">Address</span><span class="info-item-value" id="viewAddress">-</span></div>
+                                <hr class="info-divider">
+                                <div class="info-item"><span class="info-item-label">Created At</span><span class="info-item-value" id="viewCreatedAt">-</span></div>
+                                <div class="info-item"><span class="info-item-label">Last Updated</span><span class="info-item-value" id="viewUpdatedAt">-</span></div>
                             </div>
-                            <div class="form-row" style="margin-bottom:var(--spacing-6);">
-                                <div class="form-group"><label class="form-label">Blood Group</label><input type="text" class="form-control form-control-readonly" id="viewBloodGroup" placeholder="Blood Group" readonly></div>
-                                <div class="form-group"><label class="form-label">Phone Number</label><input type="text" class="form-control form-control-readonly" id="viewPhone" placeholder="Phone Number" readonly></div>
-                            </div>
-                            <div class="form-group"><label class="form-label">Address</label><textarea class="form-control form-control-readonly" id="viewAddress" placeholder="Address" rows="2" readonly></textarea></div>
-                            <div class="form-row" style="margin-top:var(--spacing-6);">
-                                <div class="form-group"><label class="form-label">Created At</label><input type="text" class="form-control form-control-readonly" id="viewCreatedAt" placeholder="Created At" readonly></div>
-                                <div class="form-group"><label class="form-label">Last Updated</label><input type="text" class="form-control form-control-readonly" id="viewUpdatedAt" placeholder="Last Updated" readonly></div>
-                            </div>
+                            <form class="info-grid" id="overviewEditForm" style="display:none;">
+                                <div class="form-group"><label class="form-label required" for="editFullName">Full Name</label><input type="text" class="form-control" id="editFullName" required></div>
+                                <div class="info-item"><span class="info-item-label">Patient ID (Conquest)</span><span class="info-item-value" id="editConquestIdDisplay">-</span></div>
+                                <div class="form-group"><label class="form-label" for="editNationalId">National ID</label><input type="text" class="form-control" id="editNationalId"></div>
+                                <hr class="info-divider">
+                                <div class="form-group"><label class="form-label" for="editBirthDate">Birth Date</label><input type="date" class="form-control" id="editBirthDate"></div>
+                                <div class="form-group"><label class="form-label" for="editSex">Sex</label><select class="form-control" id="editSex"><option value="">Select...</option><option value="M">Male</option><option value="F">Female</option></select></div>
+                                <div class="form-group"><label class="form-label" for="editBloodGroup">Blood Group</label><select class="form-control" id="editBloodGroup"><option value="">Select...</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
+                                <div class="form-group"><label class="form-label" for="editPhone">Phone Number</label><input type="tel" class="form-control" id="editPhone"></div>
+                                <hr class="info-divider">
+                                <div class="form-group" style="grid-column:1 / -1;"><label class="form-label" for="editAddress">Address</label><textarea class="form-control" id="editAddress" rows="2"></textarea></div>
+                                <hr class="info-divider">
+                                <div style="grid-column:1 / -1;display:flex;gap:var(--spacing-3);justify-content:flex-end;">
+                                    <button type="button" class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" id="saveEditBtn">Save Changes</button>
+                                </div>
+                            </form>
                         </div>
                         <div class="tab-panel" id="studiesPanel">
                             <div class="table-container"><table class="table"><thead><tr><th>Accession Number</th><th>Study Date</th><th>Status</th><th>Operator</th><th>Created At</th><th>Actions</th></tr></thead><tbody id="studiesTableBody"></tbody></table></div>
@@ -84,8 +110,13 @@
     <script type="module">
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
         import { showToast } from '../../assets/js/components/toast.js';
-        import { getPatientById, getPatientStudies, getPatientRiskProfile } from '../../assets/js/api/patients.js';
+        import { getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient } from '../../assets/js/api/patients.js';
         import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState } from '../../assets/js/utils.js';
+
+        const EDIT_ROLES = ['Secretaire', 'Admin'];
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+        const canEditPatient = EDIT_ROLES.includes(currentUser?.role);
+        let currentPatient = null;
 
         if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
         renderSidebar('sidebar-container');
@@ -100,8 +131,11 @@
             loadingOverlay.style.display = 'flex';
             try {
                 const patient = await getPatientById(patientId);
+                currentPatient = patient;
                 renderPatientHeader(patient);
                 renderOverview(patient);
+                const editBtn = document.getElementById('editPatientBtn');
+                if (editBtn) editBtn.style.display = canEditPatient ? 'inline-flex' : 'none';
                 loadStudies();
                 loadRiskProfile();
             } catch (error) {
@@ -110,7 +144,10 @@
             } finally { loadingOverlay.style.display = 'none'; }
         }
 
+        function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
+
         function renderPatientHeader(patient) {
+            document.getElementById('headerAvatar').textContent = getInitials(patient.fullName);
             document.getElementById('patientName').textContent = patient.fullName || 'Unknown';
             document.getElementById('breadcrumbPatientName').textContent = patient.fullName || 'Patient';
             document.getElementById('patientIdDisplay').textContent = `ID: ${patient.conquestPatientID || patient.nationalId || patient.id}`;
@@ -119,18 +156,26 @@
             document.getElementById('patientMeta').innerHTML = `<div class="detail-meta-item"><span class="detail-meta-label">Age</span><span class="detail-meta-value">${age !== null ? age + ' years' : '-'}</span></div><div class="detail-meta-item"><span class="detail-meta-label">Sex</span><span class="detail-meta-value">${formatSex(patient.sex)}</span></div><div class="detail-meta-item"><span class="detail-meta-label">Blood Group</span><span class="detail-meta-value">${patient.bloodGroup || '-'}</span></div><div class="detail-meta-item"><span class="detail-meta-label">Studies</span><span class="detail-meta-value">${patient.studies?.length || 0}</span></div>`;
         }
 
+        function setInfo(id, value) {
+            const el = document.getElementById(id);
+            const isEmpty = value === null || value === undefined || value === '' || value === '-';
+            el.textContent = isEmpty ? 'Not provided' : value;
+            el.classList.toggle('empty', isEmpty);
+        }
+
         function renderOverview(patient) {
-            document.getElementById('viewFullName').value = patient.fullName || '-';
-            document.getElementById('viewConquestId').value = patient.conquestPatientID || '-';
-            document.getElementById('viewNationalId').value = patient.nationalId || '-';
-            document.getElementById('viewBirthDate').value = formatDate(patient.birthDate);
-            document.getElementById('viewAge').value = calculateAge(patient.birthDate) + ' years';
-            document.getElementById('viewSex').value = formatSex(patient.sex);
-            document.getElementById('viewBloodGroup').value = patient.bloodGroup || '-';
-            document.getElementById('viewPhone').value = patient.phoneNumber || '-';
-            document.getElementById('viewAddress').value = patient.address || '-';
-            document.getElementById('viewCreatedAt').value = formatDateTime(patient.createdAt);
-            document.getElementById('viewUpdatedAt').value = formatDateTime(patient.updatedAt);
+            setInfo('viewFullName', patient.fullName);
+            setInfo('viewConquestId', patient.conquestPatientID);
+            setInfo('viewNationalId', patient.nationalId);
+            setInfo('viewBirthDate', formatDate(patient.birthDate));
+            const age = calculateAge(patient.birthDate);
+            setInfo('viewAge', age !== null && age !== undefined ? age + ' years' : null);
+            setInfo('viewSex', formatSex(patient.sex));
+            setInfo('viewBloodGroup', patient.bloodGroup);
+            setInfo('viewPhone', patient.phoneNumber);
+            setInfo('viewAddress', patient.address);
+            setInfo('viewCreatedAt', formatDateTime(patient.createdAt));
+            setInfo('viewUpdatedAt', formatDateTime(patient.updatedAt));
         }
 
         async function loadStudies() {
@@ -148,24 +193,6 @@
                 <td><span class="badge ${s.status === 'Complete' ? 'badge-success' : 'badge-warning'}">${escapeHtml(s.status)}</span></td>
                 <td>${escapeHtml(s.operatorName || '-')}</td>
                 <td>${formatDateTime(s.createdAt)}</td>
-                <td>
-                    ${s.studyInstanceUid
-                        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="btn btn-ghost btn-sm"
-                              title="Open DICOM viewer">
-                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2">
-                                 <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                 <circle cx="12" cy="12" r="3"/>
-                                 <path d="M3 12h3m12 0h3M12 3v3m0 12v3"/>
-                               </svg>
-                               View Images
-                           </a>`
-                        : `<span style="color:var(--color-gray-400);font-size:var(--font-size-sm);">No images</span>`
-                    }
-                </td>
                 <td>
     <div style="display:flex; gap:6px;">
     ${s.studyInstanceUid
@@ -224,6 +251,57 @@
         }
 
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        function enterEditMode() {
+            if (!currentPatient) return;
+            document.getElementById('editFullName').value = currentPatient.fullName || '';
+            document.getElementById('editConquestIdDisplay').textContent = currentPatient.conquestPatientID || 'Not provided';
+            document.getElementById('editNationalId').value = currentPatient.nationalId || '';
+            document.getElementById('editBirthDate').value = currentPatient.birthDate ? currentPatient.birthDate.split('T')[0] : '';
+            document.getElementById('editSex').value = currentPatient.sex || '';
+            document.getElementById('editBloodGroup').value = currentPatient.bloodGroup || '';
+            document.getElementById('editPhone').value = currentPatient.phoneNumber || '';
+            document.getElementById('editAddress').value = currentPatient.address || '';
+            document.getElementById('overviewView').style.display = 'none';
+            document.getElementById('overviewEditForm').style.display = 'grid';
+            document.getElementById('editPatientBtn').style.display = 'none';
+        }
+
+        function exitEditMode() {
+            document.getElementById('overviewView').style.display = 'grid';
+            document.getElementById('overviewEditForm').style.display = 'none';
+            if (canEditPatient) document.getElementById('editPatientBtn').style.display = 'inline-flex';
+        }
+
+        document.getElementById('editPatientBtn')?.addEventListener('click', enterEditMode);
+        document.getElementById('cancelEditBtn')?.addEventListener('click', exitEditMode);
+
+        document.getElementById('overviewEditForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveEditBtn');
+            const payload = {
+                fullName: document.getElementById('editFullName').value.trim(),
+                nationalId: document.getElementById('editNationalId').value.trim() || null,
+                birthDate: document.getElementById('editBirthDate').value || null,
+                sex: document.getElementById('editSex').value || null,
+                bloodGroup: document.getElementById('editBloodGroup').value || null,
+                phoneNumber: document.getElementById('editPhone').value.trim() || null,
+                address: document.getElementById('editAddress').value.trim() || null,
+            };
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            try {
+                await updatePatient(patientId, payload);
+                showToast.success('Patient information updated');
+                await loadPatientData();
+                exitEditMode();
+            } catch (error) {
+                showToast.error('Failed to save changes: ' + error.message);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+            }
+        });
 
         if (patientId) loadPatientData();
     </script>
