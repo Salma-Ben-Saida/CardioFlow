@@ -11,7 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 public record LoginDto(string Username, string Password);
-public record AuthResponseDto(string Token, string Username, string FullName);
+public record AuthResponseDto(string Token, string Username, string FullName, Guid UserId);
 
 public class UserService
 {
@@ -75,7 +75,7 @@ public class UserService
         // 3. Générer le jeton JWT
         string token = GenerateJwtToken(user);
 
-        return new AuthResponseDto(token, user.Username, user.FullName);
+        return new AuthResponseDto(token, user.Username, user.FullName, user.Id);
     }
 
     private string GenerateJwtToken(AppUser user)

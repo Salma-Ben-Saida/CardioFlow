@@ -10,4 +10,5 @@ public class StockMovementDto
     public string? ReferenceNote { get; set; }
     public DateTime MovedAt { get; set; }
     public Guid CreatedBy { get; set; }
+    public string? actorName { get; set; }
 }

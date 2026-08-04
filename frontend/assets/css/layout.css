@@ -3,12 +3,12 @@
    ============================================ */
 
 /* LOGIN PAGE - Purple Theme */
-.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #5e35b1 0%, #311b92 100%); padding: var(--spacing-4); }
+.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2E1065 0%, #3B0F70 100%); padding: var(--spacing-4); }
 .login-box { width: 100%; max-width: 420px; background-color: var(--color-white); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); overflow: hidden; }
 .login-header { padding: var(--spacing-10) var(--spacing-8) var(--spacing-8); text-align: center; background: linear-gradient(135deg, var(--color-gray-50) 0%, var(--color-white) 100%); }
 .login-logo { width: 80px; height: 80px; margin: 0 auto var(--spacing-4); background-color: rgba(255, 255, 255, 0.15); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; color: var(--color-white); }
 .login-logo svg { width: 48px; height: 48px; }
-.login-title { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: #5e35b1; margin-bottom: var(--spacing-1); }
+.login-title { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: #6D28D9; margin-bottom: var(--spacing-1); }
 .login-subtitle { font-size: var(--font-size-sm); color: var(--color-gray-500); }
 .login-body { padding: var(--spacing-8); }
 .login-footer { text-align: center; padding: var(--spacing-4); border-top: 1px solid var(--color-gray-200); }
@@ -17,7 +17,7 @@
 .app-layout { display: flex; min-height: 100vh; }
 
 /* SIDEBAR - Smart Admin Purple */
-.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-width); background: linear-gradient(180deg, #5e35b1 0%, #4527a0 50%, #311b92 100%); color: var(--color-white); display: flex; flex-direction: column; z-index: 100; transition: width var(--transition-normal); overflow: hidden; }
+.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-width); background: linear-gradient(180deg, #2E1065 0%, #3B0F70 100%); color: var(--color-white); display: flex; flex-direction: column; z-index: 100; transition: width var(--transition-normal); overflow: hidden; }
 .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
 .sidebar-header { display: flex; align-items: center; gap: var(--spacing-3); padding: var(--spacing-4) var(--spacing-5); min-height: var(--topbar-height); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
 .sidebar-logo { width: 36px; height: 36px; background-color: rgba(255, 255, 255, 0.1); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -87,14 +87,14 @@
 /* LIST ITEMS */
 .list-item { display: flex; align-items: center; gap: var(--spacing-3); padding: var(--spacing-3); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition-fast); margin-bottom: var(--spacing-2); }
 .list-item:hover { background-color: var(--color-gray-50); }
-.list-item.selected { background-color: rgba(94, 53, 177, 0.1); border: 1px solid #5e35b1; }
+.list-item.selected { background-color: rgba(109, 40, 217, 0.1); border: 1px solid #6D28D9; }
 .list-item-icon { width: 40px; height: 40px; border-radius: var(--radius-md); background-color: var(--color-gray-100); display: flex; align-items: center; justify-content: center; color: var(--color-gray-500); flex-shrink: 0; }
 .list-item-content { flex: 1; min-width: 0; }
 .list-item-title { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-gray-900); }
 .list-item-subtitle { font-size: var(--font-size-xs); color: var(--color-gray-500); }
 
 /* DETAIL HEADER - Purple Theme */
-.detail-header-card { background: linear-gradient(135deg, #5e35b1 0%, #311b92 100%); color: var(--color-white); padding: var(--spacing-6); border-radius: var(--radius-lg); margin-bottom: var(--spacing-6); }
+.detail-header-card { background: linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%); color: var(--color-white); padding: var(--spacing-6); border-radius: var(--radius-lg); margin-bottom: var(--spacing-6); }
 .detail-header-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--spacing-4); }
 .detail-header-name { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); margin-bottom: var(--spacing-1); }
 .detail-header-id { font-size: var(--font-size-sm); opacity: 0.8; }

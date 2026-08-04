@@ -96,10 +96,12 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddScoped<IPacsReader, OrthancPacsReader>();
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<ICathStudyRepository, CathStudyRepository>();
+builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 
 // Services Web Scoped (Résolus via IServiceProvider à l'intérieur du Background Worker)
 builder.Services.AddScoped<StudyIngestionService>(); 
 builder.Services.AddScoped<PatientService>();
+builder.Services.AddScoped<AuditService>();
 
 // Répertoires (Repositories) - Pharmacie
 builder.Services.AddScoped<IInventoryProductRepository, InventoryProductRepository>();

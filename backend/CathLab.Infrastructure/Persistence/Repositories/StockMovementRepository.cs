@@ -34,4 +34,19 @@ public class StockMovementRepository : IStockMovementRepository
 
         return (items, totalCount);
     }
+
+    public Task<(IEnumerable<StockMovement> items, int total)> GetListAsync(int page, int pageSize)
+    {
+        var query = _db.StockMovements.AsQueryable();
+
+        var total = query.Count();
+
+        var items = query
+            .OrderByDescending(m => m.MovedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Task.FromResult((items.AsEnumerable(), total));
+    }
 }

@@ -300,24 +300,40 @@ public class ProcedureService
         var reports = await _reports.GetByPatientIdAsync(patientId);
         return reports.Select(ToSummaryDto).ToList();
     }
- 
+
+    /// <summary>
+    /// Doctor identity for the summary list is taken from ConfirmedByUser -
+    /// the actual person who confirmed the report - not CathStudy.Operator.
+    /// Operator comes from PACS/DICOM metadata (often empty in practice,
+    /// e.g. when the source DICOM never populated that field) and reflects
+    /// who was assigned at admission, not necessarily who performed or
+    /// confirmed the procedure. An unconfirmed report has no confirming
+    /// doctor yet by definition, so DoctorName/DoctorId are empty until
+    /// confirmation happens - that's expected, not a bug.
+    /// </summary>
     private static ProcedureReportSummaryDto ToSummaryDto(ProcedureReport r) => new()
     {
         Id = r.Id,
         CathStudyId = r.CathStudyId,
         PatientId = r.CathStudy?.PatientId ?? Guid.Empty,
         PatientName = r.CathStudy?.Patient?.FullName ?? string.Empty,
-        DoctorId = r.CathStudy?.OperatorId ?? Guid.Empty,
-        DoctorName = r.CathStudy?.Operator?.FullName ?? string.Empty,
+        DoctorId = r.ConfirmedByUserId ?? Guid.Empty,
+        DoctorName = r.ConfirmedByUser?.FullName ?? string.Empty,
         IsConfirmed = r.IsConfirmed,
         ReportGeneratedAt = r.ReportGeneratedAt,
         ConfirmedAt = r.ConfirmedAt,
         PdfStoragePath = r.PdfStoragePath
     };
 
-    public async Task GetReportsForPatientAsync(Guid patientId, object value, bool isAdmin)
+    public async Task<List<ProcedureReportSummaryDto>> GetReportsForPatientAsync(Guid patientId, object value, bool isAdmin)
     {
-        throw new NotImplementedException();
+        if (value is Guid requestingUserId)
+            return await GetReportsForPatientAsync(patientId, requestingUserId, isAdmin);
+
+        if (value is string rawUserId && Guid.TryParse(rawUserId, out var parsedUserId))
+            return await GetReportsForPatientAsync(patientId, parsedUserId, isAdmin);
+
+        throw new ArgumentException("The requesting user identifier must be a Guid or a Guid string.", nameof(value));
     }
 
     // --- Additions to ProcedureService ---

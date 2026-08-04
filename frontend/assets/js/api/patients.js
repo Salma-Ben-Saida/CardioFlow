@@ -1,7 +1,7 @@
 /**
  * Patients API
  */
-import { get } from './client.js';
+import { get, put } from './client.js';
 
 export async function getPatients(params = {}) {
     return get('/api/patients', params);
@@ -19,4 +19,8 @@ export async function getPatientRiskProfile(id) {
     return get(`/api/patients/${id}/risk-profile`);
 }
 
-export default { getPatients, getPatientById, getPatientStudies, getPatientRiskProfile };
+export async function updatePatient(id, data) {
+    return put(`/api/patients/${id}`, data);
+}
+
+export default { getPatients, getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient };

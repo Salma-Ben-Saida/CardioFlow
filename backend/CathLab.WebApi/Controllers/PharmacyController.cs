@@ -12,10 +12,13 @@ namespace CathLab.WebApi.Controllers;
 public class PharmacyController : ControllerBase
 {
     private readonly InventoryService _inventory;
+    private readonly AuditService _audit;
 
-    public PharmacyController(InventoryService inventory)
+
+    public PharmacyController(InventoryService inventory, AuditService audit)
     {
         _inventory = inventory;
+        _audit = audit;
     }
 
     /// <summary>GET /api/pharmacy/products?search=&page=1&pageSize=20</summary>
@@ -41,6 +44,8 @@ public class PharmacyController : ControllerBase
         try
         {
             var product = await _inventory.CreateProductAsync(dto);
+            await _audit.LogActionAsync(GetCurrentUserId(), "Create", "InventoryProduct", product.Id, product.ProductName);
+
             return CreatedAtAction(nameof(GetProducts), new { }, product);
         }
         catch (ArgumentException ex)
@@ -60,6 +65,8 @@ public class PharmacyController : ControllerBase
         try
         {
             var item = await _inventory.ReceiveItemAsync(dto, GetCurrentUserId());
+            await _audit.LogActionAsync(GetCurrentUserId(), "Receive", "InventoryItem", item.Id, dto.LotNumber);
+
             return Ok(item);
         }
         catch (InvalidOperationException ex)
@@ -112,6 +119,7 @@ public class PharmacyController : ControllerBase
         try
         {
             await _inventory.MarkWastedAsync(id, request.Note, GetCurrentUserId());
+            await _audit.LogActionAsync(GetCurrentUserId(), "Waste", "InventoryItem", id, request.Note);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -162,6 +170,8 @@ public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceTyp
             Guid currentUserId = GetCurrentUserId();
 
             var items = await _inventory.ReceiveBatchAsync(dto, currentUserId);
+            await _audit.LogActionAsync(currentUserId, "ReceiveBatch", "InventoryProduct", dto.ProductId, $"{items.Count} unités");
+
             return Ok(items);
         }
         catch (InvalidOperationException ex) 

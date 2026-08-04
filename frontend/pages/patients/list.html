@@ -33,7 +33,7 @@
                     <div class="filter-group"><select class="form-control" id="sortDirFilter" title="Sort direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select></div>
                 </div>
                 <div class="card">
-                    <div class="table-container"><table class="table" id="patientsTable"><thead><tr><th>Full Name</th><th>Patient ID</th><th>Birth Date</th><th>Sex</th><th>Blood Group</th><th style="text-align:center;">Studies</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody id="patientsTableBody"></tbody></table></div>
+                    <div class="table-container"><table class="table" id="patientsTable"><thead><tr><th>Patient</th><th>Patient ID</th><th>Birth Date</th><th>Sex</th><th>Blood Group</th><th style="text-align:center;">Studies</th><th>Status</th><th></th></tr></thead><tbody id="patientsTableBody"></tbody></table></div>
                     <div id="paginationContainer" class="pagination-container"></div>
                 </div>
             </div>
@@ -92,8 +92,10 @@
 
         function renderTable(patients) {
             if (!patients || patients.length === 0) { renderEmptyState('No patients found matching your criteria.'); return; }
-            tableBody.innerHTML = patients.map(p => `<tr class="${p.isIncomplete ? 'row-highlight' : ''}" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><td><div style="font-weight:500;">${escapeHtml(p.fullName)}</div></td><td>${escapeHtml(p.conquestPatientID || p.nationalId || '-')}</td><td>${formatDate(p.birthDate)}</td><td>${formatSex(p.sex)}</td><td>${p.bloodGroup || '-'}</td><td style="text-align:center;"><span class="badge badge-info">${p.studyCount || 0}</span></td><td>${formatStatusBadge(p.isIncomplete)}</td><td style="text-align:center;"><div class="actions"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'" title="View"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></td></tr>`).join('');
+            tableBody.innerHTML = patients.map(p => `<tr class="clickable ${p.isIncomplete ? 'row-highlight' : ''}" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><td><div style="display:flex;align-items:center;gap:var(--spacing-3);"><div class="avatar-circle">${getInitials(p.fullName)}</div><div style="font-weight:500;">${escapeHtml(p.fullName)}</div></div></td><td>${escapeHtml(p.conquestPatientID || p.nationalId || '-')}</td><td>${formatDate(p.birthDate)}</td><td>${formatSex(p.sex)}</td><td>${p.bloodGroup || '-'}</td><td style="text-align:center;"><span class="badge badge-info">${p.studyCount || 0}</span></td><td>${formatStatusBadge(p.isIncomplete)}</td><td style="text-align:center;color:var(--color-gray-300);"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></td></tr>`).join('');
         }
+
+        function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
 
         function renderEmptyState(message) { tableBody.innerHTML = `<tr><td colspan="8" class="table-empty"><p>${message}</p></td></tr>`; }
 
