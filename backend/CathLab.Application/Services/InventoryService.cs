@@ -193,6 +193,7 @@ public class InventoryService
         product.CurrentStock += quantityDelta;
         await _products.UpdateAsync(product);
     }
+    
 
     private static InventoryProductDto ToDto(InventoryProduct p) => new()
     {
@@ -233,6 +234,11 @@ public class InventoryService
 public async Task<List<InventoryItemDto>> GetReservedItemsForStudyAsync(Guid cathStudyId)
 {
     var items = await _items.GetReservedForStudyAsync(cathStudyId);
+    return items.Select(i => ToDto(i, productName: null)).ToList();
+}
+public async Task<List<InventoryItemDto>> GetAllReservedItemsAsync()
+{
+    var items = await _items.GetAllReservedAsync();
     return items.Select(i => ToDto(i, productName: null)).ToList();
 }
 
@@ -317,5 +323,42 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
         }
 
         return new PagedResult<StockMovementDto>(dtos, total, page, pageSize);
+    }
+
+    public async Task<List<InventoryItemDto>> GetAllItemsAsync(string? status, string? deviceType)
+    {
+        // Parse status if provided
+        ItemStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<ItemStatus>(status, ignoreCase: true, out var s))
+                throw new ArgumentException($"Unknown item status '{status}'.");
+            parsedStatus = s;
+        }
+
+        // Parse deviceType if provided
+        DeviceType? parsedDeviceType = null;
+        if (!string.IsNullOrWhiteSpace(deviceType))
+        {
+            if (!Enum.TryParse<DeviceType>(deviceType, ignoreCase: true, out var dt))
+                throw new ArgumentException($"Unknown device type '{deviceType}'.");
+            parsedDeviceType = dt;
+        }
+
+        var items = await _items.GetAllAsync();
+
+        // Filter by status if provided
+        if (parsedStatus.HasValue)
+        {
+            items = items.Where(i => i.Status == parsedStatus.Value).ToList();
+        }
+
+        // Filter by deviceType if provided
+        if (parsedDeviceType.HasValue)
+        {
+            items = items.Where(i => i.Product?.DeviceType == parsedDeviceType.Value).ToList();
+        }
+
+        return items.Select(i => ToDto(i, productName: null)).ToList();
     }
 }

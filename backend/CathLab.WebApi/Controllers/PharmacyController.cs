@@ -8,7 +8,7 @@ namespace CathLab.WebApi.Controllers;
 
 [ApiController]
 [Route("api/pharmacy")]
-[Authorize(Roles = "Admin,ResponsablePharmacie")]
+[Authorize]
 public class PharmacyController : ControllerBase
 {
     private readonly InventoryService _inventory;
@@ -20,8 +20,9 @@ public class PharmacyController : ControllerBase
         _inventory = inventory;
         _audit = audit;
     }
-
+ 
     /// <summary>GET /api/pharmacy/products?search=&page=1&pageSize=20</summary>
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     [HttpGet("products")]
     public async Task<IActionResult> GetProducts([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -31,6 +32,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>GET /api/pharmacy/products/low-stock - products at or below MinimumStockLevel.</summary>
     [HttpGet("products/low-stock")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     public async Task<IActionResult> GetLowStockProducts()
     {
         var result = await _inventory.GetLowStockAsync();
@@ -39,6 +41,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>POST /api/pharmacy/products - add a new catalog product.</summary>
     [HttpPost("products")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateInventoryProductDto dto)
     {
         try
@@ -60,6 +63,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>POST /api/pharmacy/items/receive - register one new physical unit into stock.</summary>
     [HttpPost("items/receive")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     public async Task<IActionResult> ReceiveItem([FromBody] ReceiveInventoryItemDto dto)
     {
         try
@@ -84,6 +88,7 @@ public class PharmacyController : ControllerBase
     /// selects this item in the segmentation UI, before the report is finalized.
     /// </summary>
     [HttpPost("items/{id:guid}/reserve")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie, Medecin")]
     public async Task<IActionResult> ReserveItem(Guid id, [FromBody] ReserveItemRequest request)
     {
         try
@@ -99,6 +104,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>POST /api/pharmacy/items/{id}/release - deselected before opening, back to InStock.</summary>
     [HttpPost("items/{id:guid}/release")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie, Medecin")]
     public async Task<IActionResult> ReleaseReservation(Guid id)
     {
         try
@@ -114,6 +120,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>POST /api/pharmacy/items/{id}/waste - opened but never implanted.</summary>
     [HttpPost("items/{id:guid}/waste")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     public async Task<IActionResult> MarkWasted(Guid id, [FromBody] MarkWastedRequest request)
     {
         try
@@ -134,6 +141,7 @@ public class PharmacyController : ControllerBase
 
     /// <summary>GET /api/pharmacy/items/expiring?withinDays=30</summary>
     [HttpGet("items/expiring")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
     public async Task<IActionResult> GetExpiringItems([FromQuery] int withinDays = 30)
     {
         var items = await _inventory.GetExpiringItemsAsync(withinDays);
@@ -141,6 +149,7 @@ public class PharmacyController : ControllerBase
     }
 
     [HttpGet("items/reserved/{cathStudyId:guid}")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie, Medecin")]
 public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
 {
     var items = await _inventory.GetReservedItemsForStudyAsync(cathStudyId);
@@ -148,6 +157,7 @@ public async Task<IActionResult> GetReservedItems(Guid cathStudyId)
 }
 
 [HttpGet("items/available")]
+[Authorize(Roles = "Admin,ResponsablePharmacie, Medecin")]
 public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceType)
 {
     try
@@ -162,6 +172,8 @@ public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceTyp
 }
 
 [HttpPost("items/receive-batch")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
+
     public async Task<IActionResult> ReceiveBatch([FromBody] ReceiveInventoryBatchDto dto)
     {
         try
@@ -203,7 +215,21 @@ public async Task<IActionResult> GetAvailableItems([FromQuery] string? deviceTyp
 
     return userId;
 }
+[Authorize(Roles = "Admin,ResponsablePharmacie")]
+[HttpGet("items")]
+public async Task<IActionResult> GetAllItems([FromQuery] string? status, [FromQuery] string? deviceType)
+{
+    var items = await _inventory.GetAllItemsAsync(status, deviceType);
+    return Ok(items);
+}
 
+[Authorize(Roles = "Admin,ResponsablePharmacie")]
+[HttpGet("items/reserved")]
+public async Task<IActionResult> GetAllReservedItems()
+{
+    var items = await _inventory.GetAllReservedItemsAsync();
+    return Ok(items);
+}
 
 public class ReserveItemRequest
 {

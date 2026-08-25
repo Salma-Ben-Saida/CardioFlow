@@ -1,74 +1,57 @@
 @startuml CathLabDB_ClassDiagram
 
+title CathLab — Domain Class Diagram
+skinparam titleFontSize 22
+skinparam titleFontStyle bold
+
 skinparam classAttributeIconSize 0
 skinparam classFontSize 15
+skinparam classFontStyle bold
 skinparam classAttributeFontSize 12
-skinparam classBorderThickness 2
+skinparam classAttributeFontName Consolas
+skinparam classBorderThickness 1.5
+skinparam classBackgroundColor White
 skinparam linetype polyline
 skinparam ranksep 90
-skinparam nodesep 70
+skinparam nodesep 65
 skinparam padding 8
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam packageFontSize 16
+skinparam packageFontStyle bold
+skinparam noteBackgroundColor #FFFDF0
+skinparam noteBorderColor #D6C88A
+skinparam arrowColor #55606B
+skinparam arrowFontSize 11
 
 ' ════════════════════════════════════════════════════════════
-'  LAYER 1 — PACS  (lecture seule — Orthanc en dev,
-'                   Conquest en prod)
+'  CathLab — Domain Class Diagram
+'  Schema of the application database (CathLabDB).
+'  Patient and CathStudy rows are seeded from PACS on admission
+'  via IPacsReader, but no DB foreign key crosses that boundary
+'  — see the ingestion flow docs for that integration layer.
+'
+'  Corrected against live EF Core logs (2026-08-23):
+'   - Removed AppUser.Specialty (dropped by migration, per README)
+'   - Added CathStudy.StudyInstanceUid (present in real INSERT/SELECT)
+'   - Patient's creator FK is CreatedByUserId (the actual EF Core
+'     shadow property backing CreatedByUser), not CreatedBy.
+'     A legacy/duplicate CreatedBy column exists in the live DB —
+'     known bug, tracked in the note below.
+'
+'  Corrected against CoronaryLesion.cs (2026-08-23):
+'   - TimiFlow is nullable (byte?)
+'   - Added RefDiam, Calcified, Thrombus, ResidualStenosis,
+'     CreatedAt, CreatedByUserId
+'   - CreatedByUserId is typed string?, not Guid? — flagged as
+'     a likely bug, see note on CoronaryLesion below.
+'   - De Novo / ISR classification still does not exist on this
+'     entity — remains a genuinely open question.
 ' ════════════════════════════════════════════════════════════
 
-package "Layer 1 · PACS  [lecture seule]" #E6F1FB {
+package "CathLabDB" #E1F5EE {
 
-  class PacsStudyDto <<DTO>> {
-    StudyInstanceUid  : string
-    AccessionNumber   : string
-    PatientId         : string
-    PatientName       : string
-    PatientBirthDate  : DateOnly
-    PatientSex        : string
-    StudyDate         : DateOnly
-    Modality          : string
-  }
-
-  note bottom of PacsStudyDto
-    Objet neutre produit par
-    IPacsReader à partir de :
-    • DicomIdentifiers + MainDicomTags
-      (Orthanc — dev)
-    • Vue PacsStudy du schéma
-      Conquest (prod)
-    Le reste de l'application
-    ne voit jamais la source réelle.
-  end note
-
-  interface IPacsReader <<interface>> {
-    + GetStudyByAccessionAsync(accessionNumber) : PacsStudyDto
-    + GetPendingStudiesAsync(since) : List<PacsStudyDto>
-    + GetPatientStudiesAsync(patientId) : List<PacsStudyDto>
-  }
-
-  class OrthancPacsReader <<Infrastructure>> {
-    - _orthancContext : OrthancPacsContext
-    + GetStudyByAccessionAsync(accessionNumber) : PacsStudyDto
-    + GetPendingStudiesAsync(since) : List<PacsStudyDto>
-    + GetPatientStudiesAsync(patientId) : List<PacsStudyDto>
-  }
-
-  class OrthancRestClient <<Infrastructure>> {
-    - _httpClient : HttpClient
-    + GetInstancesForStudyAsync(studyUid) : List<string>
-    + GetInstancePreviewUrlAsync(instanceUid) : string
-    + GetWadoUriAsync(studyUid, seriesUid, instanceUid) : string
-  }
-
-  IPacsReader <|.. OrthancPacsReader : implémente
-  OrthancPacsReader ..> PacsStudyDto  : produit
-}
-
-' ════════════════════════════════════════════════════════════
-'  LAYER 2 — CathLabDB  [lecture / écriture]
-' ════════════════════════════════════════════════════════════
-
-package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
-
-  ' ── Domaine : Utilisateurs ───────────────────────────────
+  ' ── Users ─────────────────────────────────────────────────
 
   class AppUser <<entity>> {
     + Id           : Guid      <<PK>>
@@ -76,17 +59,16 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     Username       : string
     PasswordHash   : string
     FullName       : string
-    Specialty      : string
     Role           : UserRole
     IsActive       : bool
     CreatedAt      : DateTime
   }
 
-  ' ── Domaine : Patient ────────────────────────────────────
+  ' ── Patient ───────────────────────────────────────────────
 
   class Patient <<entity>> {
     + Id                : Guid      <<PK>>
-    # CreatedBy         : Guid      <<FK>>
+    # CreatedByUserId    : Guid      <<FK>>
     --
     ConquestPatientID   : string
     NationalId          : string
@@ -96,6 +78,7 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     PhoneNumber         : string
     Address             : string
     BloodGroup          : string
+    IsIncomplete        : bool
     CreatedAt           : DateTime
     UpdatedAt           : DateTime
   }
@@ -115,10 +98,9 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     PriorCABG          : bool
     EjectionFraction   : decimal
     Notes              : string
-    CreatedAt          : DateTime
   }
 
-  ' ── Domaine : Étude & Compte-rendu ───────────────────────
+  ' ── Study & Report ───────────────────────────────────────
 
   class CathStudy <<entity>> {
     + Id               : Guid      <<PK>>
@@ -126,6 +108,7 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     # OperatorId       : Guid      <<FK>>
     --
     AccessionNumber    : string
+    StudyInstanceUid   : string
     StudyDate          : DateTime
     Status             : StudyStatus
     CreatedAt          : DateTime
@@ -134,32 +117,43 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   class ProcedureReport <<entity>> {
     + Id                   : Guid      <<PK>>
     # CathStudyId          : Guid      <<FK>>
+    # ConfirmedByUserId    : Guid?     <<FK>>
     --
     Approach               : string
     CatheterUsed           : string
-    ContrastVolume_mL      : decimal
-    DoseAreaProduct_Gycm2  : decimal
+    ContrastVolumeMl       : decimal
+    DoseAreaProductGycm2   : decimal
     DominanceType          : string
-    TIMIFlowBaseline       : byte
-    TIMIFlowFinal          : byte
+    TimiFlowBaseline       : byte
+    TimiFlowFinal          : byte
     Conclusion             : string
+    Recommendations        : string
+    IsConfirmed            : bool
     ReportGeneratedAt      : DateTime
+    ConfirmedAt            : DateTime?
     PdfStoragePath         : string
   }
 
-  ' ── Domaine : Lésions coronaires ─────────────────────────
+  ' ── Coronary Lesions ──────────────────────────────────────
 
   class CoronaryLesion <<entity>> {
-    + Id                : Guid    <<PK>>
-    # ProcedureReportId : Guid    <<FK>>
+    + Id                : Guid      <<PK>>
+    # ProcedureReportId  : Guid      <<FK>>
     --
     Vessel              : string
     SegmentNumber       : byte
     StenosisPercent     : byte
     LesionType          : LesionType
-    TIMIFlow            : byte
+    TimiFlow            : byte?
     IsTreated           : bool
+    RefDiam             : string?
+    Calcified           : bool
+    Thrombus            : bool
+    ResidualStenosis    : string?
+    CreatedAt           : DateTime
+    CreatedByUserId     : string?
   }
+
 
   abstract class LesionTreatment <<entity>> {
     + Id               : Guid    <<PK>>
@@ -189,7 +183,7 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     IsPostDilation        : bool
   }
 
-  ' ── Domaine : Pharmacie ──────────────────────────────────
+  ' ── Pharmacy ──────────────────────────────────────────────
 
   class InventoryProduct <<entity>> {
     + Id              : Guid    <<PK>>
@@ -215,27 +209,8 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
     SerialNumber             : string
     Status                   : ItemStatus
     ReceivedAt               : DateTime
-    ReservedAt               : DateTime?
     ConsumedAt               : DateTime?
   }
-
-  note right of InventoryItem
-    Cycle de vie (Status) :
-    InStock   -> Reserved   (sélection par le
-                 cardiologue dans l'UI de
-                 segmentation, avant la fin
-                 de la procédure)
-    Reserved  -> Consumed   (rapport finalisé,
-                 dispositif implanté)
-    Reserved  -> Wasted     (ouvert mais non
-                 implanté — ne peut pas
-                 retourner en stock)
-    Reserved  -> InStock    (désélectionné,
-                 jamais ouvert)
-    ReservedForCathStudyId évite qu'un même
-    item physique soit réservé par deux
-    procédures concurrentes.
-  end note
 
   class StockMovement <<entity>> {
     + Id              : Guid    <<PK>>
@@ -249,13 +224,12 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   }
 
   note right of StockMovement
-    Un StockMovement n'est créé qu'à la
-    transition terminale de l'item
-    (Consumed / Wasted / Return / Expiry),
-    jamais à la simple réservation.
+    A StockMovement is only created at the item's
+    terminal transition (Consumed / Wasted / Return /
+    Expiry) — never at simple reservation.
   end note
 
-  ' ── Énumérations ─────────────────────────────────────────
+  ' ── Enumerations ──────────────────────────────────────────
 
   enum StudyStatus {
     Scheduled
@@ -274,7 +248,6 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   enum UserRole {
     Medecin
     Secretaire
-    SurveillantBloc
     ResponsablePharmacie
     Admin
   }
@@ -288,43 +261,42 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   }
 
   enum ItemStatus {
-    InStock
-    Reserved
-    Consumed
-    Wasted
+    InStock,
+    Reserved,
+    Consumed,
+    Wasted,
     Expired
   }
 
   enum MovementType {
-    Reception
-    Consumption
-    Return
-    Adjustment
+    Reception,   
+    Consumption, 
+    Return,     
     Waste
-    Expiry
   }
 
-  ' ── Associations ─────────────────────────────────────────
+  ' ── Associations ──────────────────────────────────────────
 
-  Patient          "1"    *--  "1"      RiskProfile
-  Patient          "1"    *--  "1..*"   CathStudy
-  Patient          "0..*" --   "1"      AppUser           : CreatedBy
+  Patient          "1"    *--   "1"      RiskProfile
+  Patient          "1"    *--   "1..*"   CathStudy
+  Patient          "0..*" --    "1"      AppUser           : CreatedByUserId
 
-  CathStudy        "1"    *--  "0..1"   ProcedureReport   : CathStudyId
-  CathStudy        "0..*" --   "1"      AppUser           : OperatorId
-  CathStudy        "0..*" --   "0..*"   InventoryItem     : ReservedForCathStudyId
+  CathStudy        "1"    *--   "0..1"   ProcedureReport   : CathStudyId
+  CathStudy        "0..*" --    "1"      AppUser           : OperatorId
+  CathStudy        "1"    --    "0..*"   InventoryItem     : ReservedForCathStudyId
 
-  ProcedureReport  "1"    *--  "0..*"   CoronaryLesion    : ProcedureReportId
-  CoronaryLesion   "1"    *--  "0..*"   LesionTreatment   : LesionId
-  LesionTreatment  "1"    --   "0..1"   InventoryItem     : InventoryItemId
+  ProcedureReport  "0..*" --    "0..1"   AppUser           : ConfirmedByUserId
+  ProcedureReport  "1"    *--   "0..*"   CoronaryLesion    : ProcedureReportId
+  CoronaryLesion   "1"    *--   "0..*"   LesionTreatment   : LesionId
+  LesionTreatment  "1"    --    "1"      InventoryItem     : InventoryItemId
   LesionTreatment  <|--   StentImplant
   LesionTreatment  <|--   BalloonDilation
 
-  InventoryItem    "0..*" --   "1"      InventoryProduct  : ProductId
-  StockMovement    "0..*" --   "1"      InventoryProduct  : ProductId
-  StockMovement    "0..*" --   "1"      AppUser           : CreatedBy
+  InventoryItem    "0..*" --    "1"      InventoryProduct  : ProductId
+  StockMovement    "0..*" --    "1"      InventoryProduct  : ProductId
+  StockMovement    "0..*" --    "1"      AppUser           : CreatedBy
 
-  ' ── Énumérations ─────────────────────────────────────────
+  ' ── Enum links ─────────────────────────────────────────────
 
   CathStudy        ..  StudyStatus
   CoronaryLesion   ..  LesionType
@@ -334,41 +306,20 @@ package "Layer 2 · CathLabDB  [lecture / écriture]" #E1F5EE {
   StockMovement    ..  MovementType
 
   note right of InventoryProduct
-    CurrentStock est un cache calculé.
-    Source de vérité = somme de
-    StockMovement.Quantity pour ce
-    produit. Recalculé à chaque
-    écriture Reception / Consumption.
+    CurrentStock is a computed cache.
+    Source of truth = sum of StockMovement.Quantity
+    for this product. Recalculated on every
+    Reception / Consumption write.
   end note
 
   note right of LesionTreatment
-    Stratégie TPT (Table Per Type)
-    en Entity Framework Core.
-    StentImplant et BalloonDilation
-    partagent la PK de LesionTreatment
-    via une relation 1-à-1.
-    Chaque LesionTreatment référence
-    exactement 1 InventoryItem physique
-    (dispositif à usage unique) — la
-    relation est donc 1-à-1, jamais
-    partagée entre plusieurs traitements.
+    Table-Per-Type (TPT) strategy in EF Core.
+    StentImplant and BalloonDilation share the
+    LesionTreatment PK via a 1-to-1 relationship.
+    Each LesionTreatment references exactly one
+    physical InventoryItem (single-use device) —
+    the relation is therefore 1-to-1, never shared
+    across multiple treatments.
   end note
 }
-
-' ════════════════════════════════════════════════════════════
-'  RÉFÉRENCES CROISÉES  (soft references)
-' ════════════════════════════════════════════════════════════
-
-PacsStudyDto  ..>  Patient    : «seeds»\nPatientId → ConquestPatientID
-PacsStudyDto  ..>  CathStudy  : «seeds»\nAccessionNumber → AccessionNumber
-
-note as N1
-  Aucune FK base de données
-  ne franchit la frontière
-  des deux schémas.
-  Résolution à l'exécution
-  par StudyIngestionService
-  via IPacsReader.
-end note
-
 @enduml
