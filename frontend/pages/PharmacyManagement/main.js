@@ -9,10 +9,19 @@ const API_BASE = 'http://localhost:5152/api';
 
 const API = {
   base: API_BASE,
-  itemsAvailable: (deviceType) =>
-    `${API_BASE}/pharmacy/items/available${deviceType ? `?deviceType=${encodeURIComponent(deviceType)}` : ''}`,
+  itemsReservedAll: () => `${API_BASE}/pharmacy/items/reserved`,
   itemsReserved: (studyId) =>
     `${API_BASE}/pharmacy/items/reserved/${encodeURIComponent(studyId)}`,
+  itemsAvailable: (deviceType) =>
+    `${API_BASE}/pharmacy/items/available${deviceType ? `?deviceType=${encodeURIComponent(deviceType)}` : ''}`,
+  // All physical items regardless of status, optionally filtered by status and/or device type.
+  itemsAll: (status, deviceType) => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (deviceType) params.set('deviceType', deviceType);
+    const qs = params.toString();
+    return `${API_BASE}/pharmacy/items${qs ? `?${qs}` : ''}`;
+  },
   products: (page = 1, pageSize = 200) =>
     `${API_BASE}/pharmacy/products?page=${page}&pageSize=${pageSize}`,
   createProduct: `${API_BASE}/pharmacy/products`,
@@ -21,6 +30,7 @@ const API = {
   expiring: (withinDays) =>
     `${API_BASE}/pharmacy/items/expiring?withinDays=${withinDays}`,
   waste: (id) => `${API_BASE}/pharmacy/items/${id}/waste`,
+  release: (id) => `${API_BASE}/pharmacy/items/${id}/release`,
 };
 
 /* ---------- State ---------- */
@@ -61,6 +71,7 @@ function statusPill(status) {
     Reserved: { cls: 'pill-blue', label: 'Réservé' },
     Consumed: { cls: 'pill-purple', label: 'Consommé' },
     Wasted: { cls: 'pill-red', label: 'Rebut' },
+    Expired: { cls: 'pill-grey', label: 'Expiré' },
   };
   const s = map[status] || { cls: 'pill-grey', label: status || '—' };
   return `<span class="pill ${s.cls}">${escapeHtml(s.label)}</span>`;
@@ -115,10 +126,10 @@ function setTableEmpty(table, colspan, msg = 'Aucune donnée.') {
 const VIEW_META = {
   dashboard:    { title: 'Tableau de bord',          sub: "Vue d'ensemble du stock et des alertes" },
   products:     { title: 'Produits',                 sub: 'Catalogue des produits référencés' },
-  items:         { title: 'Articles en stock',        sub: 'Unités physiques en inventaire' },
-  lowstock:     { title: 'Stock faible',             sub: 'Produits sous le seuil minimum' },
+  items:        { title: 'Tous les articles',        sub: 'Toutes les unités physiques, quel que soit leur statut' },
+  lowstock:     { title: 'Stock faible',              sub: 'Produits sous le seuil minimum' },
   expiring:     { title: 'Péremptions proches',       sub: 'Articles expirant sous peu' },
-  reservations: { title: 'Réservations par étude',   sub: 'Articles réservés pour une étude' },
+  reservations: { title: 'Réservations par étude',    sub: 'Articles réservés pour une étude' },
 };
 
 function switchView(view) {
@@ -168,7 +179,7 @@ async function loadDashboard() {
     state.products = arr;
   } catch (e) { /* keep 0 */ }
 
-  // items available
+  // items available (InStock only, for the KPI headline)
   try {
     const items = await apiGet(API.itemsAvailable());
     itemsCount = items.length;
@@ -261,15 +272,16 @@ async function loadProducts() {
   }
 }
 
-/* ---------- Items ---------- */
+/* ---------- Items (all statuses) ---------- */
 let currentDeviceFilter = '';
+let currentStatusFilter = '';
 async function loadItems() {
   const table = $('#items-table');
   setTableLoading(table, 8);
   try {
-    const items = await apiGet(API.itemsAvailable(currentDeviceFilter));
+    const items = await apiGet(API.itemsAll(currentStatusFilter, currentDeviceFilter));
     const arr = normalizeArray(items);
-    if (!arr.length) return setTableEmpty(table, 8, 'Aucun article en stock.');
+    if (!arr.length) return setTableEmpty(table, 8, 'Aucun article ne correspond à ce filtre.');
     const rows = arr.map((it) => `<tr>
       <td>${escapeHtml(it.productName)}</td>
       <td>${deviceTypePill(it.deviceType)}</td>
@@ -278,7 +290,10 @@ async function loadItems() {
       <td>${fmtDate(it.expiryDate)}</td>
       <td>${statusPill(it.status)}</td>
       <td>${escapeHtml(it.reservedForCathStudyId || '—')}</td>
-      <td>${it.status === 'InStock' || it.status === 'Reserved' ? `<button class="icon-btn" title="Mettre au rebut" data-waste="${it.id}">${iconTrash()}</button>` : ''}</td>
+      <td>
+        ${it.status === 'Reserved' ? `<button class="btn-link" data-release="${it.id}">Libérer</button>` : ''}
+        ${it.status === 'InStock' || it.status === 'Reserved' ? `<button class="icon-btn" title="Mettre au rebut" data-waste="${it.id}">${iconTrash()}</button>` : ''}
+      </td>
     </tr>`).join('');
     table.querySelector('tbody').innerHTML = rows;
   } catch (e) {
@@ -343,28 +358,39 @@ async function loadExpiring() {
 
 /* ---------- Reservations ---------- */
 async function loadReservations() {
-  // do nothing until user searches; keep placeholder
+  const table = $('#reservations-table');
+  setTableLoading(table, 7);
+  try {
+    const data = await apiGet(API.itemsReservedAll());
+    renderReservations(data);
+  } catch (e) {
+    setTableError(table, 7, e.message);
+  }
+}
+function renderReservations(data) {
+  const arr = normalizeArray(data);
+  const table = $('#reservations-table');
+  if (!arr.length) return setTableEmpty(table, 7, 'Aucun article réservé actuellement.');
+  const rows = arr.map((it) => `<tr>
+    <td>${escapeHtml(it.productName)}</td>
+    <td>${deviceTypePill(it.deviceType)}</td>
+    <td>${escapeHtml(it.lotNumber || '—')}</td>
+    <td>${escapeHtml(it.barcode || '—')}</td>
+    <td>${fmtDate(it.expiryDate)}</td>
+    <td>${statusPill(it.status)}</td>
+    <td>${fmtDate(it.reservedAt)}</td>
+  </tr>`).join('');
+  table.querySelector('tbody').innerHTML = rows;
 }
 async function searchReservations() {
   const input = $('#study-id-input');
   const table = $('#reservations-table');
   const id = input.value.trim();
-  if (!id) { toast('Saisissez un identifiant d\'étude', 'error'); return; }
+  if (!id) { loadReservations(); return; } // empty search = show all again
   setTableLoading(table, 7);
   try {
     const data = await apiGet(API.itemsReserved(id));
-    const arr = normalizeArray(data);
-    if (!arr.length) return setTableEmpty(table, 7, 'Aucun article réservé pour cette étude.');
-    const rows = arr.map((it) => `<tr>
-      <td>${escapeHtml(it.productName)}</td>
-      <td>${deviceTypePill(it.deviceType)}</td>
-      <td>${escapeHtml(it.lotNumber || '—')}</td>
-      <td>${escapeHtml(it.barcode || '—')}</td>
-      <td>${fmtDate(it.expiryDate)}</td>
-      <td>${statusPill(it.status)}</td>
-      <td>${fmtDate(it.reservedAt)}</td>
-    </tr>`).join('');
-    table.querySelector('tbody').innerHTML = rows;
+    renderReservations(data);
   } catch (e) {
     setTableError(table, 7, e.message);
     toast('Erreur lors de la recherche des réservations', 'error');
@@ -435,7 +461,6 @@ async function saveReceive() {
 
 function openWasteModal(itemId) {
   state.wasteItemId = itemId;
-  const item = { productName: '', lotNumber: '' };
   $('#waste-item-label').textContent = `Article #${itemId}`;
   $('#w-note').value = '';
   openModal('modal-waste');
@@ -446,6 +471,16 @@ async function saveWaste() {
     await apiPost(API.waste(state.wasteItemId), { note });
     closeModal('modal-waste');
     toast('Article mis au rebut');
+    loadItems();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function releaseItem(itemId) {
+  try {
+    await apiPost(API.release(itemId), {});
+    toast('Article libéré, retour au stock');
     loadItems();
   } catch (e) {
     toast(`Erreur : ${e.message}`, 'error');
@@ -512,10 +547,17 @@ function init() {
     currentDeviceFilter = e.target.value;
     loadItems();
   });
-  // waste via delegation
+  $('#items-status-filter').addEventListener('change', (e) => {
+    currentStatusFilter = e.target.value;
+    loadItems();
+  });
+  // waste + release via delegation
   $('#items-table').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-waste]');
-    if (btn) openWasteModal(btn.dataset.waste);
+    const wasteBtn = e.target.closest('[data-waste]');
+    if (wasteBtn) { openWasteModal(wasteBtn.dataset.waste); return; }
+
+    const releaseBtn = e.target.closest('[data-release]');
+    if (releaseBtn) releaseItem(releaseBtn.dataset.release);
   });
   $('#btn-save-waste').addEventListener('click', saveWaste);
 

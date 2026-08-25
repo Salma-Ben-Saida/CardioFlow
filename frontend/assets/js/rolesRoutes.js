@@ -11,11 +11,10 @@
 export const ROLE_DASHBOARDS = {
     Admin: '/frontend/pages/Admin/index.html',
     ResponsablePharmacie: '/frontend/pages/PharmacyManagement/dashboard.html',
-    Doctor: '/frontend/pages/dashboard/index.html',
     Medecin: '/frontend/pages/dashboard/index.html',
     Secretaire: '/frontend/pages/dashboard/secretaire/index.html',
 };
 
 export function getDashboardForRole(role) {
-    return ROLE_DASHBOARDS[role] || '/frontend/pages/dashboard/index.html';
+    return ROLE_DASHBOARDS[role] ;
 }

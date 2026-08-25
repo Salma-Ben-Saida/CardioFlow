@@ -35,6 +35,15 @@ public class InventoryItemRepository : IInventoryItemRepository
             .OrderBy(i => i.ExpiryDate)
             .ToListAsync();
     }
+    public async Task<List<InventoryItem>> GetAllReservedAsync()
+{
+    return await _db.InventoryItems
+        .AsNoTracking()
+        .Include(i => i.Product)
+        .Where(i => i.Status == ItemStatus.Reserved)
+        .OrderBy(i => i.ReservedAt)
+        .ToListAsync();
+}
 
     public async Task<InventoryItem> CreateAsync(InventoryItem item)
     {
@@ -63,5 +72,13 @@ public async Task<List<InventoryItem>> GetAvailableAsync(DeviceType? deviceType)
         query = query.Where(i => i.Product.DeviceType == deviceType.Value);
 
     return await query.AsNoTracking().ToListAsync();
+}
+
+public async Task<List<InventoryItem>> GetAllAsync()
+{
+    return await _db.InventoryItems
+        .Include(i => i.Product)
+        .AsNoTracking()
+        .ToListAsync();
 }
 }
