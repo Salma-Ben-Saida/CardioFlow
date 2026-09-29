@@ -20,6 +20,10 @@
 
 CardioFlow is a full-stack system built for interventional cardiology (cath lab) teams. It automates the ingestion of imaging studies from a PACS server (Orthanc), centralizes patient and procedure records, and tracks medical device inventory (stents, balloons, guidewires) through a clinically accurate reservation-to-consumption lifecycle.
 
+## 🎬 Demo
+
+> Full walkthrough : [Watch on Descript](https://share.descript.com/view/8C6c1Z1BfQR)
+
 **Core capabilities:**
 
 - 🔄 **Automated PACS ingestion** — background worker polls Orthanc every 15 minutes and ingests new studies idempotently.
