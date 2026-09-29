@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Patient Admission - CathLab Management System</title>
+    <title>Nouvelle admission d'un patient - Système de gestion du CathLab</title>
     <link rel="stylesheet" href="../../assets/css/main.css">
     <link rel="stylesheet" href="../../assets/css/components.css">
     <link rel="stylesheet" href="../../assets/css/layout.css">
@@ -20,19 +20,19 @@
         <div id="sidebar-container"></div>
         <main class="main-content">
             <header class="topbar">
-                <div class="topbar-left"><nav class="topbar-breadcrumb"><a href="/frontend/pages/dashboard/index.html">Home</a><span>/</span><a href="/frontend/pages/patients/list.html">Patients</a><span>/</span><span>New Admission</span></nav></div>
+                <div class="topbar-left"><nav class="topbar-breadcrumb"><a href="/frontend/pages/dashboard/index.html">Accueil</a><span>/</span><a href="/frontend/pages/patients/list.html">Patients</a><span>/</span><span>Nouvelle admission</span></nav></div>
                 <div class="topbar-right"><div class="topbar-user"><div class="topbar-user-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div></div></div>
             </header>
             <div class="page-content">
                 <div class="page-header">
-                    <div class="page-header-left"><h1 class="page-header-title">New Patient Admission</h1><p class="page-header-subtitle">Select a PACS study to import patient data</p></div>
-                    <div class="page-header-actions"><a href="/frontend/pages/patients/list.html" class="btn btn-secondary">Cancel</a></div>
+                    <div class="page-header-left"><h1 class="page-header-title">Nouvelle admission d'un patient</h1><p class="page-header-subtitle">Sélectionnez une étude PACS pour importer les données du patient</p></div>
+                    <div class="page-header-actions"><a href="/frontend/pages/patients/list.html" class="btn btn-secondary">Annuler</a></div>
                 </div>
                 <div class="two-panel-layout">
                     <div class="panel" style="display:flex;flex-direction:column;">
                         <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <h3 class="panel-title">PACS Studies</h3>
-                            <button class="btn btn-ghost btn-sm" id="refreshPacs" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>Refresh</button>
+                            <h3 class="panel-title">Études PACS</h3>
+                            <button class="btn btn-ghost btn-sm" id="refreshPacs" title="Actualiser"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>Actualiser</button>
                         </div>
                         <div class="panel-body" id="pacsStudiesList"></div>
                     </div>
@@ -40,39 +40,39 @@
                         <div class="panel-header" style="display:flex;align-items:center;gap:var(--spacing-3);">
                             <div class="avatar-circle" id="formAvatar" style="background:var(--color-gray-200);color:var(--color-gray-400);">?</div>
                             <div style="min-width:0;">
-                                <h3 class="panel-title">Patient Information</h3>
-                                <span class="card-subtitle" id="formSubtitle" style="margin-top:0;display:block;">Select a PACS study to populate</span>
+                                <h3 class="panel-title">Informations du patient</h3>
+                                <span class="card-subtitle" id="formSubtitle" style="margin-top:0;display:block;">Sélectionnez une étude PACS pour remplir les informations</span>
                             </div>
                         </div>
                         <div class="panel-body">
                             <form id="admissionForm">
-                                <div class="form-group"><label class="form-label required" for="patientName">Full Name</label><input type="text" class="form-control" id="patientName" name="fullName" placeholder="Enter full name" required disabled></div>
+                                <div class="form-group"><label class="form-label required" for="patientName">Nom complet</label><input type="text" class="form-control" id="patientName" name="fullName" placeholder="Entrez le nom complet" required disabled></div>
                                 <div class="form-row">
-                                    <div class="form-group"><label class="form-label" for="nationalId">National ID</label><input type="text" class="form-control" id="nationalId" name="nationalId" placeholder="Enter national ID" disabled></div>
-                                    <div class="form-group"><label class="form-label" for="phone">Phone Number</label><input type="tel" class="form-control" id="phone" name="phoneNumber" placeholder="Enter phone number" disabled></div>
+                                    <div class="form-group"><label class="form-label" for="nationalId">Identifiant national</label><input type="text" class="form-control" id="nationalId" name="nationalId" placeholder="Entrez l'identifiant national" disabled></div>
+                                    <div class="form-group"><label class="form-label" for="phone">Numéro de téléphone</label><input type="tel" class="form-control" id="phone" name="phoneNumber" placeholder="Entrez le numéro de téléphone" disabled></div>
                                 </div>
                                 <div class="form-row">
-                                    <div class="form-group"><label class="form-label" for="birthDate">Birth Date</label><input type="date" class="form-control" id="birthDate" name="birthDate" disabled></div>
-                                    <div class="form-group"><label class="form-label" for="sex">Sex</label><select class="form-control" id="sex" name="sex" disabled><option value="">Select...</option><option value="M">Male</option><option value="F">Female</option></select></div>
-                                    <div class="form-group"><label class="form-label" for="bloodGroup">Blood Group</label><select class="form-control" id="bloodGroup" name="bloodGroup" disabled><option value="">Select...</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
+                                    <div class="form-group"><label class="form-label" for="birthDate">Date de naissance</label><input type="date" class="form-control" id="birthDate" name="birthDate" disabled></div>
+                                    <div class="form-group"><label class="form-label" for="sex">Sexe</label><select class="form-control" id="sex" name="sex" disabled><option value="">Sélectionner...</option><option value="M">Homme</option><option value="F">Femme</option></select></div>
+                                    <div class="form-group"><label class="form-label" for="bloodGroup">Groupe sanguin</label><select class="form-control" id="bloodGroup" name="bloodGroup" disabled><option value="">Sélectionner...</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
                                 </div>
-                                <div class="form-group" style="margin-bottom:0;"><label class="form-label" for="address">Address</label><textarea class="form-control" id="address" name="address" rows="2" placeholder="Enter address" disabled></textarea></div>
+                                <div class="form-group" style="margin-bottom:0;"><label class="form-label" for="address">Adresse</label><textarea class="form-control" id="address" name="address" rows="2" placeholder="Entrez l'adresse" disabled></textarea></div>
                                 <input type="hidden" id="accessionNumber" name="accessionNumber">
                             </form>
                         </div>
                         <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;">
                             <small class="text-muted" id="selectedStudyInfo"></small>
-                            <button type="submit" form="admissionForm" class="btn btn-primary" id="submitBtn" disabled><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Submit Admission</button>
+                            <button type="submit" form="admissionForm" class="btn btn-primary" id="submitBtn" disabled><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Valider l'admission</button>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div style="text-align:center;"><div class="spinner spinner-lg"></div><p class="loading-text">Loading PACS studies...</p></div></div>
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div style="text-align:center;"><div class="spinner spinner-lg"></div><p class="loading-text">Chargement des études PACS...</p></div></div>
     <script type="module">
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
-        import { showToast } from '../../assets/js/components/toast.js';
+        import toast from '../../assets/js/components/toast.js';
         import { getPacsStudies, ingestPacsStudy } from '../../assets/js/api/pacs.js';
         import { formatDate, showEmptyState } from '../../assets/js/utils.js';
 
@@ -93,13 +93,13 @@
         async function loadPacsStudies() {
             loadingOverlay.style.display = 'flex';
             try { pacsStudies = await getPacsStudies(); renderPacsStudies(pacsStudies); }
-            catch (error) { showToast.error('Failed to load PACS studies: ' + error.message); showEmptyState(pacsListContainer, 'Failed to load PACS studies. Please try again.', 'folder'); }
+            catch (error) { toast.error('Échec du chargement des études PACS : ' + error.message); showEmptyState(pacsListContainer, 'Échec du chargement des études PACS. Veuillez réessayer.', 'folder'); }
             finally { loadingOverlay.style.display = 'none'; }
         }
 
         function renderPacsStudies(studies) {
-            if (!studies || studies.length === 0) { showEmptyState(pacsListContainer, 'No PACS studies available for import.', 'folder'); return; }
-            pacsListContainer.innerHTML = studies.map(s => `<div class="list-item pacs-study-item" data-accession="${escapeHtml(s.accessionNumber)}" onclick="selectStudy('${escapeHtml(s.accessionNumber)}')"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(s.patientName || 'Unknown Patient')}</div><div class="list-item-subtitle">Accession: ${escapeHtml(s.accessionNumber)}</div><div style="font-size:var(--font-size-xs);color:var(--color-gray-400);margin-top:4px;">${s.studyDate ? formatDate(s.studyDate) : '-'}${s.modality ? ' | ' + escapeHtml(s.modality) : ''}</div></div><span class="study-status-badge study-status-new">New</span></div>`).join('');
+            if (!studies || studies.length === 0) { showEmptyState(pacsListContainer, 'Aucune étude PACS disponible pour l’importation.', 'folder'); return; }
+            pacsListContainer.innerHTML = studies.map(s => `<div class="list-item pacs-study-item" data-accession="${escapeHtml(s.accessionNumber)}" onclick="selectStudy('${escapeHtml(s.accessionNumber)}')"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(s.patientName || 'Patient inconnu')}</div><div class="list-item-subtitle">Numéro d'accession : ${escapeHtml(s.accessionNumber)}</div><div style="font-size:var(--font-size-xs);color:var(--color-gray-400);margin-top:4px;">${s.studyDate ? formatDate(s.studyDate) : '-'}${s.modality ? ' | ' + escapeHtml(s.modality) : ''}</div></div><span class="study-status-badge study-status-new">Nouveau</span></div>`).join('');
         }
 
         window.selectStudy = (accessionNumber) => {
@@ -116,8 +116,8 @@
             document.getElementById('address').value = study.address || '';
             document.getElementById('accessionNumber').value = study.accessionNumber;
             setFormEnabled(true);
-            formSubtitle.textContent = `Importing from: ${study.accessionNumber}`;
-            selectedStudyInfo.textContent = `Study: ${study.accessionNumber} | ${study.patientName || 'Unknown'}`;
+            formSubtitle.textContent = `Importation depuis : ${study.accessionNumber}`;
+            selectedStudyInfo.textContent = `Étude : ${study.accessionNumber} | ${study.patientName || 'Inconnu'}`;
             const avatar = document.getElementById('formAvatar');
             avatar.textContent = getInitials(study.patientName);
             avatar.style.background = 'linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%)';
@@ -127,21 +127,32 @@
         function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
 
         admissionForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!selectedStudy) { showToast.warning('Please select a PACS study first'); return; }
-            const accessionNumber = document.getElementById('accessionNumber').value;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="spinner spinner-sm" style="display:inline-block;"></div> Processing...';
-            try {
-                await ingestPacsStudy(accessionNumber);
-                showToast.success('Patient admission completed successfully!');
-                setTimeout(() => window.location.href = '/frontend/pages/patients/list.html', 1500);
-            } catch (error) {
-                showToast.error('Failed to complete admission: ' + error.message);
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Submit Admission';
-            }
-        });
+    e.preventDefault();
+    if (!selectedStudy) { toast.warning('Veuillez d’abord sélectionner une étude PACS'); return; }
+    const accessionNumber = document.getElementById('accessionNumber').value;
+
+    const patientOverride = {
+        fullName:    document.getElementById('patientName').value.trim() || null,
+        nationalId:  document.getElementById('nationalId').value.trim() || null,
+        birthDate:   document.getElementById('birthDate').value || null,
+        sex:         document.getElementById('sex').value || null,
+        phoneNumber: document.getElementById('phone').value.trim() || null,
+        bloodGroup:  document.getElementById('bloodGroup').value || null,
+        address:     document.getElementById('address').value.trim() || null,
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="spinner spinner-sm" style="display:inline-block;"></div> Traitement...';
+    try {
+        await ingestPacsStudy(accessionNumber, patientOverride);
+        toast.success('Admission du patient terminée avec succès !');
+        setTimeout(() => window.location.href = '/frontend/pages/patients/list.html', 1500);
+    } catch (error) {
+        toast.error("Échec de l'admission : " + error.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Valider l\'admission';
+    }
+});
 
         document.getElementById('refreshPacs').addEventListener('click', loadPacsStudies);
 

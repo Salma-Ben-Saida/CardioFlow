@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - CathLab Management System</title>
+    <title>Tableau de bord - Système de gestion du CathLab</title>
     <link rel="stylesheet" href="../../assets/css/main.css">
     <link rel="stylesheet" href="../../assets/css/components.css">
     <link rel="stylesheet" href="../../assets/css/layout.css">
@@ -15,7 +15,7 @@
             <header class="topbar">
                 <div class="topbar-left">
                     <nav class="topbar-breadcrumb">
-                        <a href="#">Home</a><span>/</span><span>Dashboard</span>
+                        <a href="#">Accueil</a><span>/</span><span>Tableau de bord</span>
                     </nav>
                 </div>
                 <div class="topbar-right">
@@ -29,11 +29,11 @@
             <div class="page-content">
                 <div class="page-header">
                     <div class="page-header-left">
-                        <h1 class="page-header-title" id="pageWelcome">Dashboard</h1>
-                        <p class="page-header-subtitle">Welcome back! Here's what needs your attention.</p>
+                        <h1 class="page-header-title" id="pageWelcome">Tableau de bord</h1>
+                        <p class="page-header-subtitle">Bon retour ! Voici ce qui nécessite votre attention.</p>
                     </div>
                     <div class="page-header-actions">
-                        <a href="/frontend/pages/patients/admission.html" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New Patient</a>
+                        <a href="/frontend/pages/patients/admission.html" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Nouveau patient</a>
                     </div>
                 </div>
 
@@ -41,33 +41,33 @@
                 <div class="content-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: var(--spacing-6);" id="kpiCards">
                     <div class="card stat-card stat-card-primary">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="totalPatients">-</div><div class="stat-label">Total Patients</div></div>
+                        <div class="stat-content"><div class="stat-value" id="totalPatients">-</div><div class="stat-label">Total des patients</div></div>
                     </div>
                     <div class="card stat-card stat-card-warning">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="incompleteRecords">-</div><div class="stat-label">Incomplete Records</div></div>
+                        <div class="stat-content"><div class="stat-value" id="incompleteRecords">-</div><div class="stat-label">Dossiers incomplets</div></div>
                     </div>
                     <div class="card stat-card stat-card-success">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 4 12 14.01l-3-3"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="completeRecords">-</div><div class="stat-label">Complete Records</div></div>
+                        <div class="stat-content"><div class="stat-value" id="completeRecords">-</div><div class="stat-label">Dossiers complets</div></div>
                     </div>
                 </div>
 
                 <!-- Content Grid -->
                 <div class="content-grid" style="grid-template-columns: 2fr 1fr;">
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">Incomplete Patient Records</h3><span class="card-subtitle">Click a patient to fill in missing info</span></div>
+                        <div class="card-header"><h3 class="card-title">Dossiers patients incomplets</h3><span class="card-subtitle">Cliquez sur un patient pour compléter les informations manquantes</span></div>
                         <div class="card-body" style="padding: 0;"><div class="incomplete-list" id="incompletePatientsList"></div></div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">Recently Admitted</h3><span class="card-subtitle">Last 5 patients</span></div>
+                        <div class="card-header"><h3 class="card-title">Admissions récentes</h3><span class="card-subtitle">5 derniers patients</span></div>
                         <div class="card-body" style="padding: 0;"><div class="incomplete-list" id="recentPatientsList"></div></div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    <div class="loading-overlay" id="loadingOverlay" style="display: none;"><div style="text-align: center;"><div class="spinner spinner-lg"></div><p class="loading-text">Loading dashboard...</p></div></div>
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;"><div style="text-align: center;"><div class="spinner spinner-lg"></div><p class="loading-text">Chargement du tableau de bord...</p></div></div>
     <script type="module">
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
         import { showToast } from '../../assets/js/components/toast.js';
@@ -82,14 +82,14 @@
 
         renderSidebar('sidebar-container');
         document.getElementById('pageWelcome').textContent =
-            currentUser?.fullName ? `Welcome back, ${currentUser.fullName}` : 'Dashboard';
+            currentUser?.fullName ? `Bon retour, ${currentUser.fullName}` : 'Dashboard';
 
         async function initDashboard() {
             const loadingOverlay = document.getElementById('loadingOverlay');
             loadingOverlay.style.display = 'flex';
             try {
                 await Promise.all([loadKPIs(), loadIncompletePatients(), loadRecentPatients()]);
-            } catch (error) { showToast.error('Failed to load dashboard data. ' + error.message); }
+            } catch (error) { showToast.error('Échec du chargement des données du tableau de bord. ' + error.message); }
             finally { loadingOverlay.style.display = 'none'; }
         }
 
@@ -111,9 +111,9 @@
             try {
                 const patientsData = await getPatients({ page: 1, pageSize: 10, status: 'incomplete', sortBy: 'updatedAt', sortDir: 'desc' });
                 const patients = patientsData.items || patientsData.patients || [];
-                if (patients.length === 0) { showEmptyState(container, 'No incomplete records — nice and tidy!', 'check'); return; }
-                container.innerHTML = patients.map(p => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(p.fullName)}</div><div class="list-item-subtitle">${escapeHtml(p.conquestPatientID || p.nationalId || 'No ID')}</div></div><span class="badge badge-warning">Incomplete</span></div>`).join('');
-            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Failed to load incomplete records</p>'; }
+                if (patients.length === 0) { showEmptyState(container, 'Aucun dossier incomplet — tout est en ordre !', 'check'); return; }
+                container.innerHTML = patients.map(p => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(p.fullName)}</div><div class="list-item-subtitle">${escapeHtml(p.conquestPatientID || p.nationalId || 'Aucun identifiant')}</div></div><span class="badge badge-warning">Incomplet</span></div>`).join('');
+            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Échec du chargement des dossiers incomplets</p>'; }
         }
 
         async function loadRecentPatients() {
@@ -121,9 +121,9 @@
             try {
                 const patientsData = await getPatients({ page: 1, pageSize: 5, sortBy: 'createdAt', sortDir: 'desc' });
                 const patients = patientsData.items || patientsData.patients || [];
-                if (patients.length === 0) { showEmptyState(container, 'No patients yet', 'user'); return; }
+                if (patients.length === 0) { showEmptyState(container, 'Aucun patient pour le moment', 'user'); return; }
                 container.innerHTML = patients.map(p => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(p.fullName)}</div><div class="list-item-subtitle">${formatDate(p.createdAt)}</div></div></div>`).join('');
-            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Failed to load recent patients</p>'; }
+            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Échec du chargement des patients récents</p>'; }
         }
 
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
