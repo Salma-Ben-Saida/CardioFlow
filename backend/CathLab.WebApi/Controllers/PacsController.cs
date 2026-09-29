@@ -1,3 +1,4 @@
+using CathLab.Application.DTOs.Pacs;
 using CathLab.Application.Interfaces;
 using CathLab.Application.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -24,13 +25,13 @@ public class PacsController : ControllerBase
 
     // Ingest one study by accession number
     [HttpPost("ingest/{accessionNumber}")]
-    public async Task<IActionResult> IngestOne(string accessionNumber)
-    {
-        var result = await _ingestion.IngestStudyAsync(accessionNumber);
-        if (!result.Succeeded)
-            return BadRequest(new { error = result.Error });
-        return Ok(result);
-    }
+public async Task<IActionResult> IngestOne(string accessionNumber, [FromBody] PatientOverrideDto? overrideData)
+{
+    var result = await _ingestion.IngestStudyAsync(accessionNumber, overrideData);
+    if (!result.Succeeded)
+        return BadRequest(new { error = result.Error });
+    return Ok(result);
+}
 
     // Ingest all studies from last 30 days
     [HttpPost("ingest/all")]
