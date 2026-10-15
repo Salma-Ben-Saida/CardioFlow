@@ -604,6 +604,31 @@ function guardAccess() {
   }
   return true;
 }
+window.logoutUser = async function() {
+  const confirmed = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
+  if (!confirmed) return;
+
+  const token = sessionStorage.getItem('authToken');
+  try {
+    if (token) {
+      await fetch('http://localhost:5152/api/Auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+  } catch (error) {
+    console.warn('Logout audit call failed:', error);
+  } finally {
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    localStorage.removeItem('sidebarCollapsed');
+    window.location.href = '/frontend/pages/login.html';
+  }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   if (guardAccess()) init();
 });

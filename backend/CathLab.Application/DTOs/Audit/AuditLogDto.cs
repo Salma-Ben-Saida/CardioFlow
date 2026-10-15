@@ -17,6 +17,7 @@ public class UserActivityLogDto
     public string Username { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
     public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
     public DateTime OccurredAt { get; set; }
 }
 

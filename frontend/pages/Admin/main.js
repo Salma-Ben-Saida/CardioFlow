@@ -2,7 +2,7 @@
  * Administration — CathLab (vanilla JS, no framework)
  * ============================================================ */
 
-import { get as apiGet, post as apiPost } from '../../assets/js/api/client.js';
+import { get as apiGet, post as apiPost, put as apiPut } from '../../assets/js/api/client.js';
 
 /* ---------- API config ---------- */
 const API = {
@@ -35,7 +35,7 @@ function guardAccess() {
 }
 
 /* ---------- State ---------- */
-const state = { currentView: 'dashboard' };
+const state = { currentView: 'dashboard', selectedUserForEdit: null, selectedUserForDelete: null };
 
 /* ---------- DOM helpers ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -123,7 +123,7 @@ async function loadDashboard() {
   setTableLoading(tables.movements, 5);
   setTableLoading(tables.reports, 4);
   setTableLoading(tables.audits, 4);
-  setTableLoading(tables.logs, 3);
+  setTableLoading(tables.logs, 4);
   $('#module-pharmacy-stat').textContent = 'Chargement…';
   $('#module-patients-stat').textContent = 'Chargement…';
 
@@ -131,7 +131,8 @@ async function loadDashboard() {
   try {
     const data = await apiGet(API.movements(1, 5));
     const arr = normalizeArray(data);
-    $('#kpi-movements').textContent = data.total ?? arr.length;
+    const total = data?.totalCount ?? data?.total ?? arr.length;
+    $('#kpi-movements').textContent = total;
     if (!arr.length) setTableEmpty(tables.movements, 5, 'Aucun mouvement récent.');
     else tables.movements.querySelector('tbody').innerHTML = arr.map(movementRow).join('');
   } catch (e) {
@@ -147,7 +148,19 @@ async function loadDashboard() {
     $('#kpi-reports-pending').textContent = pending;
     const preview = arr.slice(0, 5);
     if (!preview.length) setTableEmpty(tables.reports, 4, 'Aucun rapport.');
-    else tables.reports.querySelector('tbody').innerHTML = preview.map(reportRow).join('');
+    else {
+      tables.reports.querySelector('tbody').innerHTML = preview.map(reportRow).join('');
+      tables.reports.querySelectorAll('tbody tr.clickable-row').forEach((row) => {
+        row.addEventListener('click', () => {
+          const reportId = row.dataset.reportId;
+          const cathStudyId = row.dataset.cathStudyId;
+          const patientId = row.dataset.patientId;
+          if (!cathStudyId || !patientId) return;
+          const url = `/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${encodeURIComponent(cathStudyId)}&patientId=${encodeURIComponent(patientId)}${reportId ? `&reportId=${encodeURIComponent(reportId)}` : ''}`;
+          window.location.href = url;
+        });
+      });
+    }
   } catch (e) {
     $('#kpi-reports-pending').textContent = '—';
     setTableError(tables.reports, 4, e.message);
@@ -166,7 +179,8 @@ async function loadDashboard() {
   try {
     const data = await apiGet(API.audits(1, 5));
     const arr = normalizeArray(data);
-    $('#kpi-audits').textContent = data.total ?? arr.length;
+    const total = data?.totalCount ?? data?.total ?? arr.length;
+    $('#kpi-audits').textContent = total;
     if (!arr.length) setTableEmpty(tables.audits, 4, 'Aucun audit.');
     else tables.audits.querySelector('tbody').innerHTML = arr.map(auditRow).join('');
   } catch (e) {
@@ -178,10 +192,10 @@ async function loadDashboard() {
   try {
     const data = await apiGet(API.logs(1, 5));
     const arr = normalizeArray(data);
-    if (!arr.length) setTableEmpty(tables.logs, 3, 'Aucun log.');
+    if (!arr.length) setTableEmpty(tables.logs, 4, 'Aucun log.');
     else tables.logs.querySelector('tbody').innerHTML = arr.map(logRow).join('');
   } catch (e) {
-    setTableError(tables.logs, 3, e.message);
+    setTableError(tables.logs, 4, e.message);
   }
 
   // Pharmacy module stat
@@ -208,15 +222,15 @@ async function loadDashboard() {
 function movementRow(m) {
   return `<tr>
     <td>${fmtDateTime(m.movedAt)}</td>
-    <td>${escapeHtml(m.productName)}</td>
+    <td>${escapeHtml(m.productName || '—')}</td>
     <td>${escapeHtml(m.movementType)}</td>
     <td>${m.quantity ?? '—'}</td>
-    <td>${escapeHtml(m.createdBy || '—')}</td>
+    <td>${escapeHtml(m.actorName || m.createdBy || '—')}</td>
   </tr>`;
 }
 
 function reportRow(r) {
-  return `<tr>
+  return `<tr data-report-id="${r.id || ''}" data-cath-study-id="${r.cathStudyId || ''}" data-patient-id="${r.patientId || ''}" class="clickable-row" style="cursor:pointer;">
     <td>${escapeHtml(r.patientName)}</td>
     <td>${escapeHtml(r.doctorName || '—')}</td>
     <td>${fmtDateTime(r.reportGeneratedAt)}</td>
@@ -227,7 +241,7 @@ function reportRow(r) {
 function auditRow(a) {
   return `<tr>
     <td>${fmtDateTime(a.occurredAt)}</td>
-    <td>${escapeHtml(a.actorName)}</td>
+    <td>${escapeHtml(a.actorName || a.username || '—')}</td>
     <td>${escapeHtml(a.action)}</td>
     <td>${escapeHtml(a.entityType)}</td>
   </tr>`;
@@ -238,6 +252,7 @@ function logRow(l) {
     <td>${fmtDateTime(l.occurredAt)}</td>
     <td>${escapeHtml(l.username)}</td>
     <td>${escapeHtml(l.action)}</td>
+    <td>${escapeHtml(l.userAgent || '—')}</td>
   </tr>`;
 }
 
@@ -251,11 +266,10 @@ async function loadMovements() {
     if (!arr.length) return setTableEmpty(table, 6, 'Aucun mouvement.');
     table.querySelector('tbody').innerHTML = arr.map((m) => `<tr>
       <td>${fmtDateTime(m.movedAt)}</td>
-      <td>${escapeHtml(m.productName)}</td>
+      <td>${escapeHtml(m.productName || '—')}</td>
       <td>${escapeHtml(m.movementType)}</td>
       <td>${m.quantity ?? '—'}</td>
-      <td>${escapeHtml(m.referenceNote || '—')}</td>
-      <td>${escapeHtml(m.createdBy || '—')}</td>
+      <td>${escapeHtml(m.actorName || m.createdBy || '—')}</td>
     </tr>`).join('');
   } catch (e) {
     setTableError(table, 6, e.message);
@@ -266,20 +280,33 @@ async function loadMovements() {
 /* ---------- Users ---------- */
 async function loadUsers() {
   const table = $('#users-table');
-  setTableLoading(table, 5);
+  setTableLoading(table, 6);
   try {
     const data = await apiGet(API.users());
     const arr = normalizeArray(data);
-    if (!arr.length) return setTableEmpty(table, 5, 'Aucun utilisateur.');
+    if (!arr.length) return setTableEmpty(table, 6, 'Aucun utilisateur.');
     table.querySelector('tbody').innerHTML = arr.map((u) => `<tr>
       <td>${escapeHtml(u.fullName)}</td>
       <td>${escapeHtml(u.username)}</td>
       <td>${escapeHtml(u.role)}</td>
       <td>${u.isActive ? '<span class="pill pill-green">Actif</span>' : '<span class="pill pill-grey">Inactif</span>'}</td>
       <td>${fmtDateTime(u.createdAt)}</td>
+      <td>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="icon-btn" data-action="edit-user" data-user-id="${u.id}" title="Modifier" aria-label="Modifier l'utilisateur">✏️</button>
+          <button class="icon-btn" data-action="delete-user" data-user-id="${u.id}" title="Supprimer" aria-label="Supprimer l'utilisateur">🗑️</button>
+        </div>
+      </td>
     </tr>`).join('');
+
+    table.querySelectorAll('[data-action="edit-user"]').forEach((btn) => {
+      btn.addEventListener('click', () => openEditUserModal(btn.dataset.userId));
+    });
+    table.querySelectorAll('[data-action="delete-user"]').forEach((btn) => {
+      btn.addEventListener('click', () => openDeleteUserModal(btn.dataset.userId));
+    });
   } catch (e) {
-    setTableError(table, 5, e.message);
+    setTableError(table, 6, e.message);
     toast('Erreur lors du chargement des utilisateurs', 'error');
   }
 }
@@ -305,6 +332,103 @@ async function saveUser() {
   }
 }
 
+async function openEditUserModal(userId) {
+  try {
+    const user = await apiGet(`${API.users(1, 100)}`);
+    const list = normalizeArray(user);
+    const item = list.find((u) => u.id === userId);
+    if (!item) {
+      toast('Utilisateur introuvable.', 'error');
+      return;
+    }
+
+    state.selectedUserForEdit = item;
+    $('#eu-fullname').value = item.fullName || '';
+    $('#eu-name').value = item.username || '';
+    $('#eu-password').value = '';
+    $('#eu-role').value = item.role || 'Medecin';
+    $('#eu-active').value = String(Boolean(item.isActive));
+    openModal('modal-edit-user');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function saveEditedUser() {
+  if (!state.selectedUserForEdit) return;
+
+  const payload = {
+    fullName: $('#eu-fullname').value.trim(),
+    username: $('#eu-name').value.trim(),
+    password: $('#eu-password').value.trim() || undefined,
+    role: $('#eu-role').value,
+    isActive: $('#eu-active').value === 'true'
+  };
+
+  if (!payload.fullName || !payload.username) {
+    toast('Nom complet et identifiant sont requis.', 'error');
+    return;
+  }
+
+  try {
+    await apiPut(`/api/user/${state.selectedUserForEdit.id}`, payload);
+    closeModal('modal-edit-user');
+    state.selectedUserForEdit = null;
+    toast('Utilisateur modifié avec succès');
+    loadUsers();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function openDeleteUserModal(userId) {
+  try {
+    const response = await apiGet(API.users(1, 100));
+    const users = normalizeArray(response);
+    const item = users.find((u) => u.id === userId);
+    if (!item) {
+      toast('Utilisateur introuvable.', 'error');
+      return;
+    }
+
+    state.selectedUserForDelete = item;
+    $('#delete-user-message').textContent = `Voulez-vous vraiment supprimer ${item.fullName || item.username} ?`;
+    openModal('modal-delete-user');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function confirmDeleteUser() {
+  if (!state.selectedUserForDelete) return;
+
+  try {
+    const response = await fetch(`http://localhost:5152/api/user/${state.selectedUserForDelete.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      let message = 'Erreur lors de la suppression.';
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    closeModal('modal-delete-user');
+    state.selectedUserForDelete = null;
+    toast('Utilisateur supprimé avec succès');
+    loadUsers();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
 /* ---------- Reports ---------- */
 async function loadReports() {
   const table = $('#reports-table');
@@ -313,12 +437,20 @@ async function loadReports() {
     const data = await apiGet(API.reports());
     const arr = normalizeArray(data);
     if (!arr.length) return setTableEmpty(table, 4, 'Aucun rapport.');
-    table.querySelector('tbody').innerHTML = arr.map((r) => `<tr>
+    table.querySelector('tbody').innerHTML = arr.map((r) => `<tr data-report-id="${r.id || ''}" data-cath-study-id="${r.cathStudyId || ''}" data-patient-id="${r.patientId || ''}" class="clickable-row" style="cursor:pointer;">
       <td>${escapeHtml(r.patientName)}</td>
-      <td>${escapeHtml(r.doctorName)}</td>
+      <td>${escapeHtml(r.doctorName || '—')}</td>
       <td>${fmtDateTime(r.reportGeneratedAt)}</td>
       <td>${r.isConfirmed ? '<span class="pill pill-green">Confirmé</span>' : '<span class="pill pill-amber">Brouillon</span>'}</td>
     </tr>`).join('');
+    table.querySelectorAll('tbody tr.clickable-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const cathStudyId = row.dataset.cathStudyId;
+        const patientId = row.dataset.patientId;
+        if (!cathStudyId || !patientId) return;
+        window.location.href = `/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${encodeURIComponent(cathStudyId)}&patientId=${encodeURIComponent(patientId)}`;
+      });
+    });
   } catch (e) {
     setTableError(table, 4, e.message);
     toast('Erreur lors du chargement des rapports', 'error');
@@ -349,19 +481,20 @@ async function loadAudits() {
 /* ---------- User activity logs ---------- */
 async function loadLogs() {
   const table = $('#logs-table');
-  setTableLoading(table, 4);
+  setTableLoading(table, 5);
   try {
     const data = await apiGet(API.logs());
     const arr = normalizeArray(data);
-    if (!arr.length) return setTableEmpty(table, 4, 'Aucun log.');
+    if (!arr.length) return setTableEmpty(table, 5, 'Aucun log.');
     table.querySelector('tbody').innerHTML = arr.map((l) => `<tr>
       <td>${fmtDateTime(l.occurredAt)}</td>
       <td>${escapeHtml(l.username)}</td>
       <td>${escapeHtml(l.action)}</td>
       <td>${escapeHtml(l.ipAddress || '—')}</td>
+      <td>${escapeHtml(l.userAgent || '—')}</td>
     </tr>`).join('');
   } catch (e) {
-    setTableError(table, 4, e.message);
+    setTableError(table, 5, e.message);
     toast('Erreur lors du chargement des logs', 'error');
   }
 }
@@ -375,6 +508,31 @@ function openUserModal() {
 }
 
 /* ---------- Init ---------- */
+window.logoutUser = async function() {
+  const confirmed = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
+  if (!confirmed) return;
+
+  const token = sessionStorage.getItem('authToken');
+  try {
+    if (token) {
+      await fetch('http://localhost:5152/api/Auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+  } catch (error) {
+    console.warn('Logout audit call failed:', error);
+  } finally {
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    localStorage.removeItem('sidebarCollapsed');
+    window.location.href = '/frontend/pages/login.html';
+  }
+};
+
 function init() {
   const user = getCurrentUser();
   $('#user-name').textContent = user?.fullName || user?.username || '—';
@@ -393,6 +551,8 @@ function init() {
   // users
   $('#btn-new-user').addEventListener('click', openUserModal);
   $('#btn-save-user').addEventListener('click', saveUser);
+  $('#btn-save-edit-user').addEventListener('click', saveEditedUser);
+  $('#btn-confirm-delete-user').addEventListener('click', confirmDeleteUser);
 
   // modal close
   $$('[data-close-modal]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.closeModal)));

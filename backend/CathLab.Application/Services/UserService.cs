@@ -83,12 +83,12 @@ public class UserService
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"]!));
 
-        // Définition des Claims (Données embarquées dans le jeton)
+        // Keep a single canonical JWT claim set so both login and logout use the same contract.
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // Reçu par le contrôleur d'inventaire
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, user.Role.ToString()) // Gère les accès [Authorize(Roles = "...")]
+            new Claim("nameid", user.Id.ToString()),
+            new Claim("name", user.Username),
+            new Claim("role", user.Role.ToString())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -134,15 +134,83 @@ public class UserService
             return CryptographicOperations.FixedTimeEquals(hash, testHash);
         }
     }
+    public async Task<UserDto> UpdateUserAsync(Guid id, UpdateUserDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user is null)
+        {
+            throw new KeyNotFoundException($"User with ID '{id}' not found.");
+        }
+
+        var updatedUsername = dto.Username?.Trim();
+        if (!string.IsNullOrWhiteSpace(updatedUsername) && updatedUsername != user.Username)
+        {
+            var existingUser = await _userRepository.GetByUsernameAsync(updatedUsername);
+            if (existingUser is not null && existingUser.Id != user.Id)
+            {
+                throw new InvalidOperationException($"Username '{updatedUsername}' is already taken.");
+            }
+
+            user.Username = updatedUsername;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.FullName))
+        {
+            user.FullName = dto.FullName.Trim();
+        }
+
+        if (dto.Role.HasValue)
+        {
+            user.Role = dto.Role.Value;
+        }
+
+        if (dto.IsActive.HasValue)
+        {
+            user.IsActive = dto.IsActive.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            user.PasswordHash = CryptoUtils.HashPassword(dto.Password);
+        }
+
+        await _userRepository.UpdateAsync(user);
+        await _userRepository.SaveChangesAsync();
+
+        return new UserDto(
+            user.Id,
+            user.Username,
+            user.FullName,
+            user.Role,
+            user.IsActive,
+            user.CreatedAt
+        );
+    }
+
+    public async Task DeleteUserAsync(Guid id, Guid currentUserId)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user is null)
+        {
+            throw new KeyNotFoundException($"User with ID '{id}' not found.");
+        }
+
+        if (user.Id == currentUserId)
+        {
+            throw new InvalidOperationException("You cannot delete your own account.");
+        }
+
+        await _userRepository.DeleteAsync(user);
+        await _userRepository.SaveChangesAsync();
+    }
+
     public async Task<List<UserDto>> GetUsersAsync(int page = 1, int pageSize = 20)
 {
-    // Sécurité élémentaire pour éviter les valeurs négatives ou nulles
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
     var users = await _userRepository.GetAllAsync(page, pageSize);
 
-    // Projection vers le DTO (masque le PasswordHash)
     return users.Select(user => new UserDto(
         user.Id,
         user.Username,

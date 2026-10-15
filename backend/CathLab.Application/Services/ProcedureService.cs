@@ -318,7 +318,7 @@ public class ProcedureService
         PatientId = r.CathStudy?.PatientId ?? Guid.Empty,
         PatientName = r.CathStudy?.Patient?.FullName ?? string.Empty,
         DoctorId = r.ConfirmedByUserId ?? Guid.Empty,
-        DoctorName = r.ConfirmedByUser?.FullName ?? string.Empty,
+        DoctorName = r.ConfirmedByUser?.Username ?? string.Empty,
         IsConfirmed = r.IsConfirmed,
         ReportGeneratedAt = r.ReportGeneratedAt,
         ConfirmedAt = r.ConfirmedAt,
@@ -369,7 +369,7 @@ public async Task<ProcedureReportDetailDto?> GetReportDetailByCathStudyIdAsync(G
         Recommendations = report.Recommendations,
         ConfirmedByUserId = report.ConfirmedByUserId?.ToString(),
 
-        ConfirmedByUser = (await _userRepository.GetByIdAsync(report.ConfirmedByUserId ?? Guid.Empty))?.FullName ?? string.Empty,
+        ConfirmedByUser = (await _userRepository.GetByIdAsync(report.ConfirmedByUserId ?? Guid.Empty))?.Username ?? string.Empty,
 
         Lesions = lesions.Select(l => new CoronaryLesionDto
         {

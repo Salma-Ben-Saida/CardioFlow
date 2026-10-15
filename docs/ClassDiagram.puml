@@ -229,6 +229,29 @@ package "CathLabDB" #E1F5EE {
     Expiry) — never at simple reservation.
   end note
 
+  class AuditLog <<entity>> {
+    + Id             : Guid    <<PK>>
+    # ActorUserId    : Guid    <<FK>>
+    # EntityId       : Guid    <<FK>>
+    --
+    EntityType       : string   
+    Detail      : string
+    OccurredAt          : DateTime
+    ActorUser     : AppUser
+    
+  }
+  class UserActivityLog <<entity>> {
+    + Id             : Guid    <<PK>>
+    # UserId?    : Guid    <<FK>>
+    --
+    Username       : string   
+    Action      : string
+    IpAddress?          : string
+    OccurredAt     : DateTime
+    
+  }
+
+
   ' ── Enumerations ──────────────────────────────────────────
 
   enum StudyStatus {
@@ -255,8 +278,6 @@ package "CathLabDB" #E1F5EE {
   enum DeviceType {
     Stent
     Balloon
-    GuideCatheter
-    Sheath
     Other
   }
 

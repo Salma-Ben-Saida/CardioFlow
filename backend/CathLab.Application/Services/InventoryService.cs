@@ -295,27 +295,33 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
     public async Task<PagedResult<StockMovementDto>> GetStockMovementsAsync(int page, int pageSize)
     {
         var (items, total) = await _movements.GetListAsync(page, pageSize);
+        var inventoryItems = await _items.GetAllAsync();
         var dtos = new List<StockMovementDto>();
 
         foreach (var m in items)
         {
             var user = await _users.GetByIdAsync(m.CreatedBy);
+            var username = user?.Username ?? string.Empty;
             var fullName = user?.FullName ?? string.Empty;
             var roleName = user?.Role.ToString();
-            var displayName = string.IsNullOrWhiteSpace(fullName)
-                ? roleName ?? string.Empty
-                : string.IsNullOrWhiteSpace(roleName)
-                    ? fullName
-                    : $"{fullName} ({roleName})";
+            var displayName = !string.IsNullOrWhiteSpace(username)
+                ? username
+                : !string.IsNullOrWhiteSpace(fullName)
+                    ? string.IsNullOrWhiteSpace(roleName)
+                        ? fullName
+                        : $"{fullName} ({roleName})"
+                    : roleName ?? string.Empty;
+
+            var productLabel = BuildInventoryItemLabel(m, inventoryItems);
 
             dtos.Add(new StockMovementDto
             {
                 Id = m.Id,
                 ProductId = m.ProductId,
-                ProductName = m.Product?.ProductName ?? string.Empty,
+                ProductName = productLabel,
                 MovementType = m.MovementType.ToString(),
                 Quantity = m.Quantity,
-                ReferenceNote = m.ReferenceNote,
+                ReferenceNote = null,
                 MovedAt = m.MovedAt,
                 CreatedBy = m.CreatedBy,
                 actorName = displayName
@@ -323,6 +329,27 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
         }
 
         return new PagedResult<StockMovementDto>(dtos, total, page, pageSize);
+    }
+
+    private static string BuildInventoryItemLabel(StockMovement movement, IEnumerable<InventoryItem> inventoryItems)
+    {
+        var note = movement.ReferenceNote ?? string.Empty;
+        var item = inventoryItems
+            .Where(i => i.ProductId == movement.ProductId)
+            .OrderBy(i => string.IsNullOrWhiteSpace(i.Barcode) ? 1 : 0)
+            .FirstOrDefault(i =>
+                !string.IsNullOrWhiteSpace(i.Barcode) &&
+                note.Contains(i.Barcode, StringComparison.OrdinalIgnoreCase))
+            ?? inventoryItems
+                .Where(i => i.ProductId == movement.ProductId)
+                .OrderBy(i => string.IsNullOrWhiteSpace(i.Barcode) ? 1 : 0)
+                .FirstOrDefault();
+
+        if (item is null)
+            return string.Empty;
+
+        var lot = string.IsNullOrWhiteSpace(item.LotNumber) ? "—" : item.LotNumber;
+        return $"{item.Barcode}: {lot}";
     }
 
     public async Task<List<InventoryItemDto>> GetAllItemsAsync(string? status, string? deviceType)

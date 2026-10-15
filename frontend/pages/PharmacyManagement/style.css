@@ -83,11 +83,24 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 }
 .nav-badge.zero { background: rgba(255,255,255,.12); color: #b9aee0; }
 .sidebar-footer {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 12px 16px;
   border-top: 1px solid rgba(255,255,255,.08);
   font-size: 11px; color: #9a8ec4;
 }
+.sidebar-status, .sidebar-logout {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #c9c0e8;
+  text-align: left;
+  font: inherit;
+}
+.sidebar-status { opacity: 0.8; }
+.sidebar-logout:hover { background: rgba(255,255,255,.06); color: #fff; }
 .sidebar-footer .nav-label { font-size: 11px; }
 
 /* ===== Main ===== */
