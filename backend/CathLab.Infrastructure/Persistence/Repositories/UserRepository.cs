@@ -25,6 +25,16 @@ public class UserRepository : IUserRepository
         await _context.AppUsers.AddAsync(user);
     }
 
+    public async Task UpdateAsync(AppUser user)
+    {
+        _context.AppUsers.Update(user);
+    }
+
+    public async Task DeleteAsync(AppUser user)
+    {
+        _context.AppUsers.Remove(user);
+    }
+
     public async Task<bool> SaveChangesAsync()
     {
         return await _context.SaveChangesAsync() > 0;

@@ -39,7 +39,7 @@ public class AuditRepository : IAuditRepository
             .Select(a => new AuditLogDto
             {
                 Id = a.Id,
-                ActorName = a.ActorUser.FullName,
+                ActorName = a.ActorUser.Username,
                 Action = a.Action,
                 EntityType = a.EntityType,
                 EntityId = a.EntityId,
@@ -66,6 +66,7 @@ public class AuditRepository : IAuditRepository
                 Username = l.Username,
                 Action = l.Action,
                 IpAddress = l.IpAddress,
+                UserAgent = l.UserAgent,
                 OccurredAt = l.OccurredAt,
             })
             .ToListAsync();

@@ -23,6 +23,4 @@ public class UserActivityLog
     public string? UserAgent { get; set; }
     public DateTime OccurredAt { get; set; }
 
-    // Navigation
-    public AppUser? User { get; set; }
 }

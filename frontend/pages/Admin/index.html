@@ -101,10 +101,18 @@
         </nav>
 
         <div class="sidebar-footer">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-          </span>
-          <span class="nav-label">API: localhost:5152</span>
+          <button type="button" class="sidebar-logout" onclick="logoutUser()">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            </span>
+            <span class="nav-label">Déconnexion</span>
+          </button>
+          <div class="sidebar-status">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            </span>
+            <span class="nav-label">API: localhost:5152</span>
+          </div>
         </div>
       </aside>
 
@@ -183,7 +191,7 @@
                 </div>
                 <div class="table-wrap">
                   <table class="data-table" id="dash-logs-table">
-                    <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>User-Agent</th></tr></thead>
                     <tbody></tbody>
                   </table>
                 </div>
@@ -216,7 +224,7 @@
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="movements-table">
-                  <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Note</th><th>Par</th></tr></thead>
+                  <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Par</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -232,7 +240,7 @@
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="users-table">
-                  <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Statut</th><th>Créé le</th></tr></thead>
+                  <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Statut</th><th>Créé le</th><th>Actions</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -277,7 +285,7 @@
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="logs-table">
-                  <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>IP</th></tr></thead>
+                  <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>IP</th><th>User-Agent</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -320,6 +328,71 @@
         <div class="modal-foot">
           <button class="btn btn-ghost" data-close-modal="modal-user">Annuler</button>
           <button class="btn btn-primary" id="btn-save-user">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal-overlay hidden" id="modal-edit-user">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 class="modal-title">Modifier l'utilisateur</h3>
+          <button class="modal-close" data-close-modal="modal-edit-user">×</button>
+        </div>
+        <form id="form-edit-user" class="modal-body">
+          <div class="field">
+            <label for="eu-fullname">Nom complet</label>
+            <input type="text" id="eu-fullname" required />
+          </div>
+          <div class="field">
+            <label for="eu-name">Identifiant (username)</label>
+            <input type="text" id="eu-name" required />
+          </div>
+          <div class="field">
+            <label for="eu-password">Nouveau mot de passe</label>
+            <input type="password" id="eu-password" placeholder="Laisser vide pour conserver" />
+          </div>
+          <div class="field">
+            <label for="eu-role">Rôle</label>
+            <select id="eu-role" required>
+              <option value="Admin">Admin</option>
+              <option value="Medecin">Médecin</option>
+              <option value="ResponsablePharmacie">Responsable Pharmacie</option>
+              <option value="Secretaire">Secrétaire</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="eu-active">Statut</label>
+            <select id="eu-active" required>
+              <option value="true">Actif</option>
+              <option value="false">Inactif</option>
+            </select>
+          </div>
+        </form>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-edit-user">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-edit-user">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete User Confirmation Modal -->
+    <div class="modal-overlay hidden" id="modal-delete-user">
+      <div class="modal modal-confirm">
+        <div class="modal-head modal-head-warning">
+          <h3 class="modal-title">Supprimer l'utilisateur</h3>
+          <button class="modal-close" data-close-modal="modal-delete-user">×</button>
+        </div>
+        <div class="modal-body modal-body-confirm">
+          <div class="delete-warning-icon">⚠</div>
+          <div class="delete-warning-copy">
+            <p class="delete-warning-title">Cette action est irréversible.</p>
+            <p id="delete-user-message">Voulez-vous vraiment supprimer cet utilisateur ?</p>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-delete-user">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-delete-user">Supprimer</button>
         </div>
       </div>
     </div>

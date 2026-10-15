@@ -27,13 +27,11 @@ public class UserController : ControllerBase
     {
         try
         {
-            // Appelle le service pour valider, hacher et enregistrer l'utilisateur
             var createdUser = await _userService.CreateUserAsync(dto);
 
             await _audit.LogActionAsync(GetCurrentUserId(), "Create", "AppUser", createdUser.Id,
                 $"Created user {createdUser.Username} ({createdUser.Role})");
 
-            // Retourne un statut 201 Created avec l'objet sans le mot de passe pour des raisons de sécurité
             return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, new
                 {
                     createdUser.Id,
@@ -46,57 +44,111 @@ public class UserController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // Gère le cas où le nom d'utilisateur existe déjà
             return BadRequest(new { message = ex.Message });
         }
         catch (Exception)
         {
-            // Gère les erreurs système imprévues
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 new { message = "Une erreur interne est survenue lors de la création de l'utilisateur." });
         }
     }
-[HttpGet]
-[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<UserDto>))]
-[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
-{
-    var users = await _userService.GetUsersAsync(page, pageSize);
-    return Ok(users);
-}
-[HttpGet("{id:guid}")]
-[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
-[ProducesResponseType(StatusCodes.Status404NotFound)]
-public async Task<IActionResult> GetUserById(Guid id)
-{
-    try
-    {
-        var user = await _userService.GetUserByIdAsync(id);
-        return Ok(user);
-    }
-    catch (KeyNotFoundException ex)
-    {
-        return NotFound(new { message = ex.Message });
-    }
-}
-private Guid GetCurrentUserId()
-{
-    var userPrincipal = User;
 
-    if (userPrincipal?.Identity?.IsAuthenticated != true)
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDto dto)
     {
-        throw new UnauthorizedAccessException("No authenticated user found.");
+        try
+        {
+            var updatedUser = await _userService.UpdateUserAsync(id, dto);
+
+            await _audit.LogActionAsync(GetCurrentUserId(), "Update", "AppUser", id,
+                $"Updated user {updatedUser.Username} ({updatedUser.Role})");
+
+            return Ok(updatedUser);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    var userIdClaim = userPrincipal.FindFirst("nameid")?.Value
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteUser(Guid id)
+    {
+        try
+        {
+            var currentUserId = GetCurrentUserId();
+            var deletedUser = await _userService.GetUserByIdAsync(id);
+
+            await _userService.DeleteUserAsync(id, currentUserId);
+
+            await _audit.LogActionAsync(currentUserId, "Delete", "AppUser", id,
+                $"Deleted user {deletedUser.Username} ({deletedUser.Role})");
+
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<UserDto>))]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var users = await _userService.GetUsersAsync(page, pageSize);
+        return Ok(users);
+    }
+
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserById(Guid id)
+    {
+        try
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            return Ok(user);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var userPrincipal = User;
+
+        if (userPrincipal?.Identity?.IsAuthenticated != true)
+        {
+            throw new UnauthorizedAccessException("No authenticated user found.");
+        }
+
+        var userIdClaim = userPrincipal.FindFirst("nameid")?.Value
                       ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
                       ?? userPrincipal.FindFirst("sub")?.Value;
 
-    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
-    {
-        throw new UnauthorizedAccessException("User identification token is invalid.");
-    }
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+        {
+            throw new UnauthorizedAccessException("User identification token is invalid.");
+        }
 
-    return userId;
-}
+        return userId;
+    }
 }

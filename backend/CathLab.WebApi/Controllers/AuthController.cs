@@ -1,5 +1,6 @@
 namespace CathLab.Api.Controllers;
 
+using System.Security.Claims;
 using CathLab.Application.Dtos;
 using CathLab.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -38,5 +39,24 @@ public class AuthController : ControllerBase
             await _audit.LogActivityAsync(null, dto.Username, "LoginFailed", ip, ua);
             return Unauthorized(new { message = ex.Message });
         }
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout()
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ua = Request.Headers.UserAgent.ToString();
+        var userIdClaim = User.FindFirstValue("nameid");
+        var username = User.FindFirstValue("name") ?? "unknown";
+
+        Guid? userId = null;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            userId = parsedUserId;
+        }
+
+        await _audit.LogActivityAsync(userId, username, "Logout", ip, ua);
+        return Ok(new { message = "Déconnexion réussie." });
     }
 }
