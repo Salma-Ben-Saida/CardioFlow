@@ -60,4 +60,10 @@ public class InventoryProductRepository : IInventoryProductRepository
         _db.InventoryProducts.Update(product);
         await _db.SaveChangesAsync();
     }
+
+    public async Task DeleteAsync(InventoryProduct product)
+    {
+        _db.InventoryProducts.Remove(product);
+        await _db.SaveChangesAsync();
+    }
 }

@@ -68,6 +68,58 @@ public class InventoryService
         return products.Select(ToDto).ToList();
     }
 
+    public async Task<InventoryProductDto> UpdateProductAsync(Guid id, UpdateInventoryProductDto dto)
+    {
+        var product = await _products.FindByIdAsync(id)
+            ?? throw new KeyNotFoundException("Product not found.");
+
+        if (!string.IsNullOrWhiteSpace(dto.ProductName))
+            product.ProductName = dto.ProductName.Trim();
+
+        if (!string.IsNullOrWhiteSpace(dto.Reference))
+        {
+            var reference = dto.Reference.Trim();
+            if (!string.Equals(product.Reference, reference, StringComparison.Ordinal))
+            {
+                var existing = await _products.FindByReferenceAsync(reference);
+                if (existing is not null && existing.Id != id)
+                    throw new InvalidOperationException("A product with this reference already exists.");
+            }
+            product.Reference = reference;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.DeviceType))
+        {
+            if (!Enum.TryParse<DeviceType>(dto.DeviceType, ignoreCase: true, out var deviceType))
+                throw new ArgumentException($"Unknown device type '{dto.DeviceType}'.");
+            product.DeviceType = deviceType;
+        }
+
+        if (dto.Manufacturer != null)
+            product.Manufacturer = string.IsNullOrWhiteSpace(dto.Manufacturer) ? null : dto.Manufacturer.Trim();
+
+        if (dto.UnitOfMeasure != null)
+            product.UnitOfMeasure = string.IsNullOrWhiteSpace(dto.UnitOfMeasure) ? null : dto.UnitOfMeasure.Trim();
+
+        if (dto.MinimumStockLevel.HasValue)
+            product.MinimumStockLevel = dto.MinimumStockLevel.Value;
+
+        await _products.UpdateAsync(product);
+        return ToDto(product);
+    }
+
+    public async Task DeleteProductAsync(Guid id)
+    {
+        var product = await _products.FindByIdAsync(id)
+            ?? throw new KeyNotFoundException("Product not found.");
+
+        var itemCount = product.Items.Count;
+        if (itemCount > 0)
+            throw new InvalidOperationException("Cannot delete a product that still has inventory items attached.");
+
+        await _products.DeleteAsync(product);
+    }
+
     /// Register a new physical unit into stock (e.g. scanning in a delivery).
     public async Task<InventoryItemDto> ReceiveItemAsync(ReceiveInventoryItemDto dto, Guid receivedBy)
     {
@@ -166,6 +218,53 @@ public class InventoryService
             ?? throw new InvalidOperationException("Product not found.");
         await RecordMovementAsync(product, MovementType.Waste, quantityDelta: -1,
             note: note ?? $"Wasted {item.Barcode}", createdBy: recordedBy);
+    }
+
+    public async Task<InventoryItemDto> UpdateItemAsync(Guid id, UpdateInventoryItemDto dto)
+    {
+        var item = await _items.FindByIdAsync(id)
+            ?? throw new KeyNotFoundException("Inventory item not found.");
+
+        if (!string.IsNullOrWhiteSpace(dto.Barcode))
+        {
+            var barcode = dto.Barcode.Trim();
+            if (!string.Equals(item.Barcode, barcode, StringComparison.Ordinal))
+            {
+                var duplicate = await _items.FindByBarcodeAsync(barcode);
+                if (duplicate is not null && duplicate.Id != id)
+                    throw new InvalidOperationException("An item with this barcode already exists.");
+            }
+
+            item.Barcode = barcode;
+        }
+
+        if (dto.LotNumber != null)
+            item.LotNumber = string.IsNullOrWhiteSpace(dto.LotNumber) ? null : dto.LotNumber.Trim();
+
+        if (dto.ExpiryDate.HasValue)
+            item.ExpiryDate = dto.ExpiryDate.Value;
+
+        if (dto.SerialNumber != null)
+            item.SerialNumber = string.IsNullOrWhiteSpace(dto.SerialNumber) ? null : dto.SerialNumber.Trim();
+
+        if (!string.IsNullOrWhiteSpace(dto.Status))
+        {
+            if (!Enum.TryParse<ItemStatus>(dto.Status, ignoreCase: true, out var status))
+                throw new ArgumentException($"Unknown item status '{dto.Status}'.");
+
+            item.Status = status;
+        }
+
+        await _items.UpdateAsync(item);
+        return ToDto(item, productName: null);
+    }
+
+    public async Task DeleteItemAsync(Guid id)
+    {
+        var item = await _items.FindByIdAsync(id)
+            ?? throw new KeyNotFoundException("Inventory item not found.");
+
+        await _items.DeleteAsync(item);
     }
 
     public async Task<List<InventoryItemDto>> GetExpiringItemsAsync(int withinDays)
@@ -373,11 +472,26 @@ public async Task<List<InventoryItemDto>> GetAvailableItemsAsync(string? deviceT
         }
 
         var items = await _items.GetAllAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Filter by status if provided
         if (parsedStatus.HasValue)
         {
-            items = items.Where(i => i.Status == parsedStatus.Value).ToList();
+            switch (parsedStatus.Value)
+            {
+                case ItemStatus.Expired:
+                    items = items.Where(i =>
+                        i.Status == ItemStatus.Expired ||
+                        (i.Status == ItemStatus.InStock && i.ExpiryDate <= today)
+                    ).ToList();
+                    break;
+                case ItemStatus.InStock:
+                    items = items.Where(i => i.Status == ItemStatus.InStock && i.ExpiryDate > today).ToList();
+                    break;
+                default:
+                    items = items.Where(i => i.Status == parsedStatus.Value).ToList();
+                    break;
+            }
         }
 
         // Filter by deviceType if provided

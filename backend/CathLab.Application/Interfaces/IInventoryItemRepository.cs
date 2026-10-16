@@ -14,4 +14,5 @@ public interface IInventoryItemRepository
     Task<List<InventoryItem>> GetAvailableAsync(DeviceType? deviceType);
     Task<List<InventoryItem>> GetAllReservedAsync();
     Task<List<InventoryItem>> GetAllAsync();
+    Task DeleteAsync(InventoryItem item);
 }

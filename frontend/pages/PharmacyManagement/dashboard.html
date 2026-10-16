@@ -163,11 +163,18 @@
             <div class="panel">
               <div class="panel-head">
                 <h2 class="panel-title">Catalogue des produits</h2>
-                <button class="btn btn-primary" id="btn-new-product">+ Nouveau produit</button>
+                <div class="panel-actions">
+                  <select id="products-type-filter" class="select" aria-label="Filtrer par type de produit">
+                    <option value="">Tous les types</option>
+                    <option value="Stent">Stent</option>
+                    <option value="Ballon">Ballon</option>
+                  </select>
+                  <button class="btn btn-primary" id="btn-new-product">+ Nouveau produit</button>
+                </div>
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="products-table">
-                  <thead><tr><th>Nom</th><th>Référence</th><th>Type</th><th>Fabricant</th><th>Stock</th><th>Seuil</th><th>Unité</th></tr></thead>
+                  <thead><tr><th>Nom</th><th>Référence</th><th>Type</th><th>Fabricant</th><th>Stock</th><th>Seuil</th><th>Unité</th><th></th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -359,6 +366,125 @@
         <div class="modal-foot">
           <button class="btn btn-ghost" data-close-modal="modal-waste">Annuler</button>
           <button class="btn btn-danger" id="btn-save-waste">Confirmer le rebut</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Product Modal -->
+    <div class="modal-overlay hidden" id="modal-edit-product">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 class="modal-title">Modifier le produit</h3>
+          <button class="modal-close" data-close-modal="modal-edit-product">×</button>
+        </div>
+        <form id="form-edit-product" class="modal-body">
+          <div class="field">
+            <label for="ep-name">Nom du produit</label>
+            <input type="text" id="ep-name" required />
+          </div>
+          <div class="field">
+            <label for="ep-ref">Référence</label>
+            <input type="text" id="ep-ref" required />
+          </div>
+          <div class="field">
+            <label for="ep-type">Type de dispositif</label>
+            <select id="ep-type">
+              <option value="Stent">Stent</option>
+              <option value="Ballon">Ballon</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ep-manu">Fabricant</label>
+            <input type="text" id="ep-manu" />
+          </div>
+          <div class="field">
+            <label for="ep-unit">Unité de mesure</label>
+            <input type="text" id="ep-unit" />
+          </div>
+          <div class="field">
+            <label for="ep-min">Seuil de stock minimum</label>
+            <input type="number" id="ep-min" min="0" required />
+          </div>
+        </form>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-edit-product">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-edit-product">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Product Confirm Modal -->
+    <div class="modal-overlay hidden" id="modal-delete-product">
+      <div class="modal modal-confirm">
+        <div class="modal-head">
+          <h3 class="modal-title">Confirmer la suppression</h3>
+          <button class="modal-close" data-close-modal="modal-delete-product">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-note" id="delete-product-message">Voulez-vous vraiment supprimer ce produit ?</p>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-delete-product">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-delete-product">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div class="modal-overlay hidden" id="modal-edit-item">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 class="modal-title">Modifier l'article</h3>
+          <button class="modal-close" data-close-modal="modal-edit-item">×</button>
+        </div>
+        <form id="form-edit-item" class="modal-body">
+          <div class="field">
+            <label for="ei-barcode">Code-barres</label>
+            <input type="text" id="ei-barcode" required />
+          </div>
+          <div class="field">
+            <label for="ei-lot">Lot</label>
+            <input type="text" id="ei-lot" />
+          </div>
+          <div class="field">
+            <label for="ei-expiry">Date de péremption</label>
+            <input type="date" id="ei-expiry" required />
+          </div>
+          <div class="field">
+            <label for="ei-serial">Numéro de série</label>
+            <input type="text" id="ei-serial" />
+          </div>
+          <div class="field">
+            <label for="ei-status">Statut</label>
+            <select id="ei-status">
+              <option value="InStock">En stock</option>
+              <option value="Reserved">Réservé</option>
+              <option value="Consumed">Consommé</option>
+              <option value="Wasted">Rebut</option>
+              <option value="Expired">Expiré</option>
+            </select>
+          </div>
+        </form>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-edit-item">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-edit-item">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Item Confirm Modal -->
+    <div class="modal-overlay hidden" id="modal-delete-item">
+      <div class="modal modal-confirm">
+        <div class="modal-head">
+          <h3 class="modal-title">Confirmer la suppression</h3>
+          <button class="modal-close" data-close-modal="modal-delete-item">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-note" id="delete-item-message">Voulez-vous vraiment supprimer cet article ?</p>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-delete-item">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-delete-item">Supprimer</button>
         </div>
       </div>
     </div>

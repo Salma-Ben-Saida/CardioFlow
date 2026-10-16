@@ -61,6 +61,48 @@ public class PharmacyController : ControllerBase
         }
     }
 
+    [HttpPut("products/{id:guid}")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
+    public async Task<IActionResult> UpdateProduct(Guid id, [FromBody] UpdateInventoryProductDto dto)
+    {
+        try
+        {
+            var product = await _inventory.UpdateProductAsync(id, dto);
+            return Ok(product);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("products/{id:guid}")]
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
+    public async Task<IActionResult> DeleteProduct(Guid id)
+    {
+        try
+        {
+            await _inventory.DeleteProductAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     /// <summary>POST /api/pharmacy/items/receive - register one new physical unit into stock.</summary>
     [HttpPost("items/receive")]
     [Authorize(Roles = "Admin,ResponsablePharmacie")]
@@ -224,19 +266,58 @@ public async Task<IActionResult> GetAllItems([FromQuery] string? status, [FromQu
 }
 
 [Authorize(Roles = "Admin,ResponsablePharmacie")]
-[HttpGet("items/reserved")]
-public async Task<IActionResult> GetAllReservedItems()
-{
-    var items = await _inventory.GetAllReservedItemsAsync();
-    return Ok(items);
-}
+    [HttpPut("items/{id:guid}")]
+    public async Task<IActionResult> UpdateItem(Guid id, [FromBody] UpdateInventoryItemDto dto)
+    {
+        try
+        {
+            var item = await _inventory.UpdateItemAsync(id, dto);
+            return Ok(item);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 
-public class ReserveItemRequest
-{
-    public Guid CathStudyId { get; set; }
-}
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
+    [HttpDelete("items/{id:guid}")]
+    public async Task<IActionResult> DeleteItem(Guid id)
+    {
+        try
+        {
+            await _inventory.DeleteItemAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
 
-public class MarkWastedRequest
-{
-    public string? Note { get; set; }
-}}
+    [Authorize(Roles = "Admin,ResponsablePharmacie")]
+    [HttpGet("items/reserved")]
+    public async Task<IActionResult> GetAllReservedItems()
+    {
+        var items = await _inventory.GetAllReservedItemsAsync();
+        return Ok(items);
+    }
+
+    public class ReserveItemRequest
+    {
+        public Guid CathStudyId { get; set; }
+    }
+
+    public class MarkWastedRequest
+    {
+        public string? Note { get; set; }
+    }
+}

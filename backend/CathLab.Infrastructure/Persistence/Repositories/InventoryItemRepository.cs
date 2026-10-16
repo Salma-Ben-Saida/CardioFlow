@@ -28,10 +28,11 @@ public class InventoryItemRepository : IInventoryItemRepository
 
     public async Task<List<InventoryItem>> GetExpiringAsync(int withinDays)
     {
-        var threshold = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(withinDays));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var threshold = today.AddDays(withinDays);
         return await _db.InventoryItems
             .Include(i => i.Product)
-            .Where(i => i.Status == ItemStatus.InStock && i.ExpiryDate <= threshold)
+            .Where(i => i.Status == ItemStatus.InStock && i.ExpiryDate > today && i.ExpiryDate <= threshold)
             .OrderBy(i => i.ExpiryDate)
             .ToListAsync();
     }
@@ -64,9 +65,10 @@ public class InventoryItemRepository : IInventoryItemRepository
 
 public async Task<List<InventoryItem>> GetAvailableAsync(DeviceType? deviceType)
 {
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
     var query = _db.InventoryItems
         .Include(i => i.Product)
-        .Where(i => i.Status == ItemStatus.InStock);
+        .Where(i => i.Status == ItemStatus.InStock && i.ExpiryDate > today);
 
     if (deviceType.HasValue)
         query = query.Where(i => i.Product.DeviceType == deviceType.Value);
@@ -81,4 +83,8 @@ public async Task<List<InventoryItem>> GetAllAsync()
         .AsNoTracking()
         .ToListAsync();
 }
-}
+    public async Task DeleteAsync(InventoryItem item)
+    {
+        _db.InventoryItems.Remove(item);
+        await _db.SaveChangesAsync();
+    }}
