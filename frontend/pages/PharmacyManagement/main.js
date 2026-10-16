@@ -2,7 +2,7 @@
  * Pharmacie — CathLab  (vanilla JS, no framework)
  * ============================================================ */
 
-import { get as apiGetClient, post as apiPostClient } from '../../assets/js/api/client.js';
+import { get as apiGetClient, post as apiPostClient, put as apiPutClient } from '../../assets/js/api/client.js';
 
 /* ---------- API config ---------- */
 const API_BASE = 'http://localhost:5152/api';
@@ -38,6 +38,10 @@ const state = {
   products: [],
   currentView: 'dashboard',
   wasteItemId: null,
+  selectedItemForEdit: null,
+  selectedItemForDelete: null,
+  selectedProductForEdit: null,
+  selectedProductForDelete: null,
 };
 
 /* ---------- DOM helpers ---------- */
@@ -106,6 +110,9 @@ async function apiGet(url) {
 }
 async function apiPost(url, body) {
   return apiPostClient(toApiEndpoint(url), body);
+}
+async function apiPut(url, body) {
+  return apiPutClient(toApiEndpoint(url), body);
 }
 
 /* ---------- Table helpers ---------- */
@@ -250,13 +257,18 @@ function renderExpiringPreview(data) {
 /* ---------- Products ---------- */
 async function loadProducts() {
   const table = $('#products-table');
-  setTableLoading(table, 7);
+  setTableLoading(table, 8);
   try {
     const data = await apiGet(API.products());
     const arr = normalizeArray(data);
+    let filtered = arr;
+    const typeFilter = $('#products-type-filter')?.value || '';
+    if (typeFilter) {
+      filtered = filtered.filter((p) => (p.deviceType || '').toString() === typeFilter);
+    }
     state.products = arr;
-    if (!arr.length) return setTableEmpty(table, 7, 'Aucun produit référencé.');
-    const rows = arr.map((p) => `<tr>
+    if (!filtered.length) return setTableEmpty(table, 8, 'Aucun produit référencé.');
+    const rows = filtered.map((p) => `<tr>
       <td>${escapeHtml(p.productName || p.name)}</td>
       <td>${escapeHtml(p.reference || '—')}</td>
       <td>${deviceTypePill(p.deviceType)}</td>
@@ -264,10 +276,23 @@ async function loadProducts() {
       <td>${p.currentStock ?? 0}</td>
       <td>${p.minimumStockLevel ?? 0}</td>
       <td>${escapeHtml(p.unitOfMeasure || '—')}</td>
+      <td>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;">
+          <button class="icon-btn" data-action="edit-product" data-product-id="${p.id}" title="Modifier" aria-label="Modifier le produit">✏️</button>
+          <button class="icon-btn" data-action="delete-product" data-product-id="${p.id}" title="Supprimer" aria-label="Supprimer le produit">🗑️</button>
+        </div>
+      </td>
     </tr>`).join('');
     table.querySelector('tbody').innerHTML = rows;
+
+    table.querySelectorAll('[data-action="edit-product"]').forEach((btn) => {
+      btn.addEventListener('click', () => openEditProductModal(btn.dataset.productId));
+    });
+    table.querySelectorAll('[data-action="delete-product"]').forEach((btn) => {
+      btn.addEventListener('click', () => openDeleteProductModal(btn.dataset.productId));
+    });
   } catch (e) {
-    setTableError(table, 7, e.message);
+    setTableError(table, 8, e.message);
     toast('Erreur lors du chargement des produits', 'error');
   }
 }
@@ -291,11 +316,22 @@ async function loadItems() {
       <td>${statusPill(it.status)}</td>
       <td>${escapeHtml(it.reservedForCathStudyId || '—')}</td>
       <td>
-        ${it.status === 'Reserved' ? `<button class="btn-link" data-release="${it.id}">Libérer</button>` : ''}
-        ${it.status === 'InStock' || it.status === 'Reserved' ? `<button class="icon-btn" title="Mettre au rebut" data-waste="${it.id}">${iconTrash()}</button>` : ''}
+        <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;">
+          <button class="icon-btn" data-action="edit-item" data-item-id="${it.id}" title="Modifier" aria-label="Modifier l'article">✏️</button>
+          <button class="icon-btn" data-action="delete-item" data-item-id="${it.id}" title="Supprimer" aria-label="Supprimer l'article">🗑️</button>
+          ${it.status === 'Reserved' ? `<button class="btn-link" data-release="${it.id}">Libérer</button>` : ''}
+          ${it.status === 'InStock' || it.status === 'Reserved' ? `<button class="icon-btn" title="Mettre au rebut" data-waste="${it.id}">${iconTrash()}</button>` : ''}
+        </div>
       </td>
     </tr>`).join('');
     table.querySelector('tbody').innerHTML = rows;
+
+    table.querySelectorAll('[data-action="edit-item"]').forEach((btn) => {
+      btn.addEventListener('click', () => openEditItemModal(btn.dataset.itemId));
+    });
+    table.querySelectorAll('[data-action="delete-item"]').forEach((btn) => {
+      btn.addEventListener('click', () => openDeleteItemModal(btn.dataset.itemId));
+    });
   } catch (e) {
     setTableError(table, 8, e.message);
     toast('Erreur lors du chargement des articles', 'error');
@@ -459,6 +495,105 @@ async function saveReceive() {
   }
 }
 
+async function openEditProductModal(productId) {
+  try {
+    const data = await apiGet(API.products());
+    const arr = normalizeArray(data);
+    const product = arr.find((p) => p.id === productId);
+    if (!product) {
+      toast('Produit introuvable.', 'error');
+      return;
+    }
+
+    state.selectedProductForEdit = product;
+    $('#ep-name').value = product.productName || '';
+    $('#ep-ref').value = product.reference || '';
+    $('#ep-type').value = product.deviceType || 'Stent';
+    $('#ep-manu').value = product.manufacturer || '';
+    $('#ep-unit').value = product.unitOfMeasure || '';
+    $('#ep-min').value = product.minimumStockLevel ?? 0;
+    openModal('modal-edit-product');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function saveEditedProduct() {
+  if (!state.selectedProductForEdit) return;
+
+  const payload = {
+    productName: $('#ep-name').value.trim(),
+    reference: $('#ep-ref').value.trim(),
+    deviceType: $('#ep-type').value,
+    manufacturer: $('#ep-manu').value.trim() || null,
+    unitOfMeasure: $('#ep-unit').value.trim() || null,
+    minimumStockLevel: Number($('#ep-min').value || 0),
+  };
+
+  if (!payload.productName || !payload.reference) {
+    toast('Nom et référence sont requis.', 'error');
+    return;
+  }
+
+  try {
+    await apiPut(`/api/pharmacy/products/${state.selectedProductForEdit.id}`, payload);
+    closeModal('modal-edit-product');
+    state.selectedProductForEdit = null;
+    toast('Produit modifié avec succès');
+    loadProducts();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function openDeleteProductModal(productId) {
+  try {
+    const data = await apiGet(API.products());
+    const arr = normalizeArray(data);
+    const product = arr.find((p) => p.id === productId);
+    if (!product) {
+      toast('Produit introuvable.', 'error');
+      return;
+    }
+
+    state.selectedProductForDelete = product;
+    $('#delete-product-message').textContent = `Voulez-vous vraiment supprimer ${product.productName || 'ce produit'} (${product.reference || 'sans référence'}) ?`;
+    openModal('modal-delete-product');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function confirmDeleteProduct() {
+  if (!state.selectedProductForDelete) return;
+
+  try {
+    const response = await fetch(`http://localhost:5152/api/pharmacy/products/${state.selectedProductForDelete.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      let message = 'Erreur lors de la suppression.';
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    closeModal('modal-delete-product');
+    state.selectedProductForDelete = null;
+    toast('Produit supprimé avec succès');
+    loadProducts();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
 function openWasteModal(itemId) {
   state.wasteItemId = itemId;
   $('#waste-item-label').textContent = `Article #${itemId}`;
@@ -471,6 +606,103 @@ async function saveWaste() {
     await apiPost(API.waste(state.wasteItemId), { note });
     closeModal('modal-waste');
     toast('Article mis au rebut');
+    loadItems();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function openEditItemModal(itemId) {
+  try {
+    const items = await apiGet(API.itemsAll('', currentDeviceFilter));
+    const arr = normalizeArray(items);
+    const item = arr.find((i) => i.id === itemId);
+    if (!item) {
+      toast('Article introuvable.', 'error');
+      return;
+    }
+
+    state.selectedItemForEdit = item;
+    $('#ei-barcode').value = item.barcode || '';
+    $('#ei-lot').value = item.lotNumber || '';
+    $('#ei-expiry').value = item.expiryDate || '';
+    $('#ei-serial').value = item.serialNumber || '';
+    $('#ei-status').value = item.status || 'InStock';
+    openModal('modal-edit-item');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function saveEditedItem() {
+  if (!state.selectedItemForEdit) return;
+
+  const payload = {
+    barcode: $('#ei-barcode').value.trim(),
+    lotNumber: $('#ei-lot').value.trim() || null,
+    expiryDate: $('#ei-expiry').value || null,
+    serialNumber: $('#ei-serial').value.trim() || null,
+    status: $('#ei-status').value,
+  };
+
+  if (!payload.barcode || !payload.expiryDate) {
+    toast('Code-barres et date de péremption sont requis.', 'error');
+    return;
+  }
+
+  try {
+    await apiPut(`/api/pharmacy/items/${state.selectedItemForEdit.id}`, payload);
+    closeModal('modal-edit-item');
+    state.selectedItemForEdit = null;
+    toast('Article modifié avec succès');
+    loadItems();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function openDeleteItemModal(itemId) {
+  try {
+    const items = await apiGet(API.itemsAll('', currentDeviceFilter));
+    const arr = normalizeArray(items);
+    const item = arr.find((i) => i.id === itemId);
+    if (!item) {
+      toast('Article introuvable.', 'error');
+      return;
+    }
+
+    state.selectedItemForDelete = item;
+    $('#delete-item-message').textContent = `Voulez-vous vraiment supprimer ${item.productName || 'cet article'} (${item.barcode || 'sans code-barres'}) ?`;
+    openModal('modal-delete-item');
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+}
+
+async function confirmDeleteItem() {
+  if (!state.selectedItemForDelete) return;
+
+  try {
+    const response = await fetch(`http://localhost:5152/api/pharmacy/items/${state.selectedItemForDelete.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      let message = 'Erreur lors de la suppression.';
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    closeModal('modal-delete-item');
+    state.selectedItemForDelete = null;
+    toast('Article supprimé avec succès');
     loadItems();
   } catch (e) {
     toast(`Erreur : ${e.message}`, 'error');
@@ -539,6 +771,9 @@ function init() {
   // products
   $('#btn-new-product').addEventListener('click', openProductModal);
   $('#btn-save-product').addEventListener('click', saveProduct);
+  $('#products-type-filter').addEventListener('change', () => loadProducts());
+  $('#btn-save-edit-product').addEventListener('click', saveEditedProduct);
+  $('#btn-confirm-delete-product').addEventListener('click', confirmDeleteProduct);
 
   // items
   $('#btn-receive').addEventListener('click', openReceiveModal);
@@ -560,6 +795,8 @@ function init() {
     if (releaseBtn) releaseItem(releaseBtn.dataset.release);
   });
   $('#btn-save-waste').addEventListener('click', saveWaste);
+  $('#btn-save-edit-item').addEventListener('click', saveEditedItem);
+  $('#btn-confirm-delete-item').addEventListener('click', confirmDeleteItem);
 
   // expiring window
   $('#expiring-window').addEventListener('change', (e) => {

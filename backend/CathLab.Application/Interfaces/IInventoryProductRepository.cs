@@ -10,4 +10,5 @@ public interface IInventoryProductRepository
     Task<List<InventoryProduct>> GetLowStockAsync();
     Task<InventoryProduct> CreateAsync(InventoryProduct product);
     Task UpdateAsync(InventoryProduct product);
+    Task DeleteAsync(InventoryProduct product);
 }
