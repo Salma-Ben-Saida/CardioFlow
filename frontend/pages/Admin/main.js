@@ -3,7 +3,12 @@
  * ============================================================ */
 
 import { get as apiGet, post as apiPost, put as apiPut } from '../../assets/js/api/client.js';
-
+import { ingestPacsStudy } from '../../assets/js/api/pacs.js';
+import {
+  getPacsOverview, ingestAllPacs, getArchive,
+  archiveStudy, restoreStudy, purgeStudy,
+  archivePatient, restorePatient, purgePatient,
+} from '../../assets/js/api/admin.js';
 /* ---------- API config ---------- */
 const API = {
   movements: (page = 1, pageSize = 50) => `/api/admin/movements?page=${page}&pageSize=${pageSize}`,
@@ -35,8 +40,13 @@ function guardAccess() {
 }
 
 /* ---------- State ---------- */
-const state = { currentView: 'dashboard', selectedUserForEdit: null, selectedUserForDelete: null };
-
+const state = {
+  currentView: 'dashboard',
+  selectedUserForEdit: null,
+  selectedUserForDelete: null,
+  pendingArchive: null,
+  pendingPurge: null,
+};
 /* ---------- DOM helpers ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -92,6 +102,8 @@ const VIEW_META = {
   reports: { title: 'Rapports', sub: 'Comptes-rendus de procédure' },
   audits: { title: 'Audits', sub: "Piste d'audit des actions" },
   logs: { title: 'Logs utilisateur', sub: 'Journal des connexions et actions' },
+    pacs: { title: 'Études PACS', sub: 'Orthanc → CathLab : ingestion manuelle et état de synchronisation' },
+  archive: { title: 'Archives', sub: 'Patients et études archivés : restauration ou suppression définitive' },
 };
 
 function switchView(view) {
@@ -109,9 +121,14 @@ function switchView(view) {
     reports: loadReports,
     audits: loadAudits,
     logs: loadLogs,
+    pacs: loadPacs,
+    archive: loadArchive,
   }[view]?.());
 }
-
+// Number of rows previewed on the dashboard (tuned so that reports + PACS ≈ movements in height)
+const DASH_MOVEMENTS = 7;
+const DASH_REPORTS = 2;
+const DASH_PACS = 2;
 /* ---------- Dashboard ---------- */
 async function loadDashboard() {
   const tables = {
@@ -119,11 +136,13 @@ async function loadDashboard() {
     reports: $('#dash-reports-table'),
     audits: $('#dash-audits-table'),
     logs: $('#dash-logs-table'),
+    pacs: $('#dash-pacs-table'),
   };
   setTableLoading(tables.movements, 5);
   setTableLoading(tables.reports, 4);
   setTableLoading(tables.audits, 4);
   setTableLoading(tables.logs, 4);
+  setTableLoading(tables.pacs, 3);
   $('#module-pharmacy-stat').textContent = 'Chargement…';
   $('#module-patients-stat').textContent = 'Chargement…';
 
@@ -217,13 +236,29 @@ async function loadDashboard() {
   } catch {
     $('#module-patients-stat').textContent = 'Ouvrir le module';
   }
+    // PACS studies preview (new studies come first)
+  try {
+    const arr = normalizeArray(await getPacsOverview());
+    const preview = arr.slice(0, DASH_PACS);
+    if (!preview.length) setTableEmpty(tables.pacs, 3, 'Aucune étude dans Orthanc.');
+    else tables.pacs.querySelector('tbody').innerHTML = preview.map(dashPacsRow).join('');
+  } catch (e) {
+    setTableError(tables.pacs, 3, e.message);
+  }
 }
-
+function dashPacsRow(s) {
+  const st = PACS_STATE[s.state] || { label: s.state, pill: 'pill-grey' };
+  return `<tr>
+    <td>${escapeHtml(s.accessionNumber)}</td>
+    <td>${escapeHtml(s.patientName || '—')}</td>
+    <td><span class="pill ${st.pill}">${st.label}</span></td>
+  </tr>`;
+}
 function movementRow(m) {
   return `<tr>
     <td>${fmtDateTime(m.movedAt)}</td>
     <td>${escapeHtml(m.productName || '—')}</td>
-    <td>${escapeHtml(m.movementType)}</td>
+    <td>${movementTypeCell(m.movementType)}</td>
     <td>${m.quantity ?? '—'}</td>
     <td>${escapeHtml(m.actorName || m.createdBy || '—')}</td>
   </tr>`;
@@ -242,8 +277,8 @@ function auditRow(a) {
   return `<tr>
     <td>${fmtDateTime(a.occurredAt)}</td>
     <td>${escapeHtml(a.actorName || a.username || '—')}</td>
-    <td>${escapeHtml(a.action)}</td>
-    <td>${escapeHtml(a.entityType)}</td>
+    <td>${actionCell(a.action)}</td>
+    <td>${entityCell(a.entityType)}</td>
   </tr>`;
 }
 
@@ -251,12 +286,27 @@ function logRow(l) {
   return `<tr>
     <td>${fmtDateTime(l.occurredAt)}</td>
     <td>${escapeHtml(l.username)}</td>
-    <td>${escapeHtml(l.action)}</td>
+    <td>${actionCell(l.action)}</td>
     <td>${escapeHtml(l.userAgent || '—')}</td>
   </tr>`;
 }
 
 /* ---------- Stock movements ---------- */
+const STOCK_MOVEMENT_TYPES = {
+  Reception:   { label: 'Réception',    pill: 'pill-purple' },
+  Consumption: { label: 'Consommation', pill: 'pill-orange' },
+  Return:      { label: 'Retour',       pill: 'pill-blue'   },
+  Waste:       { label: 'Rebut',        pill: 'pill-red'    },
+};
+
+function movementTypeCell(type) {
+  const key = typeof type === 'string' ? type.trim() : '';
+  const m = STOCK_MOVEMENT_TYPES[key] || STOCK_MOVEMENT_TYPES[key.charAt(0).toUpperCase() + key.slice(1)];
+  return m
+    ? `<span class="pill ${m.pill}">${m.label}</span>`
+    : `<span class="pill pill-grey">${escapeHtml(type || '—')}</span>`;
+}
+
 async function loadMovements() {
   const table = $('#movements-table');
   setTableLoading(table, 6);
@@ -267,7 +317,7 @@ async function loadMovements() {
     table.querySelector('tbody').innerHTML = arr.map((m) => `<tr>
       <td>${fmtDateTime(m.movedAt)}</td>
       <td>${escapeHtml(m.productName || '—')}</td>
-      <td>${escapeHtml(m.movementType)}</td>
+      <td>${movementTypeCell(m.movementType)}</td>
       <td>${m.quantity ?? '—'}</td>
       <td>${escapeHtml(m.actorName || m.createdBy || '—')}</td>
     </tr>`).join('');
@@ -468,8 +518,8 @@ async function loadAudits() {
     table.querySelector('tbody').innerHTML = arr.map((a) => `<tr>
       <td>${fmtDateTime(a.occurredAt)}</td>
       <td>${escapeHtml(a.actorName)}</td>
-      <td>${escapeHtml(a.action)}</td>
-      <td>${escapeHtml(a.entityType)}</td>
+      <td>${actionCell(a.action)}</td>
+      <td>${entityCell(a.entityType)}</td>
       <td>${escapeHtml(a.detail || '—')}</td>
     </tr>`).join('');
   } catch (e) {
@@ -489,7 +539,7 @@ async function loadLogs() {
     table.querySelector('tbody').innerHTML = arr.map((l) => `<tr>
       <td>${fmtDateTime(l.occurredAt)}</td>
       <td>${escapeHtml(l.username)}</td>
-      <td>${escapeHtml(l.action)}</td>
+      <td>${actionCell(l.action)}</td>
       <td>${escapeHtml(l.ipAddress || '—')}</td>
       <td>${escapeHtml(l.userAgent || '—')}</td>
     </tr>`).join('');
@@ -498,7 +548,331 @@ async function loadLogs() {
     toast('Erreur lors du chargement des logs', 'error');
   }
 }
+/* ---------- Audit action labels ---------- */
+/* ---------- Audit action labels ---------- */
+const AUDIT_ACTIONS = {
+  // Données
+  Create:       { label: 'Création',               pill: 'pill-green'  },
+  Update:       { label: 'Modification',           pill: 'pill-blue'   },
+  Delete:       { label: 'Suppression',            pill: 'pill-red'    },
+  Confirm:      { label: 'Confirmation',           pill: 'pill-green'  },
+  // Archivage
+  Archive:      { label: 'Archivage',              pill: 'pill-amber'  },
+  Restore:      { label: 'Restauration',           pill: 'pill-green'  },
+  Purge:        { label: 'Suppression définitive', pill: 'pill-red'    },
+  // Pharmacie / stock
+  Receive:      { label: 'Réception',              pill: 'pill-purple' },
+  ReceiveBatch: { label: 'Réception (lot)',        pill: 'pill-purple' },
+  Consume:      { label: 'Consommation',           pill: 'pill-purple' },
+  Waste:        { label: 'Rebut',                  pill: 'pill-red'    },
+  // Connexions (vue « Logs utilisateur »)
+  LoginSuccess: { label: 'Connexion réussie',      pill: 'pill-green'  },
+  LoginFailed:  { label: 'Échec de connexion',     pill: 'pill-red'    },
+  Logout:       { label: 'Déconnexion',            pill: 'pill-grey'   },
+};
 
+// Unknown actions still get a (grey) pill, showing the raw value
+function actionCell(action) {
+  const m = AUDIT_ACTIONS[action];
+  return m
+    ? `<span class="pill ${m.pill}">${m.label}</span>`
+    : `<span class="pill pill-grey">${escapeHtml(action || '—')}</span>`;
+}
+
+const ENTITY_LABELS = {
+  Patient:          'Patient',
+  CathStudy:        'Étude',
+  ProcedureReport:  'Rapport de procédure',
+  InventoryProduct: 'Produit (pharmacie)',
+  InventoryItem:    'Dispositif (pharmacie)',
+  AppUser:          'Utilisateur',
+};
+function entityCell(type) {
+  return escapeHtml(ENTITY_LABELS[type] || type || '—');
+}
+
+/* ---------- Shared helpers (PACS + archive) ---------- */
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = typeof d === 'string' && d.length === 10 ? new Date(`${d}T00:00:00`) : new Date(d);
+  return isNaN(dt) ? '—' : dt.toLocaleDateString('fr-FR');
+}
+
+// Disables the button while the action runs; re-enables it only if the action failed
+// (on success the table is reloaded, which replaces the button).
+async function withBusy(btn, fn) {
+  btn.disabled = true;
+  try {
+    await fn();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+    btn.disabled = false;
+  }
+}
+
+/* ---------- PACS studies (Orthanc → CathLab) ---------- */
+const PACS_STATE = {
+  New: { label: 'Nouvelle', pill: 'pill-blue' },
+  Ingested: { label: 'Ingérée', pill: 'pill-green' },
+  Archived: { label: 'Archivée', pill: 'pill-amber' },
+  PatientArchived: { label: 'Patient archivé', pill: 'pill-grey' },
+};
+
+function pacsActions(s) {
+  const acc = escapeHtml(s.accessionNumber);
+  switch (s.state) {
+    case 'New':
+      return `<button class="btn btn-primary btn-sm" data-pacs-action="ingest" data-accession="${acc}">Ingérer</button>`;
+    case 'Ingested':
+      return `<a class="btn btn-ghost btn-sm" href="/frontend/pages/patients/detail.html?id=${encodeURIComponent(s.patientId)}">Voir le patient</a>
+        <button class="btn btn-danger btn-sm" data-pacs-action="archive-study" data-id="${s.cathStudyId}" data-accession="${acc}">Archiver</button>`;
+    case 'Archived':
+      return `<button class="btn btn-ghost btn-sm" data-pacs-action="restore-study" data-id="${s.cathStudyId}">Restaurer l'étude</button>`;
+    case 'PatientArchived':
+      return `<button class="btn btn-ghost btn-sm" data-pacs-action="restore-patient" data-id="${s.patientId}">Restaurer le patient</button>`;
+    default:
+      return '';
+  }
+}
+
+function pacsRow(s) {
+  const st = PACS_STATE[s.state] || { label: s.state, pill: 'pill-grey' };
+  return `<tr>
+    <td>${escapeHtml(s.accessionNumber)}</td>
+    <td>${escapeHtml(s.patientName || '—')}<span class="cell-sub">${escapeHtml(s.patientDicomId || '')}</span></td>
+    <td>${fmtDate(s.studyDate)}</td>
+    <td>${escapeHtml(s.modality || '—')}</td>
+    <td><span class="pill ${st.pill}">${st.label}</span></td>
+    <td><div class="row-actions">${pacsActions(s)}</div></td>
+  </tr>`;
+}
+
+function renderPacsSummary(arr) {
+  const count = (key) => arr.filter((s) => s.state === key).length;
+  const nNew = count('New');
+  $('#pacs-summary').innerHTML = Object.entries(PACS_STATE)
+    .map(([key, m]) => `<span class="pill ${m.pill}">${m.label} : ${count(key)}</span>`)
+    .join('');
+  const btn = $('#btn-pacs-ingest-all');
+  btn.disabled = nNew === 0;
+  btn.textContent = nNew ? `Ingérer ${nNew === 1 ? 'la nouvelle étude' : `les ${nNew} nouvelles`}` : 'Aucune nouvelle étude';
+}
+
+async function loadPacs() {
+  const table = $('#pacs-table');
+  setTableLoading(table, 6);
+  try {
+    const arr = normalizeArray(await getPacsOverview());
+    renderPacsSummary(arr);
+    if (!arr.length) return setTableEmpty(table, 6, 'Aucune étude dans Orthanc.');
+    table.querySelector('tbody').innerHTML = arr.map(pacsRow).join('');
+  } catch (e) {
+    setTableError(table, 6, e.message);
+    toast('Erreur lors du chargement des études PACS', 'error');
+  }
+}
+
+async function ingestAllNew() {
+  const btn = $('#btn-pacs-ingest-all');
+  btn.disabled = true;
+  btn.textContent = 'Ingestion en cours…';
+  try {
+    const results = normalizeArray(await ingestAllPacs());
+    const created = results.filter((r) => r.succeeded && !r.wasAlreadyIngested && !r.wasArchived).length;
+    const skipped = results.filter((r) => r.wasArchived).length;
+    const failed = results.filter((r) => !r.succeeded).length;
+    toast(
+      `${created} étude(s) ingérée(s)` +
+        (skipped ? `, ${skipped} archivée(s) ignorée(s)` : '') +
+        (failed ? `, ${failed} échec(s)` : ''),
+      failed ? 'error' : 'success'
+    );
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  }
+  await loadPacs(); // recomputes the button label and state
+}
+
+async function onPacsAction(e) {
+  const btn = e.target.closest('[data-pacs-action]');
+  if (!btn || btn.disabled) return;
+  const { pacsAction, id, accession } = btn.dataset;
+
+  switch (pacsAction) {
+    case 'ingest':
+      return withBusy(btn, async () => {
+        const r = await ingestPacsStudy(accession, null); // null = no manual override of patient data
+        if (r.wasArchived) toast(r.info || 'Étude archivée : non ingérée', 'error');
+        else if (r.wasAlreadyIngested) toast('Étude déjà ingérée');
+        else toast(r.patientIsIncomplete ? 'Étude ingérée — dossier patient incomplet' : 'Étude ingérée');
+        await loadPacs();
+      });
+    case 'archive-study':
+      return openArchiveModal({ kind: 'study', id, label: `l'étude ${accession}` });
+    case 'restore-study':
+      return withBusy(btn, async () => {
+        await restoreStudy(id);
+        toast('Étude restaurée');
+        await loadPacs();
+      });
+    case 'restore-patient':
+      return withBusy(btn, async () => {
+        await restorePatient(id);
+        toast('Patient restauré');
+        await loadPacs();
+      });
+  }
+}
+
+/* ---------- Archive modal ---------- */
+function openArchiveModal(target) {
+  state.pendingArchive = target;
+  $('#archive-title').textContent = target.kind === 'patient' ? 'Archiver le patient' : "Archiver l'étude";
+  $('#archive-message').textContent =
+    `Vous allez archiver ${target.label}. ` +
+    (target.kind === 'patient' ? 'Toutes ses études seront archivées avec lui. ' : '') +
+    'Les données ne seront plus visibles et ne seront pas ré-ingérées automatiquement. ' +
+    'Elles pourront être restaurées depuis « Archives ».';
+  $('#archive-reason').value = '';
+  openModal('modal-archive');
+  $('#archive-reason').focus();
+}
+
+async function confirmArchive() {
+  const t = state.pendingArchive;
+  if (!t) return;
+  const reason = $('#archive-reason').value.trim();
+  if (reason.length < 3) {
+    toast("Un motif d'au moins 3 caractères est obligatoire.", 'error');
+    return;
+  }
+  const btn = $('#btn-confirm-archive');
+  btn.disabled = true;
+  try {
+    await (t.kind === 'patient' ? archivePatient(t.id, reason) : archiveStudy(t.id, reason));
+    closeModal('modal-archive');
+    state.pendingArchive = null;
+    toast(t.kind === 'patient' ? 'Patient archivé' : 'Étude archivée');
+    if (state.currentView === 'pacs') loadPacs();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- Archive view ---------- */
+function archivedPatientRow(p) {
+  return `<tr>
+    <td>${escapeHtml(p.fullName)}<span class="cell-sub">${escapeHtml(p.conquestPatientID || '')}</span></td>
+    <td>${p.studyCount ?? 0}</td>
+    <td>${fmtDateTime(p.deletedAt)}</td>
+    <td>${escapeHtml(p.deletedByName || '—')}</td>
+    <td>${escapeHtml(p.deleteReason || '—')}</td>
+    <td><div class="row-actions">
+      <button class="btn btn-ghost btn-sm" data-archive-action="restore-patient" data-id="${p.id}">Restaurer</button>
+      <button class="btn btn-danger btn-sm" data-archive-action="purge-patient" data-id="${p.id}" data-label="le patient ${escapeHtml(p.fullName)}">Supprimer définitivement</button>
+    </div></td>
+  </tr>`;
+}
+
+function archivedStudyRow(s) {
+  const restore = s.patientArchived
+    ? `<button class="btn btn-ghost btn-sm" disabled title="Restaurez d'abord le patient">Restaurer</button>`
+    : `<button class="btn btn-ghost btn-sm" data-archive-action="restore-study" data-id="${s.id}">Restaurer</button>`;
+  return `<tr>
+    <td>${escapeHtml(s.accessionNumber)}${s.deletedWithPatient ? '<span class="cell-sub">Archivée avec le patient</span>' : ''}</td>
+    <td>${escapeHtml(s.patientName || '—')}${s.patientArchived ? '<span class="cell-sub">Patient archivé</span>' : ''}</td>
+    <td>${fmtDate(s.studyDate)}</td>
+    <td>${fmtDateTime(s.deletedAt)}</td>
+    <td>${escapeHtml(s.deletedByName || '—')}</td>
+    <td>${escapeHtml(s.deleteReason || '—')}</td>
+    <td><div class="row-actions">
+      ${restore}
+      <button class="btn btn-danger btn-sm" data-archive-action="purge-study" data-id="${s.id}" data-label="l'étude ${escapeHtml(s.accessionNumber)}">Supprimer définitivement</button>
+    </div></td>
+  </tr>`;
+}
+
+async function loadArchive() {
+  const pTable = $('#archive-patients-table');
+  const sTable = $('#archive-studies-table');
+  setTableLoading(pTable, 6);
+  setTableLoading(sTable, 7);
+  try {
+    const data = await getArchive();
+    const patients = data?.patients ?? [];
+    const studies = data?.studies ?? [];
+    if (patients.length) pTable.querySelector('tbody').innerHTML = patients.map(archivedPatientRow).join('');
+    else setTableEmpty(pTable, 6, 'Aucun patient archivé.');
+    if (studies.length) sTable.querySelector('tbody').innerHTML = studies.map(archivedStudyRow).join('');
+    else setTableEmpty(sTable, 7, 'Aucune étude archivée.');
+  } catch (e) {
+    setTableError(pTable, 6, e.message);
+    setTableError(sTable, 7, e.message);
+    toast('Erreur lors du chargement des archives', 'error');
+  }
+}
+
+async function onArchiveAction(e) {
+  const btn = e.target.closest('[data-archive-action]');
+  if (!btn || btn.disabled) return;
+  const { archiveAction, id, label } = btn.dataset;
+
+  switch (archiveAction) {
+    case 'restore-study':
+      return withBusy(btn, async () => {
+        await restoreStudy(id);
+        toast('Étude restaurée');
+        await loadArchive();
+      });
+    case 'restore-patient':
+      return withBusy(btn, async () => {
+        await restorePatient(id);
+        toast('Patient restauré');
+        await loadArchive();
+      });
+    case 'purge-study':
+      return openPurgeModal({ kind: 'study', id, label: label || 'cette étude' });
+    case 'purge-patient':
+      return openPurgeModal({ kind: 'patient', id, label: label || 'ce patient' });
+  }
+}
+
+/* ---------- Purge modal (type-to-confirm) ---------- */
+const PURGE_WORD = 'SUPPRIMER';
+
+function openPurgeModal(target) {
+  state.pendingPurge = target;
+  $('#purge-message').textContent =
+    `Vous allez supprimer définitivement ${target.label}` +
+    (target.kind === 'patient'
+      ? ', ainsi que toutes ses études, rapports et traitements. '
+      : ', ainsi que son rapport et ses traitements. ') +
+    'Les dispositifs réservés seront remis en stock. Action irréversible : ' +
+    'si les études existent encore dans Orthanc, elles pourront être ré-ingérées, mais sans aucune information saisie.';
+  $('#purge-confirm').value = '';
+  $('#btn-confirm-purge').disabled = true;
+  openModal('modal-purge');
+  $('#purge-confirm').focus();
+}
+
+async function confirmPurge() {
+  const t = state.pendingPurge;
+  if (!t || $('#purge-confirm').value.trim() !== PURGE_WORD) return;
+  const btn = $('#btn-confirm-purge');
+  btn.disabled = true;
+  try {
+    await (t.kind === 'patient' ? purgePatient(t.id) : purgeStudy(t.id));
+    closeModal('modal-purge');
+    state.pendingPurge = null;
+    toast('Supprimé définitivement');
+    loadArchive();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+    btn.disabled = false;
+  }
+}
 /* ---------- Modals ---------- */
 function openModal(id) { $(`#${id}`).classList.remove('hidden'); }
 function closeModal(id) { $(`#${id}`).classList.add('hidden'); }
@@ -553,6 +927,18 @@ function init() {
   $('#btn-save-user').addEventListener('click', saveUser);
   $('#btn-save-edit-user').addEventListener('click', saveEditedUser);
   $('#btn-confirm-delete-user').addEventListener('click', confirmDeleteUser);
+
+  // PACS studies + archive  
+  $('#btn-pacs-refresh').addEventListener('click', loadPacs);
+  $('#btn-pacs-ingest-all').addEventListener('click', ingestAllNew);
+  $('#pacs-table').addEventListener('click', onPacsAction);
+  $('#archive-patients-table').addEventListener('click', onArchiveAction);
+  $('#archive-studies-table').addEventListener('click', onArchiveAction);
+  $('#btn-confirm-archive').addEventListener('click', confirmArchive);
+  $('#btn-confirm-purge').addEventListener('click', confirmPurge);
+  $('#purge-confirm').addEventListener('input', (e) => {
+    $('#btn-confirm-purge').disabled = e.target.value.trim() !== PURGE_WORD;
+  });
 
   // modal close
   $$('[data-close-modal]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.closeModal)));

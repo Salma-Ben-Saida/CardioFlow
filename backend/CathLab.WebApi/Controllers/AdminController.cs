@@ -14,12 +14,14 @@ public class AdminController : ControllerBase
     private readonly InventoryService _inventory;
     private readonly AuditService _audit;
     private readonly PatientLifecycleService _lifecycle;
+    private readonly PacsOverviewService _pacsOverview;
 
-    public AdminController(InventoryService inventory, AuditService audit, PatientLifecycleService lifecycle)
+    public AdminController(InventoryService inventory, AuditService audit, PatientLifecycleService lifecycle, PacsOverviewService pacsOverview)
     {
         _inventory = inventory;
         _audit = audit;
         _lifecycle = lifecycle;
+        _pacsOverview = pacsOverview;
     }
 
     /// <summary>GET /api/admin/movements?page=1&pageSize=50</summary>
@@ -50,6 +52,10 @@ public class AdminController : ControllerBase
     /// <summary>GET /api/admin/archive: archived patients and studies</summary>
     [HttpGet("archive")]
     public async Task<IActionResult> GetArchive() => Ok(await _lifecycle.GetArchiveAsync());
+    
+    /// <summary>GET /api/admin/pacs/studies: Orthanc studies with their state in CathLab</summary>
+    [HttpGet("pacs/studies")]
+    public async Task<IActionResult> GetPacsStudies() => Ok(await _pacsOverview.GetAsync());
 
     [HttpPost("studies/{id:guid}/archive")]
     public Task<IActionResult> ArchiveStudy(Guid id, [FromBody] ArchiveRequestDto dto) =>

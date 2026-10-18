@@ -32,6 +32,16 @@ public class ArchiveRepository : IArchiveRepository
             .OrderByDescending(s => s.DeletedAt)
             .ToListAsync();
 
+        public async Task<List<CathStudy>> GetStudiesByAccessionAsync(IEnumerable<string> accessionNumbers)
+    {
+        var list = accessionNumbers.ToList();
+        return await _ctx.CathStudies
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s => list.Contains(s.AccessionNumber))
+            .ToListAsync();
+    }
+
     public async Task<List<Patient>> GetArchivedPatientsAsync() =>
         await _ctx.Patients
             .IgnoreQueryFilters()

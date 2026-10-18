@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="../../assets/css/main.css">
     <link rel="stylesheet" href="../../assets/css/components.css">
     <link rel="stylesheet" href="../../assets/css/layout.css">
+        <style>
+        .archive-modal-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.5); display: none; align-items: center; justify-content: center; z-index: 10000; }
+        .archive-modal-overlay.open { display: flex; }
+        .archive-modal { background: var(--color-white); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); width: 440px; max-width: calc(100vw - 32px); padding: var(--spacing-6); }
+        .archive-modal h3 { margin: 0 0 var(--spacing-3); font-size: var(--font-size-lg); }
+        .archive-modal p { margin: 0 0 var(--spacing-4); font-size: var(--font-size-sm); color: var(--color-gray-600); }
+        .archive-modal-actions { display: flex; justify-content: flex-end; gap: var(--spacing-3); margin-top: var(--spacing-4); }
+    </style>
 </head>
 <body>
     <div class="app-layout">
@@ -36,12 +44,13 @@
                     </div>
                     <div class="card-body">
                         <div class="tab-panel active" id="overviewPanel">
-                            <div style="display:flex;justify-content:flex-end;margin-bottom:var(--spacing-4);">
-                                <button class="btn btn-secondary btn-sm" id="editPatientBtn" style="display:none;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    Modifier les informations
-                                </button>
-                            </div>
+                            <div style="display:flex;justify-content:flex-end;gap:var(--spacing-2);margin-bottom:var(--spacing-4);">
+    <button class="btn btn-secondary btn-sm" id="editPatientBtn" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Modifier les informations
+    </button>
+    <button class="btn btn-danger btn-sm" id="archivePatientBtn" style="display:none;">Archiver le patient</button>
+</div>
                             <div class="info-grid" id="overviewView">
                                 <div class="info-item"><span class="info-item-label">Nom complet</span><span class="info-item-value" id="viewFullName">-</span></div>
                                 <div class="info-item"><span class="info-item-label">Identifiant patient (Conquest)</span><span class="info-item-value" id="viewConquestId">-</span></div>
@@ -106,16 +115,30 @@
             </div>
         </main>
     </div>
+        <div class="archive-modal-overlay" id="archiveModal">
+        <div class="archive-modal">
+            <h3 id="archiveModalTitle">Archiver</h3>
+            <p id="archiveModalMessage"></p>
+            <label class="form-label required" for="archiveReason">Motif</label>
+            <textarea class="form-control" id="archiveReason" rows="3" maxlength="500" placeholder="Ex. : doublon, importé par erreur…"></textarea>
+            <div class="archive-modal-actions">
+                <button type="button" class="btn btn-secondary" id="archiveCancelBtn">Annuler</button>
+                <button type="button" class="btn btn-danger" id="archiveConfirmBtn">Archiver</button>
+            </div>
+        </div>
+    </div>
     <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div style="text-align:center;"><div class="spinner spinner-lg"></div><p class="loading-text">Chargement des détails du patient...</p></div></div>
     <script type="module">
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
         import { showToast } from '../../assets/js/components/toast.js';
         import { getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient } from '../../assets/js/api/patients.js';
+        import { archivePatient, archiveStudy } from '../../assets/js/api/admin.js';
         import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState } from '../../assets/js/utils.js';
 
         const EDIT_ROLES = ['Secretaire', 'Admin', 'Medecin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
         const canEditPatient = EDIT_ROLES.includes(currentUser?.role);
+        const canArchive = currentUser?.role === 'Admin';   // only admins may archive
         let currentPatient = null;
 
         if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
@@ -136,6 +159,8 @@
                 renderOverview(patient);
                 const editBtn = document.getElementById('editPatientBtn');
                 if (editBtn) editBtn.style.display = canEditPatient ? 'inline-flex' : 'none';
+                const archiveBtn = document.getElementById('archivePatientBtn');
+                if (archiveBtn) archiveBtn.style.display = canArchive ? 'inline-flex' : 'none';
                 loadStudies();
                 loadRiskProfile();
             } catch (error) {
@@ -215,6 +240,9 @@
        </svg>
        Mapping
     </a>
+        ${canArchive
+        ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber)}" title="Archiver cette étude">Archiver</button>`
+        : ''}
     </div>
 </td>
             </tr>
@@ -310,7 +338,69 @@
                 saveBtn.textContent = 'Enregistrer les modifications';
             }
         });
+        // ---- Archive (Admin only) ----
+        let archiveTarget = null;
+        const archiveModal = document.getElementById('archiveModal');
 
+        function openArchiveModal(target) {
+            archiveTarget = target;
+            document.getElementById('archiveModalTitle').textContent =
+                target.kind === 'patient' ? 'Archiver le patient' : "Archiver l'étude";
+            document.getElementById('archiveModalMessage').textContent =
+                `Vous allez archiver ${target.label}. ` +
+                (target.kind === 'patient' ? 'Toutes ses études seront archivées avec lui. ' : '') +
+                'Les données ne seront plus visibles, mais pourront être restaurées par un administrateur (menu « Archives »).';
+            document.getElementById('archiveReason').value = '';
+            archiveModal.classList.add('open');
+            document.getElementById('archiveReason').focus();
+        }
+
+        function closeArchiveModal() {
+            archiveModal.classList.remove('open');
+            archiveTarget = null;
+        }
+
+        document.getElementById('archivePatientBtn')?.addEventListener('click', () => {
+            if (!currentPatient) return;
+            openArchiveModal({ kind: 'patient', id: patientId, label: `le patient ${currentPatient.fullName}` });
+        });
+
+        document.getElementById('studiesTableBody')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-archive-study]');
+            if (!btn) return;
+            openArchiveModal({ kind: 'study', id: btn.dataset.archiveStudy, label: `l'étude ${btn.dataset.accession}` });
+        });
+
+        document.getElementById('archiveCancelBtn')?.addEventListener('click', closeArchiveModal);
+        archiveModal?.addEventListener('click', (e) => { if (e.target === archiveModal) closeArchiveModal(); });
+
+        document.getElementById('archiveConfirmBtn')?.addEventListener('click', async () => {
+            if (!archiveTarget) return;
+            const reason = document.getElementById('archiveReason').value.trim();
+            if (reason.length < 3) {
+                showToast.error('Un motif d’au moins 3 caractères est obligatoire.');
+                return;
+            }
+            const confirmBtn = document.getElementById('archiveConfirmBtn');
+            confirmBtn.disabled = true;
+            try {
+                if (archiveTarget.kind === 'patient') {
+                    await archivePatient(archiveTarget.id, reason);
+                    showToast.success('Patient archivé');
+                    closeArchiveModal();
+                    setTimeout(() => window.location.href = '/frontend/pages/patients/list.html', 800);
+                } else {
+                    await archiveStudy(archiveTarget.id, reason);
+                    showToast.success('Étude archivée');
+                    closeArchiveModal();
+                    await loadPatientData();
+                }
+            } catch (error) {
+                showToast.error('Échec de l’archivage : ' + error.message);
+            } finally {
+                confirmBtn.disabled = false;
+            }
+        });
         if (patientId) loadPatientData();
     </script>
 </body>
