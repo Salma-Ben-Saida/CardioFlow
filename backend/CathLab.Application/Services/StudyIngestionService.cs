@@ -31,7 +31,10 @@ public class StudyIngestionService
         // 2 — avoid duplicate
         var existing = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
         if (existing != null)
-            return IngestResult.AlreadyExists(existing.Id);
+            return existing.IsDeleted
+                ? IngestResult.SkippedArchived(existing.Id,
+                    $"Study {accessionNumber} is archived; restore it from the archive instead.")
+                : IngestResult.AlreadyExists(existing.Id);
 
         // 2b — an empty PatientID would silently merge unrelated patients under one record
         if (string.IsNullOrWhiteSpace(dto.PatientId))
@@ -40,6 +43,9 @@ public class StudyIngestionService
 
         // 3 — find or create patient (race-safe)
         var patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId);
+        if (patient is { IsDeleted: true })
+            return IngestResult.SkippedArchived(null,
+                $"Patient {dto.PatientId} is archived; study {accessionNumber} was not ingested.");
         if (patient == null)
         {
             try
@@ -173,6 +179,8 @@ public class IngestResult
 {
     public bool Succeeded { get; private set; }
     public bool WasAlreadyIngested { get; private set; }
+    public bool WasArchived { get; private set; }
+    public string? Info { get; private set; }
     public bool PatientIsIncomplete { get; private set; }
     public Guid? StudyId { get; private set; }
     public Guid? PatientId { get; private set; }
@@ -184,6 +192,9 @@ public class IngestResult
 
     public static IngestResult AlreadyExists(Guid studyId) =>
         new() { Succeeded = true, WasAlreadyIngested = true, StudyId = studyId };
+
+    public static IngestResult SkippedArchived(Guid? studyId, string info) =>
+    new() { Succeeded = true, WasArchived = true, StudyId = studyId, Info = info };
 
     public static IngestResult Fail(string error) =>
         new() { Succeeded = false, Error = error };

@@ -21,6 +21,12 @@ public class Patient
     // Optimistic concurrency token (SQL Server rowversion)
     public byte[] RowVersion { get; set; } = null!;
 
+    // ---- Soft delete (archive) ----
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeleteReason { get; set; }
+
     public AppUser? CreatedByUser { get; set; }
     public RiskProfile? RiskProfile { get; set; }
     public ICollection<CathStudy> Studies { get; set; } = new List<CathStudy>();
@@ -33,4 +39,20 @@ public class Patient
                     || string.IsNullOrWhiteSpace(Address)
                     || BirthDate is null
                     || string.IsNullOrWhiteSpace(Sex);
+
+        public void Archive(Guid byUserId, string reason, DateTime nowUtc)
+    {
+        IsDeleted = true;
+        DeletedAt = nowUtc;
+        DeletedByUserId = byUserId;
+        DeleteReason = reason;
+    }
+
+    public void Restore()
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        DeletedByUserId = null;
+        DeleteReason = null;
+    }
 }

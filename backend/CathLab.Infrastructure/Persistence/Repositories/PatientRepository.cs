@@ -10,8 +10,10 @@ public class PatientRepository : IPatientRepository
     private readonly CathLabDbContext _ctx;
     public PatientRepository(CathLabDbContext ctx) => _ctx = ctx;
 
+    // IgnoreQueryFilters: ingestion must also see ARCHIVED patients, otherwise it would try to re-create them and hit the unique index on ConquestPatientID.
     public async Task<Patient?> FindByConquestIdAsync(string conquestPatientId) =>
         await _ctx.Patients
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(p => p.ConquestPatientID == conquestPatientId);
 
         public async Task<Patient> CreateAsync(Patient patient)
@@ -70,8 +72,8 @@ public class PatientRepository : IPatientRepository
     string? search, 
     string? sex, 
     bool? isIncomplete, 
-    string? sortBy,     // Added parameter
-    string? sortDir,    // Added parameter
+    string? sortBy,     
+    string? sortDir,    
     int page, 
     int pageSize)
 {

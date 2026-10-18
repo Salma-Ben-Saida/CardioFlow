@@ -51,12 +51,13 @@ public class PacsIngestionWorker : BackgroundService
 
         var results = await ingestionService.IngestAllPendingAsync();
 
-        var newCount      = results.Count(r => r.Succeeded && !r.WasAlreadyIngested);
+        var newCount      = results.Count(r => r.Succeeded && !r.WasAlreadyIngested && !r.WasArchived);
         var alreadyCount  = results.Count(r => r.WasAlreadyIngested);
+        var archivedCount = results.Count(r => r.WasArchived);
         var failedCount   = results.Count(r => !r.Succeeded);
 
         _logger.LogInformation(
-            "Ingestion cycle done — New: {New}, Already ingested: {Already}, Failed: {Failed}",
-            newCount, alreadyCount, failedCount);
+            "Ingestion cycle done — New: {New}, Already ingested: {Already}, Archived (skipped): {Archived}, Failed: {Failed}",
+            newCount, alreadyCount, archivedCount, failedCount);
     }
 }

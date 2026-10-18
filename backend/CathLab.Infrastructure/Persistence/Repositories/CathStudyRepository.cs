@@ -12,6 +12,7 @@ public class CathStudyRepository : ICathStudyRepository
 
     public async Task<CathStudy?> FindByAccessionNumberAsync(string accessionNumber) =>
         await _ctx.CathStudies
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.AccessionNumber == accessionNumber);
 
         public async Task<CathStudy> CreateAsync(CathStudy study)

@@ -46,7 +46,10 @@ builder.Services.AddAuthorization();
 
 // --- Configuration des Contextes de Base de Données ---
 builder.Services.AddDbContext<CathLabDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("CathLabDb")));
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("CathLabDb"))
+       .ConfigureWarnings(w => w.Ignore(
+           Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId
+               .PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning)));
 
 builder.Services.AddDbContext<OrthancPacsContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("OrthancPACS")));
@@ -96,11 +99,13 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddScoped<IPacsReader, OrthancPacsReader>();
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<ICathStudyRepository, CathStudyRepository>();
+builder.Services.AddScoped<IArchiveRepository, ArchiveRepository>();
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 
 // Services Web Scoped (Résolus via IServiceProvider à l'intérieur du Background Worker)
 builder.Services.AddScoped<StudyIngestionService>(); 
 builder.Services.AddScoped<PatientService>();
+builder.Services.AddScoped<PatientLifecycleService>();
 builder.Services.AddScoped<AuditService>();
 
 // Répertoires (Repositories) - Pharmacie
