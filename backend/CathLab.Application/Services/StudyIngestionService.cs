@@ -57,6 +57,7 @@ public class StudyIngestionService
         else if (overrideData != null)
         {
             ApplyOverride(patient, overrideData);
+            patient.RecomputeCompleteness(); 
             patient = await _patientRepo.UpdateAsync(patient);
         }
 
@@ -120,9 +121,7 @@ private static Patient BuildPatientFromPacs(PacsStudyDto dto, PatientOverrideDto
         ApplyOverride(patient, overrideData);
 
     // Recompute completeness after any overrides were applied
-    patient.IsIncomplete = patient.NationalId is null || patient.PhoneNumber is null
-                         || patient.BloodGroup is null || patient.Address is null
-                         || patient.BirthDate is null || string.IsNullOrWhiteSpace(patient.Sex);
+    patient.RecomputeCompleteness();
 
     return patient;
 }

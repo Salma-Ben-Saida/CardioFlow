@@ -42,6 +42,7 @@ public class CathLabDbContext : DbContext
             e.HasIndex(p => p.ConquestPatientID)
              .IsUnique()
              .HasFilter("[ConquestPatientID] IS NOT NULL");
+            e.Property(p => p.RowVersion).IsRowVersion();
             e.HasOne(p => p.RiskProfile)
              .WithOne(r => r.Patient)
              .HasForeignKey<RiskProfile>(r => r.PatientId);

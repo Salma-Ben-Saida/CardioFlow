@@ -44,6 +44,27 @@ public class PatientRepository : IPatientRepository
         await _ctx.SaveChangesAsync();
         return patient;
     }
+    // Tracked on purpose: this entity is modified and saved.
+    public async Task<Patient?> FindByIdAsync(Guid id) =>
+        await _ctx.Patients.FirstOrDefaultAsync(p => p.Id == id);
+
+    public async Task<Patient> UpdateAsync(Patient patient, byte[] rowVersion)
+    {
+        // Tell EF which version the client saw; the UPDATE affects 0 rows if it changed since.
+        _ctx.Entry(patient).Property(p => p.RowVersion).OriginalValue = rowVersion;
+        patient.UpdatedAt = DateTime.UtcNow;
+
+        try
+        {
+            await _ctx.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(
+                "Ce dossier a été modifié par un autre utilisateur. Rechargez la page puis réessayez.");
+        }
+        return patient;
+    }
 
     public async Task<(List<Patient> Items, int TotalCount)> SearchAsync(
     string? search, 

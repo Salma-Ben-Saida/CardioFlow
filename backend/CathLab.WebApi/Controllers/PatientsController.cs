@@ -1,10 +1,13 @@
+using CathLab.Application.Common;
+using CathLab.Application.DTOs.Patients;
 using CathLab.Application.Services;
+using CathLab.WebApi.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/patients")]
-[Authorize(Roles = "Admin,Medecin,Secretaire")]
+[Authorize(Roles = "Admin, Medecin, Secretaire")]
 public class PatientsController : ControllerBase
 {
     private readonly PatientService _patientService;
@@ -21,7 +24,7 @@ public class PatientsController : ControllerBase
     public async Task<IActionResult> GetList(
         [FromQuery] string? search,
         [FromQuery] string? sex,
-        [FromQuery] string? status,   // "complete" | "incomplete" | ""
+        [FromQuery] string? status,   
         [FromQuery] string? sortBy = "updatedAt", 
         [FromQuery] string? sortDir = "desc",
         [FromQuery] int page     = 1,
@@ -48,7 +51,30 @@ public class PatientsController : ControllerBase
 
         return Ok(patient);
     }
+    /// <summary>
+    /// PUT /api/patients/{id}
+    /// Manual edit. The body must carry the RowVersion the client last saw.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePatientDto dto)
+    {
+        try
+        {
+            var updated = await _patientService.UpdateAsync(id, dto, User.GetUserId());
+            if (updated == null)
+                return NotFound(new { message = $"Patient {id} introuvable." });
 
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
     /// <summary>
     /// GET /api/patients/{id}/studies
     /// Returns a targeted sub-list of cath lab cardiac records assigned to this individual.
