@@ -1,3 +1,4 @@
+using CathLab.Application.Common;
 using CathLab.Application.Interfaces;
 using CathLab.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -13,12 +14,25 @@ public class CathStudyRepository : ICathStudyRepository
         await _ctx.CathStudies
             .FirstOrDefaultAsync(s => s.AccessionNumber == accessionNumber);
 
-    public async Task<CathStudy> CreateAsync(CathStudy study)
+        public async Task<CathStudy> CreateAsync(CathStudy study)
     {
         study.Id = Guid.NewGuid();
         study.CreatedAt = DateTime.UtcNow;
         _ctx.CathStudies.Add(study);
-        await _ctx.SaveChangesAsync();
+        try
+        {
+            await _ctx.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+        {
+            _ctx.Entry(study).State = EntityState.Detached;   // keep the scoped context clean
+            throw new DuplicateEntityException($"Study {study.AccessionNumber} already exists.", ex);
+        }
+        catch
+        {
+            _ctx.Entry(study).State = EntityState.Detached;
+            throw;
+        }
         return study;
     }
     public async Task<CathStudy?> FindByIdAsync(Guid id) =>

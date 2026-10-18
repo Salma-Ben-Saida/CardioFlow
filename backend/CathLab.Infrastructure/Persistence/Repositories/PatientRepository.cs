@@ -1,3 +1,4 @@
+using CathLab.Application.Common;
 using CathLab.Application.Interfaces;
 using CathLab.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -13,13 +14,26 @@ public class PatientRepository : IPatientRepository
         await _ctx.Patients
             .FirstOrDefaultAsync(p => p.ConquestPatientID == conquestPatientId);
 
-    public async Task<Patient> CreateAsync(Patient patient)
+        public async Task<Patient> CreateAsync(Patient patient)
     {
         patient.Id = Guid.NewGuid();
         patient.CreatedAt = DateTime.UtcNow;
         patient.UpdatedAt = DateTime.UtcNow;
         _ctx.Patients.Add(patient);
-        await _ctx.SaveChangesAsync();
+        try
+        {
+            await _ctx.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+        {
+            _ctx.Entry(patient).State = EntityState.Detached;
+            throw new DuplicateEntityException($"Patient {patient.ConquestPatientID} already exists.", ex);
+        }
+        catch
+        {
+            _ctx.Entry(patient).State = EntityState.Detached;
+            throw;
+        }
         return patient;
     }
 

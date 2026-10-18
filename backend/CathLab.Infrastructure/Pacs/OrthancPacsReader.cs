@@ -1,5 +1,6 @@
 using CathLab.Application.DTOs.Pacs;
 using CathLab.Application.Interfaces;
+using CathLab.Infrastructure.Pacs.Generated;
 using Microsoft.EntityFrameworkCore;
 
 namespace CathLab.Infrastructure.Pacs;
@@ -30,22 +31,62 @@ public class OrthancPacsReader : IPacsReader
 
     public OrthancPacsReader(OrthancPacsContext ctx) => _ctx = ctx;
 
-    public async Task<List<PacsStudyDto>> GetPendingStudiesAsync(DateTime since)
+        public async Task<List<PacsStudyDto>> GetPendingStudiesAsync()
     {
-        // Get all study-level resources
         var studyResources = await _ctx.Resources
+            .AsNoTracking()
             .Where(r => r.ResourceType == 1) // 1 = Study
             .ToListAsync();
 
-        var results = new List<PacsStudyDto>();
-        foreach (var study in studyResources)
-        {
-            var dto = await BuildDtoAsync(study.InternalId, study.PublicId);
-            if (dto != null) results.Add(dto);
-        }
-        return results;
+        var ids = studyResources.Select(r => r.InternalId).ToList();
+
+        var tags = (await _ctx.MainDicomTags.AsNoTracking()
+                        .Where(t => ids.Contains(t.Id)).ToListAsync())
+                   .ToLookup(t => t.Id);
+
+        var identifiers = (await _ctx.DicomIdentifiers.AsNoTracking()
+                        .Where(d => ids.Contains(d.Id)).ToListAsync())
+                   .ToLookup(d => d.Id);
+
+        return studyResources
+            .Select(r => BuildDto(r.PublicId, tags[r.InternalId].ToList(), identifiers[r.InternalId].ToList()))
+            .ToList();
+    }
+    private async Task<PacsStudyDto?> BuildDtoAsync(long internalId, string publicId)
+    {
+        var tags = await _ctx.MainDicomTags.Where(t => t.Id == internalId).ToListAsync();
+        var identifiers = await _ctx.DicomIdentifiers.Where(d => d.Id == internalId).ToListAsync();
+        return BuildDto(publicId, tags, identifiers);
     }
 
+    private static PacsStudyDto BuildDto(
+        string publicId, List<MainDicomTag> tags, List<DicomIdentifier> identifiers)
+    {
+        string? GetTag(int group, int element) =>
+            tags.FirstOrDefault(t => t.TagGroup == group && t.TagElement == element)?.Value
+            ?? identifiers.FirstOrDefault(d => d.TagGroup == group && d.TagElement == element)?.Value;
+
+        var accession   = GetTag(TagGroupAccession,   TagElementAccession);
+        var studyUid    = GetTag(TagGroupStudyUid,    TagElementStudyUid);
+        var patientId   = GetTag(TagGroupPatientId,   TagElementPatientId);
+        var patientName = GetTag(TagGroupPatientName, TagElementPatientName);
+        var birthDate   = GetTag(TagGroupBirthDate,   TagElementBirthDate);
+        var sex         = GetTag(TagGroupSex,         TagElementSex);
+        var studyDate   = GetTag(TagGroupStudyDate,   TagElementStudyDate);
+        var modality    = GetTag(TagGroupModality,    TagElementModality);
+
+        return new PacsStudyDto
+        {
+            StudyInstanceUid = studyUid ?? publicId,
+            AccessionNumber  = accession ?? publicId,
+            PatientId        = patientId ?? string.Empty,
+            PatientName      = patientName,
+            PatientBirthDate = ParseDate(birthDate),
+            PatientSex       = sex,
+            StudyDate        = ParseDate(studyDate),
+            Modality         = modality
+        };
+    }
     public async Task<PacsStudyDto?> GetStudyByAccessionAsync(string accessionNumber)
     {
         var identifier = await _ctx.DicomIdentifiers
@@ -92,42 +133,6 @@ public class OrthancPacsReader : IPacsReader
             if (dto != null) results.Add(dto);
         }
         return results;
-    }
-
-    private async Task<PacsStudyDto?> BuildDtoAsync(long internalId, string publicId)
-    {
-        var tags = await _ctx.MainDicomTags
-            .Where(t => t.Id == internalId)
-            .ToListAsync();
-
-        var identifiers = await _ctx.DicomIdentifiers
-            .Where(d => d.Id == internalId)
-            .ToListAsync();
-
-        string? GetTag(int group, int element) =>
-            tags.FirstOrDefault(t => t.TagGroup == group && t.TagElement == element)?.Value
-            ?? identifiers.FirstOrDefault(d => d.TagGroup == group && d.TagElement == element)?.Value;
-
-        var accession  = GetTag(TagGroupAccession,  TagElementAccession);
-        var studyUid   = GetTag(TagGroupStudyUid,   TagElementStudyUid);
-        var patientId  = GetTag(TagGroupPatientId,  TagElementPatientId);
-        var patientName = GetTag(TagGroupPatientName, TagElementPatientName);
-        var birthDate  = GetTag(TagGroupBirthDate,  TagElementBirthDate);
-        var sex        = GetTag(TagGroupSex,         TagElementSex);
-        var studyDate  = GetTag(TagGroupStudyDate,   TagElementStudyDate);
-        var modality   = GetTag(TagGroupModality,    TagElementModality);
-
-        return new PacsStudyDto
-        {
-            StudyInstanceUid = studyUid ?? publicId,
-            AccessionNumber  = accession ?? publicId,
-            PatientId        = patientId ?? string.Empty,
-            PatientName      = patientName,
-            PatientBirthDate = ParseDate(birthDate),
-            PatientSex       = sex,
-            StudyDate        = ParseDate(studyDate),
-            Modality         = modality
-        };
     }
 
     private static DateOnly? ParseDate(string? value)

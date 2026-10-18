@@ -1,8 +1,10 @@
 using CathLab.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/patients")]
+[Authorize(Roles = "Admin,Medecin,Secretaire")]
 public class PatientsController : ControllerBase
 {
     private readonly PatientService _patientService;

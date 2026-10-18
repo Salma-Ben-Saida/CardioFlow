@@ -1,10 +1,12 @@
 using CathLab.Application.DTOs.Pacs;
 using CathLab.Application.Interfaces;
 using CathLab.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/pacs")]
+[Authorize(Roles = "Admin,Secretaire, Medecin")]
 public class PacsController : ControllerBase
 {
     private readonly IPacsReader _pacs;
@@ -19,7 +21,7 @@ public class PacsController : ControllerBase
     [HttpGet("studies")]
     public async Task<IActionResult> GetStudies()
     {
-        var studies = await _pacs.GetPendingStudiesAsync(DateTime.UtcNow.AddDays(-30));
+        var studies = await _pacs.GetPendingStudiesAsync();
         return Ok(studies);
     }
 
@@ -35,6 +37,7 @@ public async Task<IActionResult> IngestOne(string accessionNumber, [FromBody] Pa
 
     // Ingest all studies from last 30 days
     [HttpPost("ingest/all")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> IngestAll()
     {
         var results = await _ingestion.IngestAllPendingAsync();
