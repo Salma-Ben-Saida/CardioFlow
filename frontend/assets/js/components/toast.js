@@ -69,3 +69,8 @@ export function warning(msg) { return showToast(msg, ToastType.WARNING); }
 export function info(msg) { return showToast(msg, ToastType.INFO); }
 
 export default { show: showToast, success, error, warning, info, ToastType };
+// Pages call showToast.error(...) / showToast.success(...): expose them on the function
+showToast.success = success;
+showToast.error   = error;
+showToast.warning = warning;
+showToast.info    = info;

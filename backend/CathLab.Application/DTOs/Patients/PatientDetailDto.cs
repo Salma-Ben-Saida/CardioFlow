@@ -14,6 +14,7 @@ public class PatientDetailDto
     public bool IsIncomplete { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
     public RiskProfileDto? RiskProfile { get; set; }
     public List<CathStudyDto> Studies { get; set; } = new();
 }

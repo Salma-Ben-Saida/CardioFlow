@@ -39,7 +39,7 @@
                             <div style="display:flex;justify-content:flex-end;margin-bottom:var(--spacing-4);">
                                 <button class="btn btn-secondary btn-sm" id="editPatientBtn" style="display:none;">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    Edit Info
+                                    Modifier les informations
                                 </button>
                             </div>
                             <div class="info-grid" id="overviewView">
@@ -113,7 +113,7 @@
         import { getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient } from '../../assets/js/api/patients.js';
         import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState } from '../../assets/js/utils.js';
 
-        const EDIT_ROLES = ['Secretaire', 'Admin'];
+        const EDIT_ROLES = ['Secretaire', 'Admin', 'Medecin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
         const canEditPatient = EDIT_ROLES.includes(currentUser?.role);
         let currentPatient = null;
@@ -287,6 +287,7 @@
                 bloodGroup: document.getElementById('editBloodGroup').value || null,
                 phoneNumber: document.getElementById('editPhone').value.trim() || null,
                 address: document.getElementById('editAddress').value.trim() || null,
+                rowVersion: currentPatient.rowVersion,
             };
             saveBtn.disabled = true;
             saveBtn.textContent = 'Enregistrement...';
@@ -296,10 +297,17 @@
                 await loadPatientData();
                 exitEditMode();
             } catch (error) {
-                showToast.error('Échec de l’enregistrement des modifications : ' + error.message);
-            } finally {
+                   if (error.status === 409) {
+                       // Someone else saved first: show fresh data and a fresh rowVersion
+                        showToast.error('Ce dossier a été modifié par un autre utilisateur. Les données ont été rechargées : vérifiez-les puis refaites votre modification.');
+                       await loadPatientData();
+                       exitEditMode();
+                   } else {
+                       showToast.error('Échec de l’enregistrement des modifications : ' + error.message);
+                   }
+               } finally {
                 saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Changes';
+                saveBtn.textContent = 'Enregistrer les modifications';
             }
         });
 

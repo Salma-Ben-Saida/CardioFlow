@@ -17,8 +17,20 @@ public class Patient
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    
+    // Optimistic concurrency token (SQL Server rowversion)
+    public byte[] RowVersion { get; set; } = null!;
 
     public AppUser? CreatedByUser { get; set; }
     public RiskProfile? RiskProfile { get; set; }
     public ICollection<CathStudy> Studies { get; set; } = new List<CathStudy>();
+    
+    /// <summary>Single source of truth for the "dossier incomplet" rule.</summary>
+    public void RecomputeCompleteness() =>
+        IsIncomplete = string.IsNullOrWhiteSpace(NationalId)
+                    || string.IsNullOrWhiteSpace(PhoneNumber)
+                    || string.IsNullOrWhiteSpace(BloodGroup)
+                    || string.IsNullOrWhiteSpace(Address)
+                    || BirthDate is null
+                    || string.IsNullOrWhiteSpace(Sex);
 }
