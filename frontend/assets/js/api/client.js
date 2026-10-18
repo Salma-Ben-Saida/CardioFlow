@@ -23,11 +23,16 @@ export async function apiRequest(endpoint, options = {}) {
 
     try {
         const response = await fetch(url, { ...options, headers });
-        if (response.status === 401 || response.status === 403) {
-    clearToken();
-    window.location.href = '/frontend/pages/login.html';
-    throw new Error('Unauthorized');
-}
+
+               if (response.status === 401) {
+            clearToken();
+            window.location.href = '/frontend/pages/login.html';
+            throw new Error('Unauthorized');
+        }
+        if (response.status === 403) {
+            throw new Error("Accès refusé : vous n'avez pas les droits nécessaires.");
+        }
+
         if (response.status === 204 || response.status === 205) {
             return null;
         }

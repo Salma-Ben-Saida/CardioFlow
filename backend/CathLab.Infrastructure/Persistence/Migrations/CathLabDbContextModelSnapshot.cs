@@ -125,6 +125,9 @@ namespace CathLab.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AccessionNumber")
+                        .IsUnique();
+
                     b.HasIndex("OperatorId");
 
                     b.HasIndex("PatientId");
@@ -375,6 +378,10 @@ namespace CathLab.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ConquestPatientID")
+                        .IsUnique()
+                        .HasFilter("[ConquestPatientID] IS NOT NULL");
+
                     b.HasIndex("CreatedByUserId");
 
                     b.ToTable("Patients");
@@ -566,8 +573,6 @@ namespace CathLab.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("UserActivityLogs");
                 });
 
@@ -757,15 +762,6 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("CathLab.Domain.Entities.UserActivityLog", b =>
-                {
-                    b.HasOne("CathLab.Domain.Entities.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CathLab.Domain.Entities.BalloonDilation", b =>

@@ -1,3 +1,4 @@
+using CathLab.Application.Common;
 using CathLab.Application.DTOs.Pacs;
 using CathLab.Application.Interfaces;
 using CathLab.Domain.Entities;
@@ -20,60 +21,90 @@ public class StudyIngestionService
         _studyRepo = studyRepo;
     }
 
-    public async Task<IngestResult> IngestStudyAsync(string accessionNumber, PatientOverrideDto? overrideData = null)
-{
-    // 1 — fetch from PACS
-    var dto = await _pacsReader.GetStudyByAccessionAsync(accessionNumber);
-    if (dto == null)
-        return IngestResult.Fail($"Study {accessionNumber} not found in PACS");
-
-    // 2 — avoid duplicate
-    var existing = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
-    if (existing != null)
-        return IngestResult.AlreadyExists(existing.Id);
-
-    // 3 — find or create patient
-    var patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId);
-    if (patient == null)
+        public async Task<IngestResult> IngestStudyAsync(string accessionNumber, PatientOverrideDto? overrideData = null)
     {
-        patient = BuildPatientFromPacs(dto, overrideData);
-        patient = await _patientRepo.CreateAsync(patient);
+        // 1 — fetch from PACS
+        var dto = await _pacsReader.GetStudyByAccessionAsync(accessionNumber);
+        if (dto == null)
+            return IngestResult.Fail($"Study {accessionNumber} not found in PACS");
+
+        // 2 — avoid duplicate
+        var existing = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
+        if (existing != null)
+            return IngestResult.AlreadyExists(existing.Id);
+
+        // 2b — an empty PatientID would silently merge unrelated patients under one record
+        if (string.IsNullOrWhiteSpace(dto.PatientId))
+            return IngestResult.Fail(
+                $"Study {accessionNumber} has no PatientID in PACS; cannot link it to a patient safely.");
+
+        // 3 — find or create patient (race-safe)
+        var patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId);
+        if (patient == null)
+        {
+            try
+            {
+                patient = await _patientRepo.CreateAsync(BuildPatientFromPacs(dto, overrideData));
+            }
+            catch (DuplicateEntityException)
+            {
+                // another ingestion created it a moment ago
+                patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId)
+                          ?? throw new InvalidOperationException(
+                                $"Patient {dto.PatientId} vanished during ingestion.");
+            }
+        }
+        else if (overrideData != null)
+        {
+            ApplyOverride(patient, overrideData);
+            patient = await _patientRepo.UpdateAsync(patient);
+        }
+
+        // 4 — create study (race-safe)
+        var study = new CathStudy
+        {
+            PatientId        = patient.Id,
+            AccessionNumber  = dto.AccessionNumber,
+            StudyInstanceUid = dto.StudyInstanceUid,
+            StudyDate        = dto.StudyDate.HasValue
+                                ? dto.StudyDate.Value.ToDateTime(TimeOnly.MinValue)
+                                : DateTime.UtcNow,
+            Status           = StudyStatus.Scheduled
+        };
+
+        try
+        {
+            study = await _studyRepo.CreateAsync(study);
+        }
+        catch (DuplicateEntityException)
+        {
+            var now = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
+            return now != null
+                ? IngestResult.AlreadyExists(now.Id)
+                : IngestResult.Fail($"Study {accessionNumber} could not be created.");
+        }
+
+        return IngestResult.Success(study.Id, patient.Id, patient.IsIncomplete);
     }
-    else if (overrideData != null)
+
+    public async Task<List<IngestResult>> IngestAllPendingAsync()
     {
-        ApplyOverride(patient, overrideData);
-        patient = await _patientRepo.UpdateAsync(patient);
+        var studies = await _pacsReader.GetPendingStudiesAsync();
+        var results = new List<IngestResult>();
+        foreach (var dto in studies)
+        {
+            try
+            {
+                results.Add(await IngestStudyAsync(dto.AccessionNumber));
+            }
+            catch (Exception ex)
+            {
+                // one bad study must not abort the whole cycle
+                results.Add(IngestResult.Fail($"Study {dto.AccessionNumber}: {ex.Message}"));
+            }
+        }
+        return results;
     }
-
-    // 4 — create study
-    var study = new CathStudy
-    {
-        PatientId        = patient.Id,
-        AccessionNumber  = dto.AccessionNumber,
-        StudyInstanceUid = dto.StudyInstanceUid,
-        StudyDate        = dto.StudyDate.HasValue
-                            ? dto.StudyDate.Value.ToDateTime(TimeOnly.MinValue)
-                            : DateTime.UtcNow,
-        Status           = StudyStatus.Scheduled
-    };
-    study = await _studyRepo.CreateAsync(study);
-
-    return IngestResult.Success(study.Id, patient.Id, patient.IsIncomplete);
-}
-
-public async Task<List<IngestResult>> IngestAllPendingAsync()
-{
-    // unchanged — background worker still ingests with no overrides
-    var studies = await _pacsReader.GetPendingStudiesAsync(DateTime.UtcNow.AddDays(-30));
-    var results = new List<IngestResult>();
-    foreach (var dto in studies)
-    {
-        var result = await IngestStudyAsync(dto.AccessionNumber);
-        results.Add(result);
-    }
-    return results;
-}
-
 private static Patient BuildPatientFromPacs(PacsStudyDto dto, PatientOverrideDto? overrideData)
 {
     var patient = new Patient

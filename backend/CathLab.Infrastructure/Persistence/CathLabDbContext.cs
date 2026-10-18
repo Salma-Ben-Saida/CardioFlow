@@ -39,6 +39,9 @@ public class CathLabDbContext : DbContext
             e.Property(p => p.NationalId).HasMaxLength(50);
             e.Property(p => p.Sex).HasMaxLength(1);
             e.Property(p => p.BloodGroup).HasMaxLength(10);
+            e.HasIndex(p => p.ConquestPatientID)
+             .IsUnique()
+             .HasFilter("[ConquestPatientID] IS NOT NULL");
             e.HasOne(p => p.RiskProfile)
              .WithOne(r => r.Patient)
              .HasForeignKey<RiskProfile>(r => r.PatientId);
@@ -53,6 +56,7 @@ public class CathLabDbContext : DbContext
             e.Property(s => s.Id).ValueGeneratedOnAdd();
             e.Property(s => s.AccessionNumber).HasMaxLength(100);
             e.Property(s => s.StudyInstanceUid).HasMaxLength(200);
+            e.HasIndex(s => s.AccessionNumber).IsUnique();
             e.Property(s => s.Status)
              .HasConversion<string>()
              .HasMaxLength(50);
