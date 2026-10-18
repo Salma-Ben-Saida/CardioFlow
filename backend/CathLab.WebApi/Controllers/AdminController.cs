@@ -1,4 +1,6 @@
+using CathLab.Application.DTOs.Archive;
 using CathLab.Application.Services;
+using CathLab.WebApi.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,11 +13,13 @@ public class AdminController : ControllerBase
 {
     private readonly InventoryService _inventory;
     private readonly AuditService _audit;
+    private readonly PatientLifecycleService _lifecycle;
 
-    public AdminController(InventoryService inventory, AuditService audit)
+    public AdminController(InventoryService inventory, AuditService audit, PatientLifecycleService lifecycle)
     {
         _inventory = inventory;
         _audit = audit;
+        _lifecycle = lifecycle;
     }
 
     /// <summary>GET /api/admin/movements?page=1&pageSize=50</summary>
@@ -40,5 +44,45 @@ public class AdminController : ControllerBase
     {
         var result = await _audit.GetActivityLogsAsync(page, pageSize);
         return Ok(result);
+    }
+        // ───────────── Archive / restore / purge ─────────────
+
+    /// <summary>GET /api/admin/archive: archived patients and studies</summary>
+    [HttpGet("archive")]
+    public async Task<IActionResult> GetArchive() => Ok(await _lifecycle.GetArchiveAsync());
+
+    [HttpPost("studies/{id:guid}/archive")]
+    public Task<IActionResult> ArchiveStudy(Guid id, [FromBody] ArchiveRequestDto dto) =>
+        Lifecycle(() => _lifecycle.ArchiveStudyAsync(id, dto.Reason, User.GetUserId()), $"Étude {id} introuvable.");
+
+    [HttpPost("studies/{id:guid}/restore")]
+    public Task<IActionResult> RestoreStudy(Guid id) =>
+        Lifecycle(() => _lifecycle.RestoreStudyAsync(id, User.GetUserId()), $"Étude {id} introuvable.");
+
+    [HttpDelete("studies/{id:guid}/purge")]
+    public Task<IActionResult> PurgeStudy(Guid id) =>
+        Lifecycle(() => _lifecycle.PurgeStudyAsync(id, User.GetUserId()), $"Étude {id} introuvable.");
+
+    [HttpPost("patients/{id:guid}/archive")]
+    public Task<IActionResult> ArchivePatient(Guid id, [FromBody] ArchiveRequestDto dto) =>
+        Lifecycle(() => _lifecycle.ArchivePatientAsync(id, dto.Reason, User.GetUserId()), $"Patient {id} introuvable.");
+
+    [HttpPost("patients/{id:guid}/restore")]
+    public Task<IActionResult> RestorePatient(Guid id) =>
+        Lifecycle(() => _lifecycle.RestorePatientAsync(id, User.GetUserId()), $"Patient {id} introuvable.");
+
+    [HttpDelete("patients/{id:guid}/purge")]
+    public Task<IActionResult> PurgePatient(Guid id) =>
+        Lifecycle(() => _lifecycle.PurgePatientAsync(id, User.GetUserId()), $"Patient {id} introuvable.");
+
+    // 204 = done, 404 = not found, 400 = invalid input, 409 = business rule (already archived, confirmed report…)
+    private async Task<IActionResult> Lifecycle(Func<Task<bool>> action, string notFoundMessage)
+    {
+        try
+        {
+            return await action() ? NoContent() : NotFound(new { message = notFoundMessage });
+        }
+        catch (ArgumentException ex)         { return BadRequest(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
     }
 }

@@ -43,6 +43,8 @@ public class CathLabDbContext : DbContext
              .IsUnique()
              .HasFilter("[ConquestPatientID] IS NOT NULL");
             e.Property(p => p.RowVersion).IsRowVersion();
+            e.Property(p => p.DeleteReason).HasMaxLength(500);
+            e.HasQueryFilter(p => !p.IsDeleted);
             e.HasOne(p => p.RiskProfile)
              .WithOne(r => r.Patient)
              .HasForeignKey<RiskProfile>(r => r.PatientId);
@@ -58,6 +60,8 @@ public class CathLabDbContext : DbContext
             e.Property(s => s.AccessionNumber).HasMaxLength(100);
             e.Property(s => s.StudyInstanceUid).HasMaxLength(200);
             e.HasIndex(s => s.AccessionNumber).IsUnique();
+            e.Property(s => s.DeleteReason).HasMaxLength(500);
+            e.HasQueryFilter(s => !s.IsDeleted);
             e.Property(s => s.Status)
              .HasConversion<string>()
              .HasMaxLength(50);
