@@ -71,5 +71,7 @@ export async function post(endpoint, data = {}) {
 export async function put(endpoint, data = {}) {
     return apiRequest(endpoint, { method: 'PUT', body: JSON.stringify(data) });
 }
-
-export default { get, post, put, setToken, getToken, clearToken };
+export async function del(endpoint) {
+    return apiRequest(endpoint, { method: 'DELETE' });
+}
+export default { get, post, put, del, setToken, getToken, clearToken };

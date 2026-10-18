@@ -239,6 +239,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .pill-green  { background: #dcfce7; color: #15803d; }
 .pill-blue   { background: #dbeafe; color: #1d4ed8; }
 .pill-purple { background: #ede9fe; color: #6d28d9; }
+.pill-orange { background: #ffedd5; color: #c2410c; }
 .pill-red    { background: #fee2e2; color: #dc2626; }
 .pill-amber  { background: #fef3c7; color: #b45309; }
 .pill-grey   { background: #f1eef9; color: #6b6580; }
@@ -480,3 +481,15 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .report-finding p { margin: 3px 0; font-size: 13px; }
 
 .row-loading td, .row-error td, .empty-row td { text-align: center; color: #9ca3af; padding: 24px; }
+
+/* ===== PACS / archive views ===== */
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+a.btn { display: inline-block; text-decoration: none; }
+.row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cell-sub { display: block; font-size: 11px; color: #6b6580; margin-top: 2px; }
+.summary-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* Dashboard: right column = reports + PACS preview, same total height as the movements card */
+.panel-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel-stack > .panel { flex: 1; }

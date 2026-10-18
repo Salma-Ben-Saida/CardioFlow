@@ -66,7 +66,21 @@
               <span class="nav-label">Rapports</span>
             </a>
           </div>
-
+          <div class="nav-group">
+            <span class="nav-group-label">Données patients</span>
+            <a href="#" class="nav-item" data-view="pacs">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              </span>
+              <span class="nav-label">Études PACS</span>
+            </a>
+            <a href="#" class="nav-item" data-view="archive">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              </span>
+              <span class="nav-label">Archives</span>
+            </a>
+          </div>
           <div class="nav-group">
             <span class="nav-group-label">Sécurité</span>
             <a href="#" class="nav-item" data-view="audits">
@@ -158,16 +172,31 @@
                 </div>
               </div>
 
-              <div class="panel">
-                <div class="panel-head">
-                  <h2 class="panel-title">Derniers rapports</h2>
-                  <a href="#" class="panel-link" data-goto="reports">Tout voir →</a>
+                            <div class="panel-stack">
+                <div class="panel">
+                  <div class="panel-head">
+                    <h2 class="panel-title">Derniers rapports</h2>
+                    <a href="#" class="panel-link" data-goto="reports">Tout voir →</a>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="data-table" id="dash-reports-table">
+                      <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
                 </div>
-                <div class="table-wrap">
-                  <table class="data-table" id="dash-reports-table">
-                    <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th></tr></thead>
-                    <tbody></tbody>
-                  </table>
+
+                <div class="panel">
+                  <div class="panel-head">
+                    <h2 class="panel-title">Études PACS</h2>
+                    <a href="#" class="panel-link" data-goto="pacs">Tout voir →</a>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="data-table" id="dash-pacs-table">
+                      <thead><tr><th>N° d'accession</th><th>Patient</th><th>État</th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
@@ -261,7 +290,51 @@
               </div>
             </div>
           </section>
+          <!-- PACS studies -->
+          <section class="view hidden" id="view-pacs">
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Études disponibles dans Orthanc</h2>
+                <div class="panel-actions">
+                  <button class="btn btn-ghost" id="btn-pacs-refresh">↻ Actualiser</button>
+                  <button class="btn btn-primary" id="btn-pacs-ingest-all" disabled>Ingérer les nouvelles</button>
+                </div>
+              </div>
+              <div class="summary-chips" id="pacs-summary"></div>
+              <div class="table-wrap">
+                <table class="data-table" id="pacs-table">
+                  <thead><tr><th>N° d'accession</th><th>Patient</th><th>Date</th><th>Modalité</th><th>État</th><th>Actions</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
+          <!-- Archive -->
+          <section class="view hidden" id="view-archive">
+            <div class="panel" style="margin-bottom:16px;">
+              <div class="panel-head">
+                <h2 class="panel-title">Patients archivés</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="archive-patients-table">
+                  <thead><tr><th>Patient</th><th>Études</th><th>Archivé le</th><th>Par</th><th>Motif</th><th>Actions</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Études archivées</h2>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="archive-studies-table">
+                  <thead><tr><th>N° d'accession</th><th>Patient</th><th>Date de l'étude</th><th>Archivée le</th><th>Par</th><th>Motif</th><th>Actions</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
           <!-- Audits -->
           <section class="view hidden" id="view-audits">
             <div class="panel">
@@ -396,7 +469,47 @@
         </div>
       </div>
     </div>
+    <!-- Archive Modal (study or patient) -->
+    <div class="modal-overlay hidden" id="modal-archive">
+      <div class="modal modal-confirm">
+        <div class="modal-head modal-head-warning">
+          <h3 class="modal-title" id="archive-title">Archiver</h3>
+          <button class="modal-close" data-close-modal="modal-archive">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-note" id="archive-message"></p>
+          <div class="field">
+            <label for="archive-reason">Motif (obligatoire)</label>
+            <textarea id="archive-reason" rows="3" maxlength="500" placeholder="Ex. : étude importée par erreur"></textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-archive">Annuler</button>
+          <button class="btn btn-primary" id="btn-confirm-archive">Archiver</button>
+        </div>
+      </div>
+    </div>
 
+    <!-- Purge Modal (permanent deletion, type-to-confirm) -->
+    <div class="modal-overlay hidden" id="modal-purge">
+      <div class="modal modal-confirm">
+        <div class="modal-head modal-head-warning">
+          <h3 class="modal-title">Suppression définitive</h3>
+          <button class="modal-close" data-close-modal="modal-purge">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-note" id="purge-message"></p>
+          <div class="field">
+            <label for="purge-confirm">Tapez <strong>SUPPRIMER</strong> pour confirmer</label>
+            <input type="text" id="purge-confirm" autocomplete="off" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-purge">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-purge" disabled>Supprimer définitivement</button>
+        </div>
+      </div>
+    </div>
     <!-- Toast -->
     <div class="toast-container" id="toast-container"></div>
 
