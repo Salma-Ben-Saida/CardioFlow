@@ -10,7 +10,7 @@ const currentRole = currentUser?.role;
 // Otherwise the item only shows if currentRole is in the list.
 const navItems = [
     { section: 'main', title: 'Principal', items: [
-        { label: 'Tableau de bord', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>', href: getDashboardForRole(currentRole), match: ['/frontend/pages/dashboard/'], roles: null },
+        { label: 'Tableau de bord', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>', href: getDashboardForRole(currentRole), match: ['/frontend/pages/dashboard/', '/frontend/pages/secretaire/'], roles: null },
     ]},
     { section: 'patients', title: 'Patients', items: [
         { label: 'Liste des patients', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', href: '/frontend/pages/patients/list.html', match: ['/frontend/pages/patients/list.html', '/frontend/pages/patients/detail.html'], roles: null },
