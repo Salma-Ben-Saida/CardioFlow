@@ -68,6 +68,7 @@ public class PharmacyController : ControllerBase
         try
         {
             var product = await _inventory.UpdateProductAsync(id, dto);
+            await _audit.LogActionAsync(GetCurrentUserId(), "Update", "InventoryProduct", product.Id, product.ProductName);
             return Ok(product);
         }
         catch (KeyNotFoundException ex)
@@ -91,6 +92,7 @@ public class PharmacyController : ControllerBase
         try
         {
             await _inventory.DeleteProductAsync(id);
+            await _audit.LogActionAsync(GetCurrentUserId(), "Delete", "InventoryProduct", id, null);
             return NoContent();
         }
         catch (KeyNotFoundException ex)
@@ -272,6 +274,7 @@ public async Task<IActionResult> GetAllItems([FromQuery] string? status, [FromQu
         try
         {
             var item = await _inventory.UpdateItemAsync(id, dto);
+            await _audit.LogActionAsync(GetCurrentUserId(), "Update", "InventoryItem", item.Id, item.Barcode);
             return Ok(item);
         }
         catch (KeyNotFoundException ex)
@@ -295,6 +298,7 @@ public async Task<IActionResult> GetAllItems([FromQuery] string? status, [FromQu
         try
         {
             await _inventory.DeleteItemAsync(id);
+            await _audit.LogActionAsync(GetCurrentUserId(), "Delete", "InventoryItem", id, null);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

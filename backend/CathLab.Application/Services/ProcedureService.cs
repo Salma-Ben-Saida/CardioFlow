@@ -14,6 +14,7 @@ public class ProcedureService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPdfGenerator _pdfGenerator;
     private readonly IUserRepository _userRepository;
+    private readonly ICathStudyRepository _studies;
 
     public ProcedureService(
         IProcedureReportRepository reports,
@@ -22,7 +23,8 @@ public class ProcedureService
         InventoryService inventory,
         IUnitOfWork unitOfWork,
         IPdfGenerator pdfGenerator,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ICathStudyRepository studies)
     {
         _reports = reports;
         _lesions = lesions;
@@ -31,6 +33,7 @@ public class ProcedureService
         _unitOfWork = unitOfWork;
         _pdfGenerator = pdfGenerator;
         _userRepository = userRepository;
+        _studies = studies;
     }
 
     /// <summary>Placing a Lesion marker. Creates the ProcedureReport on first use for this CathStudy.</summary>
@@ -234,6 +237,12 @@ public class ProcedureService
                 report.ConfirmedByUserId = confirmedBy;
 
                 await _reports.UpdateAsync(report);
+                var study = await _studies.FindByIdAsync(report.CathStudyId);
+                if (study is not null)
+                {
+                    study.Complete();
+                    await _studies.UpdateAsync(study);
+                }
             });
     }
 

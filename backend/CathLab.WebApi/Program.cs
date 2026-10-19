@@ -107,6 +107,7 @@ builder.Services.AddScoped<StudyIngestionService>();
 builder.Services.AddScoped<PatientService>();
 builder.Services.AddScoped<PatientLifecycleService>();
 builder.Services.AddScoped<PacsOverviewService>();
+builder.Services.AddScoped<StudySchedulingService>();
 builder.Services.AddScoped<AuditService>();
 
 // Répertoires (Repositories) - Pharmacie

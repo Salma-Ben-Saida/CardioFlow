@@ -11,11 +11,14 @@ public class PacsController : ControllerBase
 {
     private readonly IPacsReader _pacs;
     private readonly StudyIngestionService _ingestion;
+    private readonly PacsOverviewService _overview;
 
-    public PacsController(IPacsReader pacs, StudyIngestionService ingestion)
+
+    public PacsController(IPacsReader pacs, StudyIngestionService ingestion, PacsOverviewService overview)
     {
         _pacs = pacs;
         _ingestion = ingestion;
+        _overview = overview;
     }
 
     [HttpGet("studies")]
@@ -24,6 +27,10 @@ public class PacsController : ControllerBase
         var studies = await _pacs.GetPendingStudiesAsync();
         return Ok(studies);
     }
+
+    // Orthanc studies + their state in CathLab (read-only: Admin, Secretaire, Medecin)
+    [HttpGet("overview")]
+    public async Task<IActionResult> GetOverview() => Ok(await _overview.GetAsync());
 
     // Ingest one study by accession number
     [HttpPost("ingest/{accessionNumber}")]

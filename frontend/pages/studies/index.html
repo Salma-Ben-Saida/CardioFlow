@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning des interventions - Système de gestion du CathLab</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/components.css">
+    <link rel="stylesheet" href="../../assets/css/layout.css">
+    <style>
+        tr.needs-scheduling { background-color: rgba(239, 68, 68, 0.06); }
+        .flag-dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:8px; box-shadow:0 0 0 3px rgba(239,68,68,.2); }
+        .row-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        dialog { border:none; border-radius:12px; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,.2); min-width:340px; }
+        dialog::backdrop { background: rgba(0,0,0,.4); }
+        dialog label { display:block; font-size:14px; margin:12px 0 6px; color:#374151; }
+        dialog input { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; }
+        .dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+        .dialog-title { margin:0 0 4px; }
+        .dialog-patient { margin:0; color:#6b7280; font-size:14px; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <nav class="topbar-breadcrumb"><a href="#">Accueil</a><span>/</span><span>Planning des interventions</span></nav>
+                </div>
+            </header>
+            <div class="page-content">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-header-title">Planning des interventions</h1>
+                        <p class="page-header-subtitle" id="subtitle">Chargement…</p>
+                    </div>
+                    <div class="page-header-actions">
+                        <label for="filterStatus" class="sr-only">Filtrer par statut</label>
+                        <select id="filterStatus" class="btn btn-secondary" aria-label="Filtrer par statut">
+                            <option value="">Tous les statuts</option>
+                            <option value="Pending">À planifier</option>
+                            <option value="Scheduled">Planifiées</option>
+                            <option value="InProgress">En cours</option>
+                            <option value="Completed">Terminées</option>
+                            <option value="Cancelled">Annulées</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btnRefresh" type="button">↻ Actualiser</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>Patient</th><th>N° d'accession</th><th>Ingérée le</th><th>Intervention</th><th>Statut</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="studiesBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <dialog id="dlgSchedule">
+        <h3 id="dlgTitle" class="dialog-title">Planifier l'intervention</h3>
+        <p id="dlgPatient" class="dialog-patient"></p>
+        <label for="dlgDateTime">Date et heure de l'intervention</label>
+        <input type="datetime-local" id="dlgDateTime">
+        <div class="dlg-actions">
+            <button class="btn btn-secondary" id="dlgCancel" type="button">Fermer</button>
+            <button class="btn btn-primary" id="dlgSave" type="button">Enregistrer</button>
+        </div>
+    </dialog>
+
+    <script type="module">
+        import { renderSidebar } from '../../assets/js/components/sidebar.js';
+        import { showToast } from '../../assets/js/components/toast.js';
+        import { getStudies, scheduleStudy, cancelStudy } from '../../assets/js/api/studies.js';
+
+        const ALLOWED_ROLES = ['Medecin', 'Secretaire', 'Admin'];
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+        if (!sessionStorage.getItem('authToken') || !currentUser || !ALLOWED_ROLES.includes(currentUser.role)) {
+            window.location.href = '/frontend/pages/login.html';
+        }
+        renderSidebar('sidebar-container');
+
+        const STATUS = {
+            Pending:    { label: 'À planifier', badge: 'badge-danger' },
+            Scheduled:  { label: 'Planifiée',   badge: 'badge-info' },
+            InProgress: { label: 'En cours',    badge: 'badge-warning' },
+            Completed:  { label: 'Terminée',    badge: 'badge-success' },
+            Cancelled:  { label: 'Annulée',     badge: 'badge-neutral' },
+        };
+
+        const tbody = document.getElementById('studiesBody');
+        const filterEl = document.getElementById('filterStatus');
+        const dlg = document.getElementById('dlgSchedule');
+        const dlgInput = document.getElementById('dlgDateTime');
+        let studies = [];
+        let editingId = null;
+
+        const esc = (t) => { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+        const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+        const pad = (n) => String(n).padStart(2, '0');
+        function toLocalInput(iso) {
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        function actions(s) {
+            const btn = (act, label, cls) => `<button class="btn ${cls} btn-sm" data-act="${act}" data-id="${s.id}">${label}</button>`;
+            switch (s.status) {
+                case 'Pending':    return btn('schedule', 'Planifier', 'btn-primary') + btn('cancel', 'Annuler', 'btn-secondary');
+                case 'Scheduled':  return btn('schedule', 'Replanifier', 'btn-secondary') + btn('cancel', 'Annuler', 'btn-secondary');
+                case 'Cancelled':  return btn('schedule', 'Replanifier', 'btn-secondary');
+                case 'InProgress':
+                    return currentUser.role === 'Secretaire' ? '—'
+                        : `<a class="btn btn-primary btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}">Ouvrir</a>`;
+                default: return '—';
+            }
+        }
+
+        function row(s) {
+            const st = STATUS[s.status] || { label: s.status, badge: 'badge-neutral' };
+            const flag = s.needsScheduling ? '<span class="flag-dot" title="Intervention non planifiée"></span>' : '';
+            return `<tr class="${s.needsScheduling ? 'needs-scheduling' : ''}">
+                <td>${flag}<a href="/frontend/pages/patients/detail.html?id=${encodeURIComponent(s.patientId)}" style="font-weight:500;">${esc(s.patientName)}</a></td>
+                <td>${esc(s.accessionNumber)}</td>
+                <td>${fmtDateTime(s.ingestedAt)}</td>
+                <td>${fmtDateTime(s.scheduledAt)}</td>
+                <td><span class="badge ${st.badge}">${st.label}</span></td>
+                <td><div class="row-actions">${actions(s)}</div></td>
+            </tr>`;
+        }
+
+        function render() {
+            const f = filterEl.value;
+            const rows = studies.filter(s => !f || s.status === f);
+            tbody.innerHTML = rows.length
+                ? rows.map(row).join('')
+                : '<tr><td colspan="6" class="table-empty"><p>Aucune étude.</p></td></tr>';
+            const pending = studies.filter(s => s.needsScheduling).length;
+            document.getElementById('subtitle').innerHTML = pending
+                ? `<span class="flag-dot"></span><strong>${pending}</strong> étude(s) à planifier`
+                : 'Toutes les études ingérées sont planifiées';
+        }
+
+        // Pending first, then by intervention time, then newest ingestion
+        function sortStudies(arr) {
+            const rank = { Pending: 0, InProgress: 1, Scheduled: 2, Cancelled: 3, Completed: 4 };
+            return [...arr].sort((a, b) =>
+                (rank[a.status] ?? 9) - (rank[b.status] ?? 9) ||
+                (new Date(a.scheduledAt || 0) - new Date(b.scheduledAt || 0)) ||
+                (new Date(b.ingestedAt) - new Date(a.ingestedAt)));
+        }
+
+        async function load() {
+            tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>Chargement…</p></td></tr>';
+            try {
+                const data = await getStudies();
+                studies = sortStudies(Array.isArray(data) ? data : []);
+                render();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;">${esc(e.message)}</td></tr>`;
+                showToast.error('Erreur lors du chargement des études');
+            }
+        }
+
+        tbody.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-act]');
+            if (!btn) return;
+            const s = studies.find(x => x.id === btn.dataset.id);
+            if (!s) return;
+
+            if (btn.dataset.act === 'schedule') {
+                editingId = s.id;
+                document.getElementById('dlgTitle').textContent = s.scheduledAt ? "Replanifier l'intervention" : "Planifier l'intervention";
+                document.getElementById('dlgPatient').textContent = `${s.patientName} — ${s.accessionNumber}`;
+                const now = new Date();
+                dlgInput.min = toLocalInput(now.toISOString());
+                dlgInput.value = s.scheduledAt ? toLocalInput(s.scheduledAt) : '';
+                dlg.showModal();
+            } else if (btn.dataset.act === 'cancel') {
+                if (!window.confirm(`Annuler l'étude de ${s.patientName} (${s.accessionNumber}) ?`)) return;
+                btn.disabled = true;
+                try {
+                    await cancelStudy(s.id);
+                    showToast.success('Étude annulée');
+                    await load();
+                } catch (err) { showToast.error(err.message); btn.disabled = false; }
+            }
+        });
+
+        document.getElementById('dlgCancel').addEventListener('click', () => dlg.close());
+        document.getElementById('dlgSave').addEventListener('click', async () => {
+            if (!dlgInput.value) { showToast.warning('Choisissez une date et une heure'); return; }
+            const saveBtn = document.getElementById('dlgSave');
+            saveBtn.disabled = true;
+            try {
+                await scheduleStudy(editingId, new Date(dlgInput.value).toISOString()); // local time -> UTC
+                dlg.close();
+                showToast.success('Intervention planifiée');
+                await load();
+            } catch (err) { showToast.error(err.message); }
+            finally { saveBtn.disabled = false; }
+        });
+
+        filterEl.addEventListener('change', render);
+        document.getElementById('btnRefresh').addEventListener('click', load);
+        load();
+    </script>
+</body>
+</html>
