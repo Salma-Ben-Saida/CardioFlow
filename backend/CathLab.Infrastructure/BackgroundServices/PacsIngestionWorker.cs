@@ -59,5 +59,9 @@ public class PacsIngestionWorker : BackgroundService
         _logger.LogInformation(
             "Ingestion cycle done — New: {New}, Already ingested: {Already}, Archived (skipped): {Archived}, Failed: {Failed}",
             newCount, alreadyCount, archivedCount, failedCount);
+        
+        var scheduling = scope.ServiceProvider.GetRequiredService<StudySchedulingService>();
+        var started = await scheduling.StartDueStudiesAsync();
+        if (started > 0) _logger.LogInformation("{Count} study(ies) moved to InProgress", started);
     }
 }

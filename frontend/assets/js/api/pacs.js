@@ -6,7 +6,9 @@ import { get, post } from './client.js';
 export async function getPacsStudies() {
     return get('/api/pacs/studies');
 }
-
+export async function getPacsOverview() {
+    return get('/api/pacs/overview');
+}
 export async function ingestPacsStudy(accessionNumber, patientOverride) {
     return post(`/api/pacs/ingest/${encodeURIComponent(accessionNumber)}`, patientOverride);
 }
@@ -16,4 +18,4 @@ export async function getDicomInstances(studyInstanceUid) {
     return get(`/api/dicom/study/${encodeURIComponent(studyInstanceUid)}/instances`);
 }
 
-export default { getPacsStudies, ingestPacsStudy, getDicomInstances };
+export default { getPacsStudies, getPacsOverview, ingestPacsStudy, getDicomInstances };

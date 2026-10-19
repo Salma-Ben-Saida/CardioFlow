@@ -40,4 +40,23 @@ public class CathStudyRepository : ICathStudyRepository
     await _ctx.CathStudies
         .Include(s => s.Operator) 
         .FirstOrDefaultAsync(s => s.Id == id);
+
+    public async Task<List<CathStudy>> GetAllWithPatientAsync() =>
+    await _ctx.CathStudies
+        .AsNoTracking()
+        .Include(s => s.Patient)
+        .OrderByDescending(s => s.CreatedAt)
+        .ToListAsync();
+
+    public async Task UpdateAsync(CathStudy study) => await _ctx.SaveChangesAsync();
+
+    public async Task<int> StartDueStudiesAsync(DateTime nowUtc)
+    {
+        var due = await _ctx.CathStudies
+            .Where(s => s.Status == StudyStatus.Scheduled && s.ScheduledAt != null && s.ScheduledAt <= nowUtc)
+            .ToListAsync();
+        foreach (var s in due) s.StartIfDue(nowUtc);
+        if (due.Count > 0) await _ctx.SaveChangesAsync();
+        return due.Count;
+    }
 }

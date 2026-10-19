@@ -9,13 +9,58 @@ const currentRole = currentUser?.role;
 // `roles: null` (or omitted) means visible to every authenticated role.
 // Otherwise the item only shows if currentRole is in the list.
 const navItems = [
-    { section: 'main', title: 'Principal', items: [
-        { label: 'Tableau de bord', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>', href: getDashboardForRole(currentRole), match: ['/frontend/pages/dashboard/', '/frontend/pages/secretaire/'], roles: null },
-    ]},
-    { section: 'patients', title: 'Patients', items: [
-        { label: 'Liste des patients', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', href: '/frontend/pages/patients/list.html', match: ['/frontend/pages/patients/list.html', '/frontend/pages/patients/detail.html'], roles: null },
-        { label: 'Nouvelle admission', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>', href: '/frontend/pages/patients/admission.html', match: ['/frontend/pages/patients/admission.html'], roles: ['Admin', 'Doctor', 'Medecin', 'Secretaire'] },
-    ]},
+    {
+        section: 'main',
+        title: 'Principal',
+        items: [
+            {
+                label: 'Tableau de bord',
+                icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+                href: getDashboardForRole(currentRole),
+                match: ['/frontend/pages/dashboard/', '/frontend/pages/secretaire/'],
+                roles: null
+            }
+        ]
+    },
+    {
+        section: 'planning',
+        title: 'Interventions',
+        items: [
+            {
+                label: 'Planning des interventions',
+                icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+                href: '/frontend/pages/studies/index.html',
+                match: ['/frontend/pages/studies/'],
+                roles: ['Medecin', 'Secretaire', 'Admin']
+            }
+        ]
+    },
+    {
+        section: 'patients',
+        title: 'Patients',
+        items: [
+            {
+                label: 'Liste des patients',
+                icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+                href: '/frontend/pages/patients/list.html',
+                match: ['/frontend/pages/patients/list.html', '/frontend/pages/patients/detail.html'],
+                roles: null
+            }
+        ]
+    },
+    {
+        section: 'pacs',
+        title: 'Imagerie',
+        items: [
+            {
+                label: 'Études PACS',
+                icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+                href: '/frontend/pages/pacs/index.html',
+                match: ['/frontend/pages/pacs/'],
+                roles: ['Medecin', 'Secretaire']
+            }
+        ]
+    }
 ];
 
 function isActivePage(matchPatterns) {

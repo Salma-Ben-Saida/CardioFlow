@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Études PACS - Système de gestion du CathLab</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/components.css">
+    <link rel="stylesheet" href="../../assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <nav class="topbar-breadcrumb">
+                        <a href="#">Accueil</a><span>/</span><span>Études PACS</span>
+                    </nav>
+                </div>
+            </header>
+            <div class="page-content">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-header-title">Études PACS</h1>
+                        <p class="page-header-subtitle">Études disponibles dans Orthanc et leur état dans CathLab</p>
+                    </div>
+                    <div class="page-header-actions">
+                        <button class="btn btn-secondary" id="btnRefresh" type="button">↻ Actualiser</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>N° d'accession</th><th>Patient</th><th>Date</th><th>Modalité</th><th>État</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="pacsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { renderSidebar } from '../../assets/js/components/sidebar.js';
+        import { showToast } from '../../assets/js/components/toast.js';
+        import { getPacsOverview, ingestPacsStudy } from '../../assets/js/api/pacs.js';
+
+        const ALLOWED_ROLES = ['Medecin', 'Secretaire', 'Admin'];
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+        if (!sessionStorage.getItem('authToken') || !currentUser || !ALLOWED_ROLES.includes(currentUser.role)) {
+            window.location.href = '/frontend/pages/login.html';
+        }
+
+        renderSidebar('sidebar-container');
+
+        const STATES = {
+            New:             { label: 'Nouvelle',        badge: 'badge-info' },
+            Ingested:        { label: 'Ingérée',         badge: 'badge-success' },
+            Archived:        { label: 'Archivée',        badge: 'badge-warning' },
+            PatientArchived: { label: 'Patient archivé', badge: 'badge-neutral' },
+        };
+
+        const tbody = document.getElementById('pacsBody');
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            const dt = typeof d === 'string' && d.length === 10 ? new Date(`${d}T00:00:00`) : new Date(d);
+            return isNaN(dt) ? '—' : dt.toLocaleDateString('fr-FR');
+        }
+
+        function actions(s) {
+            if (s.state === 'New') {
+                return `<button class="btn btn-primary btn-sm" data-accession="${escapeHtml(s.accessionNumber)}">Ingérer</button>`;
+            }
+            if (s.state === 'Ingested') {
+                return `<a class="btn btn-secondary btn-sm" href="/frontend/pages/patients/detail.html?id=${encodeURIComponent(s.patientId)}">Voir le patient</a>`;
+            }
+            return '—';
+        }
+
+        function row(s) {
+            const st = STATES[s.state] || { label: s.state, badge: 'badge-neutral' };
+            return `<tr>
+                <td>${escapeHtml(s.accessionNumber)}</td>
+                <td><div style="font-weight:500;">${escapeHtml(s.patientName || '—')}</div><div style="font-size:12px;color:#6b7280;">${escapeHtml(s.patientDicomId || '')}</div></td>
+                <td>${fmtDate(s.studyDate)}</td>
+                <td>${escapeHtml(s.modality || '—')}</td>
+                <td><span class="badge ${st.badge}">${st.label}</span></td>
+                <td>${actions(s)}</td>
+            </tr>`;
+        }
+
+        async function load() {
+            tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>Chargement…</p></td></tr>';
+            try {
+                const data = await getPacsOverview();
+                const arr = Array.isArray(data) ? data : (data?.items || []);
+                tbody.innerHTML = arr.length
+                    ? arr.map(row).join('')
+                    : '<tr><td colspan="6" class="table-empty"><p>Aucune étude dans Orthanc.</p></td></tr>';
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;">${escapeHtml(e.message)}</td></tr>`;
+                showToast.error('Erreur lors du chargement des études PACS');
+            }
+        }
+
+        tbody.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-accession]');
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            try {
+                const r = await ingestPacsStudy(btn.dataset.accession, null); // null = no manual patient override
+                if (r.wasArchived) showToast.error(r.info || 'Étude archivée : non ingérée');
+                else if (r.wasAlreadyIngested) showToast.info('Étude déjà ingérée');
+                else if (r.patientIsIncomplete) showToast.warning('Étude ingérée — dossier patient incomplet');
+                else showToast.success('Étude ingérée');
+                await load();
+            } catch (err) {
+                showToast.error(`Erreur : ${err.message}`);
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('btnRefresh').addEventListener('click', load);
+        load();
+    </script>
+</body>
+</html>

@@ -76,7 +76,7 @@ public class StudyIngestionService
             StudyDate        = dto.StudyDate.HasValue
                                 ? dto.StudyDate.Value.ToDateTime(TimeOnly.MinValue)
                                 : DateTime.UtcNow,
-            Status           = StudyStatus.Scheduled
+            Status           = StudyStatus.Pending
         };
 
         try
