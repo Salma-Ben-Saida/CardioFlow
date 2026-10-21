@@ -11,7 +11,10 @@
         tr.needs-scheduling { background-color: rgba(239, 68, 68, 0.06); }
         .flag-dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:8px; box-shadow:0 0 0 3px rgba(239,68,68,.2); }
         .row-actions { display:flex; gap:8px; flex-wrap:wrap; }
-        dialog { border:none; border-radius:12px; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,.2); min-width:340px; }
+        dialog { border:none; border-radius:12px; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,.2);
+         min-width:340px; max-width:calc(100vw - 32px); margin:auto; }
+        dialog[open] { animation: dlg-in .15s ease-out; }
+        @keyframes dlg-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
         dialog::backdrop { background: rgba(0,0,0,.4); }
         dialog label { display:block; font-size:14px; margin:12px 0 6px; color:#374151; }
         dialog input { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; }
@@ -116,8 +119,7 @@
                 case 'Scheduled':  return btn('schedule', 'Replanifier', 'btn-secondary') + btn('cancel', 'Annuler', 'btn-secondary');
                 case 'Cancelled':  return btn('schedule', 'Replanifier', 'btn-secondary');
                 case 'InProgress':
-                    return currentUser.role === 'Secretaire' ? '—'
-                        : `<a class="btn btn-primary btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}">Ouvrir</a>`;
+    return `<a class="btn btn-primary btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}">${currentUser.role === 'Secretaire' ? 'Consulter' : 'Ouvrir'}</a>`;
                 default: return '—';
             }
         }
@@ -194,8 +196,14 @@
         });
 
         document.getElementById('dlgCancel').addEventListener('click', () => dlg.close());
+        dlg.addEventListener('click', (e) => {
+        const r = dlg.getBoundingClientRect();
+        const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+        if (!inside) dlg.close();
+    }); 
         document.getElementById('dlgSave').addEventListener('click', async () => {
             if (!dlgInput.value) { showToast.warning('Choisissez une date et une heure'); return; }
+            if (new Date(dlgInput.value) < new Date()) { showToast.warning('La date doit être dans le futur'); return; }
             const saveBtn = document.getElementById('dlgSave');
             saveBtn.disabled = true;
             try {

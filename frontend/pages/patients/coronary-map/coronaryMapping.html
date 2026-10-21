@@ -235,11 +235,13 @@
 const API_BASE = 'http://localhost:5152/api';
 const CATH_STUDY_ID = new URLSearchParams(location.search).get('cathStudyId');
 const PATIENT_ID = new URLSearchParams(location.search).get('patientId');
+const CURRENT_USER = JSON.parse(sessionStorage.getItem('user') || 'null');
+const IS_READ_ONLY = CURRENT_USER?.role === 'Secretaire';
 
 function authHeaders(extra = {}) {
   const token = sessionStorage.getItem('authToken');
   if (!token) {
-    window.location.href = '/frontend/pages/login/index.html';
+    window.location.href = '/frontend/pages/login.html';
     throw new Error('Session expirée, redirection vers le login.');
   }
   return { ...extra, 'Authorization': 'Bearer ' + token };
@@ -248,7 +250,7 @@ function authHeaders(extra = {}) {
 function handleHttpError(res){
   if(res.status === 401){
     sessionStorage.removeItem('authToken');
-    window.location.href = '/frontend/pages/login/index.html';
+    window.location.href = '/frontend/pages/login.html';
   }
 }
 
@@ -1072,6 +1074,9 @@ function updateStatusBadge(){
   if(reportStatus?.status === 'Confirmed'){
     badge.className = 'status-badge confirmed';
     badge.textContent = 'Confirmé le ' + formatFrDate(reportStatus.confirmedAt) + ' par D.' + (reportStatus.confirmedByUserName || '?');
+  } else if(IS_READ_ONLY){
+    badge.className = 'status-badge draft';
+    badge.textContent = 'Brouillon — lecture seule';
   } else {
     badge.className = 'status-badge draft';
     badge.textContent = 'Brouillon — modifiable';
@@ -1079,14 +1084,20 @@ function updateStatusBadge(){
 }
 
 function applyLockState(){
-  isLocked = reportStatus?.status === 'Confirmed';
+  const confirmed = reportStatus?.status === 'Confirmed';
+  isLocked = confirmed || IS_READ_ONLY;
   document.body.classList.toggle('locked', isLocked);
   updateStatusBadge();
-  const conc = document.getElementById('f-conclusion');
-  const reco = document.getElementById('f-recommendations');
-  if(conc) conc.disabled = isLocked;
-  if(reco) reco.disabled = isLocked;
-  if(isLocked) showToast('Rapport verrouillé — lecture seule', 'info');
+  ['f-conclusion','f-recommendations','f-approach','f-catheter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = isLocked;
+  });
+  const pdfBtn = document.getElementById('downloadPdfBtn');
+  if(pdfBtn) pdfBtn.style.display = IS_READ_ONLY ? 'none' : '';
+  const reserved = document.getElementById('reservedPanel');
+  if(reserved && IS_READ_ONLY) reserved.style.display = 'none';
+  if(confirmed) showToast('Rapport verrouillé — lecture seule', 'info');
+  else if(IS_READ_ONLY) showToast('Mode lecture seule', 'info');
 }
 
 function showConflictBanner(msg){
@@ -1276,6 +1287,7 @@ function openFullReport(){
   reportModalLayer.appendChild(modal);
   document.getElementById('closeReportModal').onclick = ()=>{ reportModalLayer.innerHTML=''; };
   document.getElementById('printReport').onclick = ()=> window.print();
+  if(IS_READ_ONLY) document.getElementById('downloadPdfBtnModal')?.remove();
   document.getElementById('downloadPdfBtnModal').onclick = downloadPdf;
 }
 
@@ -1390,7 +1402,7 @@ async function hydrateFromServer(){
 }
 /* --- Inventory sync --- */
 async function syncInventory(){
-  if(!CATH_STUDY_ID) return;
+  if(!CATH_STUDY_ID || IS_READ_ONLY) return;
   try{
     const [reserved, stents, balloons] = await Promise.all([
       apiGet('/pharmacy/items/reserved/' + CATH_STUDY_ID),
@@ -1530,22 +1542,25 @@ document.getElementById('f-approach').addEventListener('blur', saveReportMeta);
 document.getElementById('f-catheter').addEventListener('blur', saveReportMeta);
 
 /* --- Initial loads --- */
-if(CATH_STUDY_ID){
-  apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
-    .then(items => { window.__reservedItems = items; renderReservedPanel(items); })
-    .catch(err => console.error('Could not load reserved items', err));
-} else {
-  console.warn('cathStudyId absent de l\'URL — ouvrez cette page avec ?cathStudyId=<id>.');
-  renderReservedPanel([]);
+if(!IS_READ_ONLY){ 
+
+  if(CATH_STUDY_ID){
+    apiGet('/pharmacy/items/reserved/'+CATH_STUDY_ID)
+      .then(items => { window.__reservedItems = items; renderReservedPanel(items); })
+      .catch(err => console.error('Could not load reserved items', err));
+  } else {
+    console.warn('cathStudyId absent de l\'URL — ouvrez cette page avec ?cathStudyId=<id>.');
+    renderReservedPanel([]);
+  }
+
+  apiGet('/pharmacy/items/available?deviceType=Stent')
+    .then(items => window.__availableStents = items)
+    .catch(err => console.error('Could not load available stents', err));
+
+  apiGet('/pharmacy/items/available?deviceType=Ballon')
+    .then(items => window.__availableBalloons = items)
+    .catch(err => console.error('Could not load available balloons', err));
 }
-
-apiGet('/pharmacy/items/available?deviceType=Stent')
-  .then(items => window.__availableStents = items)
-  .catch(err => console.error('Could not load available stents', err));
-
-apiGet('/pharmacy/items/available?deviceType=Ballon')
-  .then(items => window.__availableBalloons = items)
-  .catch(err => console.error('Could not load available balloons', err));
 
 /* --- Re-fetch status on focus (guard against concurrent confirmation) --- */
 document.addEventListener('focus', ()=>{
