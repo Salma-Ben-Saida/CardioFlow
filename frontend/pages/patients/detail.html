@@ -208,7 +208,7 @@
     try {
         const studies = await getPatientStudies(patientId);
         if (!studies || studies.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>No studies found for this patient</p></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>Aucune étude trouvée pour ce patient</p></td></tr>';
             return;
         }
         tbody.innerHTML = studies.map(s => `
@@ -228,7 +228,7 @@
                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/>
                  <path d="M3 12h3m12 0h3M12 3v3m0 12v3"/>
                </svg>
-               View Images
+               Voir les images
            </a>`
         : `<span style="color:var(--color-gray-400);font-size:var(--font-size-sm);">Aucune image</span>`
     }
@@ -238,7 +238,7 @@
             fill="none" stroke="currentColor" stroke-width="2">
          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
        </svg>
-       Mapping
+       Cartographie coronaire
     </a>
         ${canArchive
         ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber)}" title="Archiver cette étude">Archiver</button>`

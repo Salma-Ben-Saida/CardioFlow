@@ -8,7 +8,7 @@ namespace CathLab.WebApi.Controllers;
 
 [ApiController]
 [Route("api/procedures")]
-[Authorize(Roles = "Admin,Medecin")]
+[Authorize(Roles = "Admin,Medecin, Secretaire")]
 public class ProceduresController : ControllerBase
 {
     private readonly ProcedureService _procedures;
@@ -29,6 +29,7 @@ public class ProceduresController : ControllerBase
     /// this CathStudy if one doesn't exist yet.
     /// </summary>
     [HttpPost("lesions")]
+    [Authorize(Roles = "Admin,Medecin")]
     public async Task<IActionResult> AddLesion([FromBody] CreateLesionDto dto)
     {
         try
@@ -48,6 +49,7 @@ public class ProceduresController : ControllerBase
     /// UI flow. Consumes the chosen InventoryItem as part of this call.
     /// </summary>
     [HttpPost("lesions/{lesionId:guid}/stent")]
+    [Authorize(Roles = "Admin,Medecin")]
     public async Task<IActionResult> AddStentTreatment(Guid lesionId, [FromBody] CreateStentTreatmentDto dto)
     {
         dto.LesionId = lesionId; // route is authoritative over any body value
@@ -72,6 +74,8 @@ public class ProceduresController : ControllerBase
     /// addable from an existing Lesion, never standalone.
     /// </summary>
     [HttpPost("lesions/{lesionId:guid}/balloon")]
+    [Authorize(Roles = "Admin,Medecin")]
+
     public async Task<IActionResult> AddBalloonTreatment(Guid lesionId, [FromBody] CreateBalloonTreatmentDto dto)
     {
         dto.LesionId = lesionId;
@@ -105,6 +109,7 @@ public class ProceduresController : ControllerBase
 /// Irreversible.
 /// </summary>
 [HttpPost("reports/{reportId:guid}/confirm")]
+[Authorize(Roles = "Admin,Medecin")]
 public async Task<IActionResult> ConfirmReport(Guid reportId)
 {
     try
@@ -141,6 +146,7 @@ public async Task<IActionResult> GetReportByCathStudy(Guid cathStudyId)
 /// (Approach, CatheterUsed, Conclusion...) required before confirmation.
 /// </summary>
 [HttpPut("reports/{reportId:guid}")]
+[Authorize(Roles = "Admin,Medecin")]
 public async Task<IActionResult> UpdateReportNarrative(Guid reportId, [FromBody] UpdateReportNarrativeDto dto)
 {
     try
@@ -156,6 +162,7 @@ public async Task<IActionResult> UpdateReportNarrative(Guid reportId, [FromBody]
 
 /// <summary>DELETE /api/procedures/lesions/{lesionId} - removes a marker entirely.</summary>
 [HttpDelete("lesions/{lesionId:guid}")]
+[Authorize(Roles = "Admin,Medecin")]
 public async Task<IActionResult> DeleteLesion(Guid lesionId)
 {
     try
@@ -171,6 +178,8 @@ public async Task<IActionResult> DeleteLesion(Guid lesionId)
 
 /// <summary>DELETE /api/procedures/treatments/{treatmentId} - removes one stent/balloon.</summary>
 [HttpDelete("treatments/{treatmentId:guid}")]
+[Authorize(Roles = "Admin,Medecin")]
+
 public async Task<IActionResult> DeleteTreatment(Guid treatmentId)
 {
     try

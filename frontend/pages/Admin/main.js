@@ -549,7 +549,6 @@ async function loadLogs() {
   }
 }
 /* ---------- Audit action labels ---------- */
-/* ---------- Audit action labels ---------- */
 const AUDIT_ACTIONS = {
   // Données
   Create:       { label: 'Création',               pill: 'pill-green'  },
@@ -569,6 +568,9 @@ const AUDIT_ACTIONS = {
   LoginSuccess: { label: 'Connexion réussie',      pill: 'pill-green'  },
   LoginFailed:  { label: 'Échec de connexion',     pill: 'pill-red'    },
   Logout:       { label: 'Déconnexion',            pill: 'pill-grey'   },
+  // Planning des interventions
+  Schedule:     { label: 'Planification',          pill: 'pill-blue'   },
+  Cancel:       { label: 'Annulation',             pill: 'pill-orange' },
 };
 
 // Unknown actions still get a (grey) pill, showing the raw value
