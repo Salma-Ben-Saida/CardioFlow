@@ -36,17 +36,17 @@
 
                 <!-- KPI Cards: administrative only, no clinical/report data -->
                 <div class="content-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: var(--spacing-6);" id="kpiCards">
-                    <div class="card stat-card stat-card-primary">
+                    <div style="cursor:pointer" onclick="location.href='/frontend/pages/studies/index.html'" class="card stat-card stat-card-primary">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="totalPatients">-</div><div class="stat-label">Total des patients</div></div>
+                        <div class="stat-content"><div class="stat-value" id="toSchedule">-</div><div class="stat-label">Études à planifier</div></div>
                     </div>
-                    <div class="card stat-card stat-card-warning">
+                    <div style="cursor:pointer" onclick="location.href='/frontend/pages/studies/index.html'" class="card stat-card stat-card-warning">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
                         <div class="stat-content"><div class="stat-value" id="incompleteRecords">-</div><div class="stat-label">Dossiers incomplets</div></div>
                     </div>
-                    <div class="card stat-card stat-card-success">
+                    <div style="cursor:pointer" onclick="location.href='/frontend/pages/studies/index.html'" class="card stat-card stat-card-success">
                         <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 4 12 14.01l-3-3"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-                        <div class="stat-content"><div class="stat-value" id="completeRecords">-</div><div class="stat-label">Dossiers complets</div></div>
+                        <div class="stat-content"><div class="stat-value" id="todayCount">-</div><div class="stat-label">Interventions aujourd'hui</div></div>
                     </div>
                 </div>
 
@@ -57,7 +57,7 @@
                         <div class="card-body" style="padding: 0;"><div class="incomplete-list" id="incompletePatientsList"></div></div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">Admissions récentes</h3><span class="card-subtitle">Derniers patients</span></div>
+                        <div class="card-header"><h3 class="card-title">Prochaines interventions</h3><span class="card-subtitle">Derniers patients</span></div>
                         <div class="card-body" style="padding: 0;"><div class="incomplete-list" id="recentPatientsList"></div></div>
                     </div>
                 </div>
@@ -70,6 +70,7 @@
         import { showToast } from '../../assets/js/components/toast.js';
         import { getPatients } from '../../assets/js/api/patients.js';
         import { formatDate, showEmptyState } from '../../assets/js/utils.js';
+        import { getStudies } from '../../assets/js/api/studies.js';
 
         const ALLOWED_ROLES = ['Secretaire', 'Admin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
@@ -91,17 +92,28 @@
         }
 
         async function loadKPIs() {
-            try {
-                const patientsData = await getPatients({ page: 1, pageSize: 1 });
-                const totalPatients = patientsData.totalCount || patientsData.total || patientsData.items?.length || 0;
-                document.getElementById('totalPatients').textContent = totalPatients;
+    const incomplete = await getPatients({ page: 1, pageSize: 1, status: 'incomplete' });
+    document.getElementById('incompleteRecords').textContent = incomplete.totalCount || incomplete.total || 0;
 
-                const incompleteData = await getPatients({ page: 1, pageSize: 1, status: 'incomplete' });
-                const incompleteCount = incompleteData.totalCount || incompleteData.total || 0;
-                document.getElementById('incompleteRecords').textContent = incompleteCount;
-                document.getElementById('completeRecords').textContent = Math.max(totalPatients - incompleteCount, 0);
-            } catch (error) { throw error; }
-        }
+    const studies = await getStudies();
+    const today = new Date().toDateString();
+    document.getElementById('toSchedule').textContent = studies.filter(s => s.needsScheduling).length;
+    document.getElementById('todayCount').textContent =
+        studies.filter(s => s.scheduledAt && new Date(s.scheduledAt).toDateString() === today && s.status !== 'Cancelled').length;
+}
+
+async function loadRecentPatients() {
+    const container = document.getElementById('recentPatientsList');
+    try {
+        const studies = (await getStudies())
+            .filter(s => s.status === 'Scheduled' && new Date(s.scheduledAt) >= new Date())
+            .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)).slice(0, 5);
+        if (!studies.length) { showEmptyState(container, 'Aucune intervention planifiée', 'check'); return; }
+        container.innerHTML = studies.map(s => `<div class="list-item" onclick="window.location.href='/frontend/pages/studies/index.html'">
+            <div class="list-item-content"><div class="list-item-title">${escapeHtml(s.patientName)}</div>
+            <div class="list-item-subtitle">${new Date(s.scheduledAt).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div></div></div>`).join('');
+    } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Échec du chargement</p>'; }
+}
 
         async function loadIncompletePatients() {
             const container = document.getElementById('incompletePatientsList');
@@ -113,16 +125,7 @@
             } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Échec du chargement des dossiers incomplets</p>'; }
         }
 
-        async function loadRecentPatients() {
-            const container = document.getElementById('recentPatientsList');
-            try {
-                const patientsData = await getPatients({ page: 1, pageSize: 5, sortBy: 'createdAt', sortDir: 'desc' });
-                const patients = patientsData.items || patientsData.patients || [];
-                if (patients.length === 0) { showEmptyState(container, 'Aucun patient pour le moment', 'user'); return; }
-                container.innerHTML = patients.map(p => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(p.fullName)}</div><div class="list-item-subtitle">${formatDate(p.createdAt)}</div></div></div>`).join('');
-            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:var(--spacing-4);">Échec du chargement des patients récents</p>'; }
-        }
-
+        
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
         initDashboard();
     </script>

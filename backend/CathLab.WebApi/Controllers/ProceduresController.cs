@@ -151,12 +151,31 @@ public async Task<IActionResult> UpdateReportNarrative(Guid reportId, [FromBody]
 {
     try
     {
-        await _procedures.UpdateReportNarrativeAsync(reportId, dto);
-        return NoContent();
+        var isAdmin = User.IsInRole("Admin");
+    await _procedures.UpdateReportNarrativeAsync(reportId, dto, isAdmin);
+    if (isAdmin)
+        await _audit.LogActionAsync(GetCurrentUserId(), "Update", "ProcedureReport", reportId, null);
+    return NoContent();
     }
     catch (InvalidOperationException ex)
     {
         return Conflict(new { error = ex.Message });
+    }
+}
+
+[HttpDelete("reports/{reportId:guid}")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> DeleteReport(Guid reportId)
+{
+    try
+    {
+        await _procedures.DeleteReportAsync(reportId);
+        await _audit.LogActionAsync(GetCurrentUserId(), "Delete", "ProcedureReport", reportId, null);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return NotFound(new { error = ex.Message });
     }
 }
 

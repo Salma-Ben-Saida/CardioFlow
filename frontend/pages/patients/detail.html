@@ -40,6 +40,7 @@
                     <div class="tabs" style="padding:0 var(--spacing-6);background:var(--color-gray-50);">
                         <button class="tab active" data-tab="overview">Aperçu</button>
                         <button class="tab" data-tab="studies">Études</button>
+                        <button class="tab" data-tab="reports" id="reportsTabBtn" style="display:none;">Rapports</button>
                         <button class="tab" data-tab="risk">Profil de risque</button>
                     </div>
                     <div class="card-body">
@@ -88,6 +89,11 @@
                         <div class="tab-panel" id="studiesPanel">
                             <div class="table-container"><table class="table"><thead><tr><th>Numéro d’accession</th><th>Date de l’étude</th><th>Statut</th><th>Opérateur</th><th>Créé le</th><th>Actions</th></tr></thead><tbody id="studiesTableBody"></tbody></table></div>
                         </div>
+                        <div class="tab-panel" id="reportsPanel">
+  <div class="table-container"><table class="table">
+    <thead><tr><th>Date</th><th>Médecin</th><th>Statut</th><th></th></tr></thead>
+    <tbody id="reportsTableBody"></tbody></table></div>
+</div>
                         <div class="tab-panel" id="riskPanel">
                             <div id="riskProfileContent"><div class="content-grid" style="grid-template-columns:1fr 1fr;">
                                 <div>
@@ -134,11 +140,17 @@
         import { getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient } from '../../assets/js/api/patients.js';
         import { archivePatient, archiveStudy } from '../../assets/js/api/admin.js';
         import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState } from '../../assets/js/utils.js';
+        import { getPatientReports } from '../../assets/js/api/reports.js';
 
         const EDIT_ROLES = ['Secretaire', 'Admin', 'Medecin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
         const canEditPatient = EDIT_ROLES.includes(currentUser?.role);
-        const canArchive = currentUser?.role === 'Admin';   // only admins may archive
+        const canArchive = currentUser?.role === 'Admin';   
+        const canViewImaging = ['Admin', 'Medecin'].includes(currentUser?.role);
+        if (currentUser?.role === 'Secretaire') {
+    document.querySelector('.tab[data-tab="risk"]')?.remove();
+    document.getElementById('riskPanel')?.remove();
+}
         let currentPatient = null;
 
         if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
@@ -147,7 +159,17 @@
         const patientId = getQueryParam('id');
         if (!patientId) { showToast.error('Aucun identifiant de patient fourni'); setTimeout(() => window.location.href = '/frontend/pages/patients/list.html', 2000); }
 
-        document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active')); tab.classList.add('active'); document.getElementById(`${tab.dataset.tab}Panel`).classList.add('active'); }));
+        function activateTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `${name}Panel`));
+}
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    activateTab(tab.dataset.tab);
+    history.replaceState(null, '', '#' + tab.dataset.tab);
+}));
+const _hash = location.hash.slice(1);
+if (_hash && document.getElementById(`${_hash}Panel`)) activateTab(_hash);
+
 
         async function loadPatientData() {
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -162,7 +184,8 @@
                 const archiveBtn = document.getElementById('archivePatientBtn');
                 if (archiveBtn) archiveBtn.style.display = canArchive ? 'inline-flex' : 'none';
                 loadStudies();
-                loadRiskProfile();
+                loadReports();
+                if (currentUser?.role !== 'Secretaire') loadRiskProfile();
             } catch (error) {
                 showToast.error('Échec du chargement du patient : ' + error.message);
                 setTimeout(() => window.location.href = '/frontend/pages/patients/list.html', 2000);
@@ -170,6 +193,21 @@
         }
 
         function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
+
+        async function loadReports() {
+    if (!canViewImaging) return;
+    document.getElementById('reportsTabBtn').style.display = '';
+    const tbody = document.getElementById('reportsTableBody');
+    try {
+        const reports = await getPatientReports(patientId);
+        tbody.innerHTML = reports.length ? reports.map(r => `<tr>
+            <td>${formatDateTime(r.reportGeneratedAt)}</td>
+            <td>${escapeHtml(r.doctorName || '—')}</td>
+            <td>${r.isConfirmed ? '<span class="badge badge-success">Confirmé</span>' : '<span class="badge badge-warning">Brouillon</span>'}</td>
+            <td><a class="btn btn-ghost btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${r.cathStudyId}&patientId=${patientId}">Ouvrir</a></td></tr>`).join('')
+            : '<tr><td colspan="4" class="table-empty"><p>Aucun rapport</p></td></tr>';
+    } catch { tbody.innerHTML = '<tr><td colspan="4" class="table-empty"><p>Aucun rapport accessible pour ce patient</p></td></tr>'; }
+}
 
         function renderPatientHeader(patient) {
             document.getElementById('headerAvatar').textContent = getInitials(patient.fullName);
@@ -203,7 +241,32 @@
             setInfo('viewUpdatedAt', formatDateTime(patient.updatedAt));
         }
 
-        async function loadStudies() {
+       function imagingActions(s) {
+    const viewImagesBtn = s.studyInstanceUid
+        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}"
+              target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Ouvrir le visualiseur DICOM">
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2">
+                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/>
+                 <path d="M3 12h3m12 0h3M12 3v3m0 12v3"/>
+               </svg>
+               Visualiseur DICOM
+           </a>`
+        : `<span style="color:var(--color-gray-400);font-size:var(--font-size-sm);">Aucune image</span>`;
+
+    const coronaryMapBtn = `<a href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${encodeURIComponent(s.id)}&patientId=${encodeURIComponent(patientId)}"
+       class="btn btn-ghost btn-sm" title="Ouvrir la cartographie coronaire">
+       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2">
+         <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+       </svg>
+       Cartographie coronaire
+    </a>`;
+
+    return viewImagesBtn + coronaryMapBtn;
+}
+
+async function loadStudies() {
     const tbody = document.getElementById('studiesTableBody');
     try {
         const studies = await getPatientStudies(patientId);
@@ -211,6 +274,10 @@
             tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><p>Aucune étude trouvée pour ce patient</p></td></tr>';
             return;
         }
+
+        
+        const canViewImaging = ['Admin', 'Medecin'].includes(currentUser?.role);
+
         tbody.innerHTML = studies.map(s => `
             <tr>
                 <td><div style="font-weight:500;">${escapeHtml(s.accessionNumber)}</div></td>
@@ -219,32 +286,13 @@
                 <td>${escapeHtml(s.operatorName || '-')}</td>
                 <td>${formatDateTime(s.createdAt)}</td>
                 <td>
-    <div style="display:flex; gap:6px;">
-    ${s.studyInstanceUid
-        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}"
-              target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Ouvrir le visualiseur DICOM">
-               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2">
-                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/>
-                 <path d="M3 12h3m12 0h3M12 3v3m0 12v3"/>
-               </svg>
-               Voir les images
-           </a>`
-        : `<span style="color:var(--color-gray-400);font-size:var(--font-size-sm);">Aucune image</span>`
-    }
-    <a href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${encodeURIComponent(s.id)}&patientId=${encodeURIComponent(patientId)}"
-       class="btn btn-ghost btn-sm" title="Ouvrir la cartographie coronaire">
-       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2">
-         <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-       </svg>
-       Cartographie coronaire
-    </a>
-        ${canArchive
-        ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber)}" title="Archiver cette étude">Archiver</button>`
-        : ''}
-    </div>
-</td>
+                    <div style="display:flex; gap:6px;">
+                        ${canViewImaging ? imagingActions(s) : ''}
+                        ${canArchive
+                            ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber)}" title="Archiver cette étude">Archiver</button>`
+                            : ''}
+                    </div>
+                </td>
             </tr>
         `).join('');
     } catch {

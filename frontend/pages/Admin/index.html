@@ -284,7 +284,7 @@
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="reports-table">
-                  <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th></tr></thead>
+                  <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -469,6 +469,28 @@
         </div>
       </div>
     </div>
+
+    <!-- Delete Report Confirmation Modal -->
+        <div class="modal-overlay hidden" id="modal-delete-report">
+      <div class="modal modal-confirm">
+        <div class="modal-head modal-head-warning">
+          <h3 class="modal-title">Supprimer le rapport</h3>
+          <button class="modal-close" data-close-modal="modal-delete-report">×</button>
+        </div>
+        <div class="modal-body modal-body-confirm">
+          <div class="delete-warning-icon">⚠</div>
+          <div class="delete-warning-copy">
+            <p class="delete-warning-title">Cette action est irréversible.</p>
+            <p id="delete-report-message">Voulez-vous vraiment supprimer ce rapport ?</p>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close-modal="modal-delete-report">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-delete-report">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Archive Modal (study or patient) -->
     <div class="modal-overlay hidden" id="modal-archive">
       <div class="modal modal-confirm">

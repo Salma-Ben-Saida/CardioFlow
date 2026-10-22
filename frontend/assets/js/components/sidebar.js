@@ -86,7 +86,7 @@ export function renderSidebar(containerId = 'sidebar-container') {
     navItems.forEach(section => {
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return;
-        html += `<div class="nav-section"><div class="nav-section-title">${section.title}</div>`;
+        html += `<div class="nav-section">${visibleItems.length > 1 ? `<div class="nav-section-title">${section.title}</div>` : ''}`;
         visibleItems.forEach(item => {
             const isActive = isActivePage(item.match) ? 'active' : '';
             html += `<a href="${item.href}" class="nav-item ${isActive}"><span class="nav-item-icon">${item.icon}</span><span class="nav-item-text">${item.label}</span></a>`;
