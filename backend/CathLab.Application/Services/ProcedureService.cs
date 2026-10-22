@@ -413,12 +413,12 @@ public async Task<ProcedureReportDetailDto?> GetReportDetailByCathStudyIdAsync(G
 }
 
 /// <summary>Update the narrative fields required before confirmation.</summary>
-public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativeDto dto)
+public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativeDto dto, bool isAdmin = false)
 {
     var report = await _reports.FindByIdAsync(reportId)
         ?? throw new InvalidOperationException("Procedure report not found.");
 
-    if (report.IsConfirmed)
+    if (report.IsConfirmed && !isAdmin)
         throw new InvalidOperationException("Cannot edit a confirmed report.");
 
     if (dto.Approach is not null) report.Approach = dto.Approach;
@@ -431,7 +431,45 @@ public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativ
     if (dto.DoseAreaProductGycm2.HasValue) report.DoseAreaProductGycm2 = dto.DoseAreaProductGycm2;
     if (dto.Recommendations is not null) report.Recommendations = dto.Recommendations;
 
+        if (report.IsConfirmed)
+    {
+        report.Lesions = await _lesions.GetByProcedureReportAsync(reportId);
+        report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report);
+    }
+
     await _reports.UpdateAsync(report);
+}
+public async Task DeleteReportAsync(Guid reportId)
+{
+    var report = await _reports.FindByIdAsync(reportId)
+        ?? throw new InvalidOperationException("Procedure report not found.");
+
+    var lesions = await _lesions.GetByProcedureReportAsync(reportId);
+    var pdfPath = report.PdfStoragePath;
+    var wasConfirmed = report.IsConfirmed;
+    var cathStudyId = report.CathStudyId;
+
+    await _unitOfWork.ExecuteInTransactionAsync(async () =>
+    {
+        if (!wasConfirmed)
+            foreach (var lesion in lesions)
+                foreach (var treatment in lesion.Treatments)
+                    await _inventory.ReleaseItemAsync(treatment.InventoryItemId);
+
+        await _reports.DeleteAsync(reportId);
+
+        var study = await _studies.FindByIdAsync(cathStudyId);
+        if (study is not null && study.Status == StudyStatus.Completed)
+        {
+            study.Status = StudyStatus.InProgress;
+            await _studies.UpdateAsync(study);
+        }
+    });
+
+    if (!string.IsNullOrEmpty(pdfPath) && File.Exists(pdfPath))
+    {
+        try { File.Delete(pdfPath); } catch { /* orphan file is harmless */ }
+    }
 }
 
 /// <summary>Deletes a single treatment and releases its reserved device back to stock.</summary>

@@ -8,6 +8,9 @@ public interface IProcedureReportRepository
     Task<ProcedureReport?> FindByCathStudyIdAsync(Guid cathStudyId);
     Task<ProcedureReport> CreateAsync(ProcedureReport report);
     Task UpdateAsync(ProcedureReport report);
+    
+    /// <summary>Deletes the report together with its lesions and treatments.</summary>
+    Task DeleteAsync(Guid id);
 
     /// <summary>
     /// All reports for studies performed BY this doctor, across all of

@@ -63,7 +63,7 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">Enregistrements incomplets</h3><span class="card-subtitle">Nécessite une attention</span></div>
+                        <div class="card-header"><h3 class="card-title">Études à traiter</h3><span class="card-subtitle">Nécessite une attention</span></div>
                         <div class="card-body" style="padding: 0;"><div class="incomplete-list" id="incompletePatientsList"></div></div>
                     </div>
                 </div>
@@ -77,6 +77,7 @@
         import { getPatients } from '../../assets/js/api/patients.js';
         import { getReports } from '../../assets/js/api/reports.js';
         import { formatDate, formatStatusBadge, showEmptyState } from '../../assets/js/utils.js';
+        import { getStudies } from '../../assets/js/api/studies.js';
 
         const ALLOWED_ROLES = ['Medecin', 'Admin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
@@ -148,15 +149,20 @@
             } catch { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#ef4444;">Échec du chargement des rapports récents</td></tr>'; }
         }
 
-        async function loadIncompletePatients() {
-            const container = document.getElementById('incompletePatientsList');
-            try {
-                const patientsData = await getPatients({ page: 1, pageSize: 10, status: 'incomplete' });
-                const patients = patientsData.items || patientsData.patients || [];
-                if (patients.length === 0) { showEmptyState(container, 'Aucun dossier incomplet', 'check'); return; }
-                container.innerHTML = patients.map(p => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/detail.html?id=${p.id}'"><div class="list-item-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="list-item-content"><div class="list-item-title">${escapeHtml(p.fullName)}</div><div class="list-item-subtitle">${escapeHtml(p.conquestPatientID || p.nationalId || 'Aucun identifiant')}</div></div><span class="badge badge-warning">!</span></div>`).join('');
-            } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;">Échec du chargement des dossiers incomplets</p>'; }
-        }
+    async function loadIncompletePatients() {
+    const container = document.getElementById('incompletePatientsList');
+    try {
+        const studies = (await getStudies())
+            .filter(s => ['InProgress', 'Scheduled'].includes(s.status))
+            .sort((a, b) => (a.status === 'InProgress' ? -1 : 1) || new Date(a.scheduledAt) - new Date(b.scheduledAt))
+            .slice(0, 8);
+        if (!studies.length) { showEmptyState(container, 'Aucune étude à traiter', 'check'); return; }
+        container.innerHTML = studies.map(s => `<div class="list-item" onclick="window.location.href='/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}'">
+            <div class="list-item-content"><div class="list-item-title">${escapeHtml(s.patientName)}</div>
+            <div class="list-item-subtitle">${s.scheduledAt ? new Date(s.scheduledAt).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : '—'}</div></div>
+            <span class="badge ${s.status === 'InProgress' ? 'badge-warning' : 'badge-info'}">${s.status === 'InProgress' ? 'En cours' : 'Planifiée'}</span></div>`).join('');
+    } catch { container.innerHTML = '<p style="text-align:center;color:#6b7280;">Échec du chargement</p>'; }
+}
 
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
         initDashboard();

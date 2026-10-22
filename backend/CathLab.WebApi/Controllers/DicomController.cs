@@ -4,9 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Net.Http;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/dicom")]
+
 public class DicomController : ControllerBase
 {
     private readonly HttpClient _http;

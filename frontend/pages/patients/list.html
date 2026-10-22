@@ -19,7 +19,6 @@
             <div class="page-content">
                 <div class="page-header">
                     <div class="page-header-left"><h1 class="page-header-title">Liste des patients</h1><p class="page-header-subtitle">Gérer et consulter tous les dossiers des patients</p></div>
-                    <div class="page-header-actions"><a href="/frontend/pages/patients/admission.html" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Nouveau patient</a></div>
                 </div>
                 <div class="filter-bar">
                     <div class="filter-group filter-group-search">
@@ -45,10 +44,23 @@
         import { showToast } from '../../assets/js/components/toast.js';
         import { createPagination } from '../../assets/js/components/pagination.js';
         import { getPatients } from '../../assets/js/api/patients.js';
+        import { getDashboardForRole } from '../../assets/js/rolesRoutes.js';
         import { formatDate, formatSex, formatStatusBadge, debounce, getQueryParam, setQueryParams } from '../../assets/js/utils.js';
 
         if (!sessionStorage.getItem('authToken')) window.location.href = '/frontend/pages/login.html';
         renderSidebar('sidebar-container');
+
+        // Correction dynamique du fil d'ariane "Accueil" selon le rôle de l'utilisateur
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+        if (currentUser?.role) {
+            document.querySelector('.topbar-breadcrumb a').href = getDashboardForRole(currentUser.role);
+        }
+
+        // Si la secrétaire n'a pas le droit d'ajouter de patient, on peut masquer le bouton d'en-tête
+        if (currentUser?.role === 'Secretaire') {
+            const headerActions = document.querySelector('.page-header-actions');
+            if (headerActions) headerActions.style.display = 'none';
+        }
 
         let currentPage = 1, pageSize = 20, paginationInstance = null;
         const searchInput = document.getElementById('searchInput');

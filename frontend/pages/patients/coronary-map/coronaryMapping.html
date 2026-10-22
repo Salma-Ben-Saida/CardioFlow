@@ -220,6 +220,7 @@
         <button class="btn" id="viewReportBtn">Voir le rapport</button>
         <button class="btn" id="downloadPdfBtn">Télécharger PDF</button>
         <button class="btn primary" id="confirmReportBtn">Confirmer le rapport</button>
+        <button class="btn primary" id="amendReportBtn" style="display:none">Enregistrer les modifications</button>
       </div>
       <div class="hint">Moteur de template déterministe — sauvegarde automatique à chaque action.</div>
     </div>
@@ -237,6 +238,10 @@ const CATH_STUDY_ID = new URLSearchParams(location.search).get('cathStudyId');
 const PATIENT_ID = new URLSearchParams(location.search).get('patientId');
 const CURRENT_USER = JSON.parse(sessionStorage.getItem('user') || 'null');
 const IS_READ_ONLY = CURRENT_USER?.role === 'Secretaire';
+
+const IS_ADMIN = CURRENT_USER?.role === 'Admin';
+const EDIT_MODE = IS_ADMIN && new URLSearchParams(location.search).get('mode') === 'edit';
+if (IS_READ_ONLY) window.location.replace('/frontend/pages/secretaire/index.html');
 
 function authHeaders(extra = {}) {
   const token = sessionStorage.getItem('authToken');
@@ -1071,7 +1076,11 @@ function updateConfirmButton(){
 function updateStatusBadge(){
   const badge = document.getElementById('statusBadge');
   if(!badge) return;
-  if(reportStatus?.status === 'Confirmed'){
+  if(reportStatus?.status === 'Confirmed' && EDIT_MODE){
+  badge.className = 'status-badge draft';
+  badge.textContent = 'Mode correction (administrateur) — rapport confirmé';
+}
+  else if(reportStatus?.status === 'Confirmed'){
     badge.className = 'status-badge confirmed';
     badge.textContent = 'Confirmé le ' + formatFrDate(reportStatus.confirmedAt) + ' par D.' + (reportStatus.confirmedByUserName || '?');
   } else if(IS_READ_ONLY){
@@ -1088,16 +1097,21 @@ function applyLockState(){
   isLocked = confirmed || IS_READ_ONLY;
   document.body.classList.toggle('locked', isLocked);
   updateStatusBadge();
-  ['f-conclusion','f-recommendations','f-approach','f-catheter'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.disabled = isLocked;
-  });
+  const amending = confirmed && EDIT_MODE;
+['f-conclusion','f-recommendations','f-approach','f-catheter'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.disabled = isLocked && !amending;
+});
+const amendBtn = document.getElementById('amendReportBtn');
+if(amendBtn) amendBtn.style.display = amending ? '' : 'none';
+
   const pdfBtn = document.getElementById('downloadPdfBtn');
   if(pdfBtn) pdfBtn.style.display = IS_READ_ONLY ? 'none' : '';
   const reserved = document.getElementById('reservedPanel');
   if(reserved && IS_READ_ONLY) reserved.style.display = 'none';
-  if(confirmed) showToast('Rapport verrouillé — lecture seule', 'info');
-  else if(IS_READ_ONLY) showToast('Mode lecture seule', 'info');
+
+  if(confirmed && EDIT_MODE) showToast('Mode correction : seuls les textes du compte-rendu sont modifiables', 'info');
+else if(confirmed) showToast('Rapport verrouillé — lecture seule', 'info');
 }
 
 function showConflictBanner(msg){
@@ -1187,6 +1201,22 @@ async function confirmReport(){
     }
   };
 }
+
+async function saveAmendment(){
+  if(!EDIT_MODE || !reportStatus?.reportId) return;
+  const approach = document.getElementById('f-approach').value.trim();
+  const catheterUsed = document.getElementById('f-catheter').value.trim();
+  const conclusion = document.getElementById('f-conclusion').value.trim();
+  const recommendations = document.getElementById('f-recommendations').value;
+  if(!approach || !catheterUsed || !conclusion){ showToast('Approche, Cathéter et Conclusion sont obligatoires', 'error'); return; }
+  const btn = document.getElementById('amendReportBtn'); btn.disabled = true;
+  try{
+    await apiPut('/procedures/reports/' + reportStatus.reportId, { approach, catheterUsed, conclusion, recommendations });
+    showToast('Rapport modifié — PDF régénéré', 'success');
+  } catch(err){ showToast('Erreur : ' + err.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+document.getElementById('amendReportBtn').onclick = saveAmendment;
 
 /* --- D. Validation before confirm --- */
 function validateBeforeConfirm(){

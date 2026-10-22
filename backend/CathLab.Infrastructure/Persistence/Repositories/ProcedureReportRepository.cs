@@ -32,6 +32,20 @@ public class ProcedureReportRepository : IProcedureReportRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task DeleteAsync(Guid id)
+{
+    var report = await _db.ProcedureReports
+        .Include(r => r.Lesions).ThenInclude(l => l.Treatments)
+        .FirstOrDefaultAsync(r => r.Id == id);
+    if (report is null) return;
+
+    foreach (var lesion in report.Lesions)
+        _db.RemoveRange(lesion.Treatments);
+    _db.RemoveRange(report.Lesions);
+    _db.ProcedureReports.Remove(report);
+    await _db.SaveChangesAsync();
+}
+
     /// <summary>
     /// A report belongs to a doctor if they were assigned as CathStudy
     /// Operator (from PACS/DICOM metadata - often empty in practice) OR if

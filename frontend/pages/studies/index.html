@@ -119,8 +119,8 @@
                 case 'Scheduled':  return btn('schedule', 'Replanifier', 'btn-secondary') + btn('cancel', 'Annuler', 'btn-secondary');
                 case 'Cancelled':  return btn('schedule', 'Replanifier', 'btn-secondary');
                 case 'InProgress':
-    return `<a class="btn btn-primary btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}">${currentUser.role === 'Secretaire' ? 'Consulter' : 'Ouvrir'}</a>`;
-                default: return '—';
+    if (currentUser.role === 'Secretaire') return '—';
+    return `<a class="btn btn-primary btn-sm" href="/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${s.id}&patientId=${s.patientId}">Ouvrir</a>`;
             }
         }
 

@@ -2,7 +2,7 @@
  * Administration — CathLab (vanilla JS, no framework)
  * ============================================================ */
 
-import { get as apiGet, post as apiPost, put as apiPut } from '../../assets/js/api/client.js';
+import { get as apiGet, post as apiPost, put as apiPut, del as apiDelete } from '../../assets/js/api/client.js';
 import { ingestPacsStudy } from '../../assets/js/api/pacs.js';
 import {
   getPacsOverview, ingestAllPacs, getArchive,
@@ -487,24 +487,72 @@ async function loadReports() {
     const data = await apiGet(API.reports());
     const arr = normalizeArray(data);
     if (!arr.length) return setTableEmpty(table, 4, 'Aucun rapport.');
+
+    state.reports = arr;
+
     table.querySelector('tbody').innerHTML = arr.map((r) => `<tr data-report-id="${r.id || ''}" data-cath-study-id="${r.cathStudyId || ''}" data-patient-id="${r.patientId || ''}" class="clickable-row" style="cursor:pointer;">
       <td>${escapeHtml(r.patientName)}</td>
       <td>${escapeHtml(r.doctorName || '—')}</td>
       <td>${fmtDateTime(r.reportGeneratedAt)}</td>
       <td>${r.isConfirmed ? '<span class="pill pill-green">Confirmé</span>' : '<span class="pill pill-amber">Brouillon</span>'}</td>
+      <td>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="icon-btn" data-action="edit-report" title="Modifier">✏️</button>
+            <button class="icon-btn" data-action="delete-report" title="Supprimer">🗑️</button>
+          </div>
+        </td>
     </tr>`).join('');
     table.querySelectorAll('tbody tr.clickable-row').forEach((row) => {
       row.addEventListener('click', () => {
-        const cathStudyId = row.dataset.cathStudyId;
-        const patientId = row.dataset.patientId;
-        if (!cathStudyId || !patientId) return;
-        window.location.href = `/frontend/pages/patients/coronary-map/coronaryMapping.html?cathStudyId=${encodeURIComponent(cathStudyId)}&patientId=${encodeURIComponent(patientId)}`;
+        openReportInMapping(row, false);
+      });
+      
+      row.querySelector('[data-action="edit-report"]').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openReportInMapping(row, true);
+      });
+      
+      row.querySelector('[data-action="delete-report"]').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openDeleteReportModal(row.dataset.reportId);
       });
     });
   } catch (e) {
-    setTableError(table, 4, e.message);
+    setTableError(table, 5, e.message);
     toast('Erreur lors du chargement des rapports', 'error');
   }
+}
+
+function openReportInMapping(row, editMode) {
+  const { cathStudyId, patientId, reportId } = row.dataset;
+  if (!cathStudyId || !patientId) return;
+  const qs = new URLSearchParams({ cathStudyId, patientId });
+  if (reportId) qs.set('reportId', reportId);
+  if (editMode) qs.set('mode', 'edit');
+  window.location.href = `/frontend/pages/patients/coronary-map/coronaryMapping.html?${qs}`;
+}
+function openDeleteReportModal(reportId) {
+  const item = (state.reports || []).find((r) => r.id === reportId);
+  if (!item) { toast('Rapport introuvable.', 'error'); return; }
+  state.selectedReportForDelete = item;
+  $('#delete-report-message').textContent = item.isConfirmed
+    ? `Le rapport CONFIRMÉ de ${item.patientName || 'ce patient'} sera supprimé avec ses lésions et traitements. Les dispositifs déjà consommés restent déduits du stock.`
+    : `Voulez-vous vraiment supprimer le brouillon de ${item.patientName || 'ce patient'} ? Les dispositifs réservés retourneront en stock.`;
+  openModal('modal-delete-report');
+}
+async function confirmDeleteReport() {
+  const r = state.selectedReportForDelete;
+  if (!r) return;
+  const btn = $('#btn-confirm-delete-report');
+  btn.disabled = true;
+  try {
+    await apiDelete(`/api/procedures/reports/${r.id}`);
+    closeModal('modal-delete-report');
+    state.selectedReportForDelete = null;
+    toast('Rapport supprimé avec succès');
+    loadReports();
+  } catch (e) { toast(`Erreur : ${e.message}`, 'error'); }
+  finally { btn.disabled = false; }
 }
 
 /* ---------- Audits ---------- */
@@ -929,6 +977,7 @@ function init() {
   $('#btn-save-user').addEventListener('click', saveUser);
   $('#btn-save-edit-user').addEventListener('click', saveEditedUser);
   $('#btn-confirm-delete-user').addEventListener('click', confirmDeleteUser);
+  $('#btn-confirm-delete-report').addEventListener('click', confirmDeleteReport);
 
   // PACS studies + archive  
   $('#btn-pacs-refresh').addEventListener('click', loadPacs);
