@@ -1,6 +1,7 @@
 using CathLab.Domain.Entities;
 
 namespace CathLab.Application.Interfaces;
+public record PatientHeader(string FullName, DateOnly? BirthDate, string? Sex, DateTime StudyDate, string AccessionNumber);
 
 /// <summary>
 /// Generates the final PDF report for a confirmed ProcedureReport.
@@ -17,5 +18,5 @@ public interface IPdfGenerator
     /// that Includes that graph), since those are what gets rendered.
     /// </summary>
     /// <returns>A storage path or URI identifying the generated file.</returns>
-    Task<string> GenerateAsync(ProcedureReport report);
+    Task<string> GenerateAsync(ProcedureReport report, PatientHeader? patient = null);
 }

@@ -35,4 +35,6 @@ public interface IProcedureReportRepository
  
     /// <summary>Admin-only: every report in the system, newest-first.</summary>
     Task<List<ProcedureReport>> GetAllAsync();
+
+    Task<PatientHeader?> GetPatientHeaderAsync(Guid cathStudyId);
 }

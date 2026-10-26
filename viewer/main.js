@@ -20,7 +20,13 @@ import {
 import cornerstoneDICOMImageLoader from '@cornerstonejs/dicom-image-loader';
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const API_BASE      = 'http://localhost:5152';
+const API_BASE = `${location.protocol}//${location.hostname}:5152`;
+const _t = new URLSearchParams(location.hash.slice(1)).get('token');
+if (_t) {
+  sessionStorage.setItem('authToken', _t);
+  history.replaceState(null, '', location.pathname + location.search); // drop token from the address bar
+}
+const authHeaders = () => ({ Authorization: 'Bearer ' + (sessionStorage.getItem('authToken') || '') });
 const DICOMWEB_BASE = 'http://localhost:5501/orthanc-wadors/dicom-web';
 
 // ── Metadata maps ─────────────────────────────────────────────────────────────
@@ -142,7 +148,8 @@ async function main() {
   if (!studyUID) { showError('No studyUID provided.'); return; }
 
   const data = await fetch(
-    `${API_BASE}/api/dicom/study/${encodeURIComponent(studyUID)}/instances`
+    `${API_BASE}/api/dicom/study/${encodeURIComponent(studyUID)}/instances`,
+  { headers: authHeaders() }
   ).then(r => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
@@ -466,12 +473,17 @@ function renderSeriesSidebar(displayItems, engine) {
     const thumb = document.createElement('div');
     thumb.className = 'series-thumb' + (i === 0 ? ' active' : '');
     thumb.innerHTML = `
-      <img src="${API_BASE}/api/dicom/preview/${item.inst.orthancId}"
+      <img data-src="${API_BASE}/api/dicom/preview/${item.inst.orthancId}"
            crossorigin="anonymous" alt="Series ${item.seriesIndex + 1} (${item.bitsAllocated}-bit)"
            onerror="this.style.display='none'">
       <span>Series ${item.seriesIndex + 1} (${item.bitsAllocated}-bit)</span>
       <span class="count">${item.frameCount} img</span>
     `;
+    const _img = thumb.querySelector('img');
+  fetch(_img.dataset.src, { headers: authHeaders() })
+  .then(r => r.ok ? r.blob() : Promise.reject())
+  .then(b => { _img.src = URL.createObjectURL(b); })
+  .catch(() => { _img.style.display = 'none'; });
     thumb.addEventListener('click', async () => {
       if (isCinePlaying) { utilities.cine.stopClip(viewportEl); isCinePlaying = false; }
       document.getElementById('btnPlay').textContent = '▶ Play';

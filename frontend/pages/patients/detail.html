@@ -139,7 +139,7 @@
         import { showToast } from '../../assets/js/components/toast.js';
         import { getPatientById, getPatientStudies, getPatientRiskProfile, updatePatient } from '../../assets/js/api/patients.js';
         import { archivePatient, archiveStudy } from '../../assets/js/api/admin.js';
-        import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState } from '../../assets/js/utils.js';
+        import { formatDate, formatDateTime, formatSex, formatStatusBadge, calculateAge, getQueryParam, showEmptyState, escapeHtml, getInitials } from '../../assets/js/utils.js';
         import { getPatientReports } from '../../assets/js/api/reports.js';
 
         const EDIT_ROLES = ['Secretaire', 'Admin', 'Medecin'];
@@ -192,8 +192,6 @@ if (_hash && document.getElementById(`${_hash}Panel`)) activateTab(_hash);
             } finally { loadingOverlay.style.display = 'none'; }
         }
 
-        function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(/\s+/); return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase(); }
-
         async function loadReports() {
     if (!canViewImaging) return;
     document.getElementById('reportsTabBtn').style.display = '';
@@ -243,7 +241,7 @@ if (_hash && document.getElementById(`${_hash}Panel`)) activateTab(_hash);
 
        function imagingActions(s) {
     const viewImagesBtn = s.studyInstanceUid
-        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}"
+        ? `<a href="href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}#token=${encodeURIComponent(sessionStorage.getItem('authToken') || '')}""
               target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Ouvrir le visualiseur DICOM">
                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2">
@@ -325,8 +323,6 @@ async function loadStudies() {
             if (value) { factorEl.classList.add('active'); badgeEl.className = 'badge badge-danger'; badgeEl.textContent = 'Oui'; }
             else { factorEl.classList.remove('active'); badgeEl.className = 'badge badge-neutral'; badgeEl.textContent = 'No'; }
         }
-
-        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
         function enterEditMode() {
             if (!currentPatient) return;

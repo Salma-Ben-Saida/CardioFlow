@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/dicom")]
-
+[Authorize(Roles = "Admin,Medecin")]
 public class DicomController : ControllerBase
 {
     private readonly HttpClient _http;

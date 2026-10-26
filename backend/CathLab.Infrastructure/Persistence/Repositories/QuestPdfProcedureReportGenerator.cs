@@ -21,7 +21,7 @@ public class QuestPdfProcedureReportGenerator : IPdfGenerator
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public async Task<string> GenerateAsync(ProcedureReport report)
+    public async Task<string> GenerateAsync(ProcedureReport report, PatientHeader? patient = null)
     {
         Directory.CreateDirectory(_storageRoot);
         var fileName = $"{report.Id}.pdf";
@@ -36,12 +36,17 @@ public class QuestPdfProcedureReportGenerator : IPdfGenerator
                 page.DefaultTextStyle(x => x.FontSize(10));
 
                 page.Header().Column(col =>
-                {
-                    col.Item().Text("Procedure Report").FontSize(18).Bold();
-                    col.Item().Text($"Report ID: {report.Id}");
-                    col.Item().Text($"Cath Study ID: {report.CathStudyId}");
-                    col.Item().Text($"Generated: {report.ReportGeneratedAt:g}");
-                });
+{
+    col.Item().Text("Compte-rendu de coronarographie").FontSize(18).Bold();
+    if (patient is not null)
+    {
+        col.Item().Text($"Patient : {patient.FullName}").Bold();
+        col.Item().Text($"Né(e) le : {(patient.BirthDate?.ToString("dd/MM/yyyy") ?? "—")}   Sexe : {patient.Sex ?? "—"}");
+        col.Item().Text($"Étude : {patient.AccessionNumber} du {patient.StudyDate:dd/MM/yyyy}");
+    }
+    col.Item().Text($"Rapport n° {report.Id}").FontSize(8);
+    col.Item().Text($"Généré le {report.ReportGeneratedAt:dd/MM/yyyy HH:mm}").FontSize(8);
+});
 
                 page.Content().PaddingVertical(15).Column(col =>
                 {

@@ -9,6 +9,8 @@ import {
   archiveStudy, restoreStudy, purgeStudy,
   archivePatient, restorePatient, purgePatient,
 } from '../../assets/js/api/admin.js';
+import { confirmDialog } from '../../assets/js/components/confirm.js';
+import { showToast } from '../../assets/js/components/toast.js';
 /* ---------- API config ---------- */
 const API = {
   movements: (page = 1, pageSize = 50) => `/api/admin/movements?page=${page}&pageSize=${pageSize}`,
@@ -72,16 +74,7 @@ function normalizeArray(data) {
 }
 
 /* ---------- Toast ---------- */
-function toast(msg, type = 'success') {
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  $('#toast-container').appendChild(el);
-  setTimeout(() => {
-    el.classList.add('fade');
-    setTimeout(() => el.remove(), 200);
-  }, 3000);
-}
+function toast(msg, type = 'success') { showToast(msg, type); }
 
 /* ---------- Table helpers ---------- */
 function setTableLoading(table, colspan, msg = 'Chargement…') {
@@ -453,74 +446,50 @@ async function confirmDeleteUser() {
   if (!state.selectedUserForDelete) return;
 
   try {
-    const response = await fetch(`http://localhost:5152/api/user/${state.selectedUserForDelete.id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      let message = 'Erreur lors de la suppression.';
-      try {
-        const data = await response.json();
-        message = data.message || message;
-      } catch {}
-      throw new Error(message);
-    }
-
-    closeModal('modal-delete-user');
-    state.selectedUserForDelete = null;
-    toast('Utilisateur supprimé avec succès');
-    loadUsers();
-  } catch (e) {
-    toast(`Erreur : ${e.message}`, 'error');
-  }
+  await apiDelete(`/api/user/${state.selectedUserForDelete.id}`);
+  closeModal('modal-delete-user');
+  state.selectedUserForDelete = null;
+  toast('Utilisateur supprimé avec succès');
+  loadUsers();
+} catch (e) {
+  toast(`Erreur : ${e.message}`, 'error');
 }
-
+}
 /* ---------- Reports ---------- */
 async function loadReports() {
   const table = $('#reports-table');
-  setTableLoading(table, 4);
+  setTableLoading(table, 5);
   try {
-    const data = await apiGet(API.reports());
-    const arr = normalizeArray(data);
-    if (!arr.length) return setTableEmpty(table, 4, 'Aucun rapport.');
-
-    state.reports = arr;
-
-    table.querySelector('tbody').innerHTML = arr.map((r) => `<tr data-report-id="${r.id || ''}" data-cath-study-id="${r.cathStudyId || ''}" data-patient-id="${r.patientId || ''}" class="clickable-row" style="cursor:pointer;">
-      <td>${escapeHtml(r.patientName)}</td>
-      <td>${escapeHtml(r.doctorName || '—')}</td>
-      <td>${fmtDateTime(r.reportGeneratedAt)}</td>
-      <td>${r.isConfirmed ? '<span class="pill pill-green">Confirmé</span>' : '<span class="pill pill-amber">Brouillon</span>'}</td>
-      <td>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="icon-btn" data-action="edit-report" title="Modifier">✏️</button>
-            <button class="icon-btn" data-action="delete-report" title="Supprimer">🗑️</button>
-          </div>
-        </td>
-    </tr>`).join('');
-    table.querySelectorAll('tbody tr.clickable-row').forEach((row) => {
-      row.addEventListener('click', () => {
-        openReportInMapping(row, false);
-      });
-      
-      row.querySelector('[data-action="edit-report"]').addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        openReportInMapping(row, true);
-      });
-      
-      row.querySelector('[data-action="delete-report"]').addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        openDeleteReportModal(row.dataset.reportId);
-      });
-    });
+    state.reports = normalizeArray(await apiGet(API.reports()));
+    renderReports();
   } catch (e) {
     setTableError(table, 5, e.message);
     toast('Erreur lors du chargement des rapports', 'error');
   }
+}
+
+function renderReports() {
+  const table = $('#reports-table');
+  const q = ($('#reports-search').value || '').trim().toLowerCase();
+  const st = $('#reports-status').value;
+  const arr = (state.reports || []).filter((r) =>
+    (!st || (st === 'confirmed') === !!r.isConfirmed) &&
+    (!q || `${r.patientName} ${r.doctorName}`.toLowerCase().includes(q)));
+  if (!arr.length) return setTableEmpty(table, 5, 'Aucun rapport.');
+  table.querySelector('tbody').innerHTML = arr.map((r) => `<tr data-report-id="${r.id || ''}" data-cath-study-id="${r.cathStudyId || ''}" data-patient-id="${r.patientId || ''}" class="clickable-row" style="cursor:pointer;">
+    <td>${escapeHtml(r.patientName)}</td>
+    <td>${escapeHtml(r.doctorName || '—')}</td>
+    <td>${fmtDateTime(r.reportGeneratedAt)}</td>
+    <td>${r.isConfirmed ? '<span class="pill pill-green">Confirmé</span>' : '<span class="pill pill-amber">Brouillon</span>'}</td>
+    <td><div style="display:flex;gap:8px;align-items:center;">
+      <button class="icon-btn" data-action="edit-report" title="Modifier">✏️</button>
+      <button class="icon-btn" data-action="delete-report" title="Supprimer">🗑️</button>
+    </div></td></tr>`).join('');
+  table.querySelectorAll('tbody tr.clickable-row').forEach((row) => {
+    row.addEventListener('click', () => openReportInMapping(row, false));
+    row.querySelector('[data-action="edit-report"]').addEventListener('click', (ev) => { ev.stopPropagation(); openReportInMapping(row, true); });
+    row.querySelector('[data-action="delete-report"]').addEventListener('click', (ev) => { ev.stopPropagation(); openDeleteReportModal(row.dataset.reportId); });
+  });
 }
 
 function openReportInMapping(row, editMode) {
@@ -531,6 +500,7 @@ function openReportInMapping(row, editMode) {
   if (editMode) qs.set('mode', 'edit');
   window.location.href = `/frontend/pages/patients/coronary-map/coronaryMapping.html?${qs}`;
 }
+
 function openDeleteReportModal(reportId) {
   const item = (state.reports || []).find((r) => r.id === reportId);
   if (!item) { toast('Rapport introuvable.', 'error'); return; }
@@ -933,8 +903,8 @@ function openUserModal() {
 
 /* ---------- Init ---------- */
 window.logoutUser = async function() {
-  const confirmed = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
-  if (!confirmed) return;
+  const confirmed = await confirmDialog({ title: 'Déconnexion', message: 'Êtes-vous sûr de vouloir vous déconnecter ?', confirmText: 'Se déconnecter' });
+if (!confirmed) return;
 
   const token = sessionStorage.getItem('authToken');
   try {
@@ -978,6 +948,11 @@ function init() {
   $('#btn-save-edit-user').addEventListener('click', saveEditedUser);
   $('#btn-confirm-delete-user').addEventListener('click', confirmDeleteUser);
   $('#btn-confirm-delete-report').addEventListener('click', confirmDeleteReport);
+
+
+// reports
+$('#reports-search').addEventListener('input', renderReports);
+$('#reports-status').addEventListener('change', renderReports);
 
   // PACS studies + archive  
   $('#btn-pacs-refresh').addEventListener('click', loadPacs);
