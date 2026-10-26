@@ -282,6 +282,17 @@
               <div class="panel-head">
                 <h2 class="panel-title">Rapports</h2>
               </div>
+<div class="panel-actions">
+  <input class="input" id="reports-search" placeholder="Rechercher un patient ou médecin…" style="width:240px;">
+  <select
+    class="select"
+    id="reports-status"
+    title="Filtrer les rapports"
+    aria-label="Filtrer les rapports"
+  >
+    <option value="">Tous</option><option value="draft">Brouillons</option><option value="confirmed">Confirmés</option>
+  </select>
+</div>
               <div class="table-wrap">
                 <table class="data-table" id="reports-table">
                   <thead><tr><th>Patient</th><th>Médecin</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>

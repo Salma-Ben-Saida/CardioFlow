@@ -2,6 +2,7 @@
  * Sidebar Component
  */
 import { getDashboardForRole } from '../rolesRoutes.js';
+import { confirmDialog } from './confirm.js';
 
 const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
 const currentRole = currentUser?.role;
@@ -122,8 +123,9 @@ window.toggleSidebar = function() {
 };
 
 window.logoutUser = async function() {
-    const confirmed = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
-    if (!confirmed) return;
+    const confirmed = await confirmDialog({ title: 'Déconnexion', message: 'Êtes-vous sûr de vouloir vous déconnecter ?', confirmText: 'Se déconnecter' });
+if (!confirmed) return;
+
 
     const token = sessionStorage.getItem('authToken');
     try {

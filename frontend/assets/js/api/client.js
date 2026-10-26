@@ -2,7 +2,7 @@
  * API Client - Base fetch wrapper with JWT header injection
  */
 
-const API_BASE_URL = 'http://localhost:5152';
+const API_BASE_URL = window.API_BASE_URL || `${location.protocol}//${location.hostname}:5152`;
 let authToken = sessionStorage.getItem('authToken') || null;
 
 export function setToken(token) {

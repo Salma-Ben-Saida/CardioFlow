@@ -81,6 +81,7 @@
         import { renderSidebar } from '../../assets/js/components/sidebar.js';
         import { showToast } from '../../assets/js/components/toast.js';
         import { getStudies, scheduleStudy, cancelStudy } from '../../assets/js/api/studies.js';
+        import { confirmDialog } from '../../assets/js/components/confirm.js';
 
         const ALLOWED_ROLES = ['Medecin', 'Secretaire', 'Admin'];
         const currentUser = JSON.parse(sessionStorage.getItem('user') || 'null');
@@ -185,7 +186,7 @@
                 dlgInput.value = s.scheduledAt ? toLocalInput(s.scheduledAt) : '';
                 dlg.showModal();
             } else if (btn.dataset.act === 'cancel') {
-                if (!window.confirm(`Annuler l'étude de ${s.patientName} (${s.accessionNumber}) ?`)) return;
+                if (!await confirmDialog({ title: "Annuler l'étude", message: `Annuler l'étude de ${esc(s.patientName)} (${esc(s.accessionNumber)}) ?`, confirmText: 'Annuler l’étude', danger: true })) return;
                 btn.disabled = true;
                 try {
                     await cancelStudy(s.id);

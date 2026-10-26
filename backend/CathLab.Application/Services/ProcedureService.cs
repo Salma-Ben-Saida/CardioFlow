@@ -222,6 +222,9 @@ public class ProcedureService
         var lesions = await _lesions.GetByProcedureReportAsync(reportId);
         report.Lesions = lesions;
 
+        var header = await _reports.GetPatientHeaderAsync(report.CathStudyId);
+        report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report, header);
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 Console.WriteLine($"ConfirmReportAsync: reportId={reportId} confirmedBy={confirmedBy}");
@@ -238,6 +241,7 @@ public class ProcedureService
 
                 await _reports.UpdateAsync(report);
                 var study = await _studies.FindByIdAsync(report.CathStudyId);
+
                 if (study is not null)
                 {
                     study.Complete();
@@ -327,7 +331,9 @@ public class ProcedureService
         PatientId = r.CathStudy?.PatientId ?? Guid.Empty,
         PatientName = r.CathStudy?.Patient?.FullName ?? string.Empty,
         DoctorId = r.ConfirmedByUserId ?? Guid.Empty,
-        DoctorName = r.ConfirmedByUser?.Username ?? string.Empty,
+        DoctorName = string.IsNullOrWhiteSpace(r.ConfirmedByUser?.FullName)
+        ? (r.ConfirmedByUser?.Username ?? string.Empty)
+        : r.ConfirmedByUser!.FullName,
         IsConfirmed = r.IsConfirmed,
         ReportGeneratedAt = r.ReportGeneratedAt,
         ConfirmedAt = r.ConfirmedAt,
@@ -376,9 +382,7 @@ public async Task<ProcedureReportDetailDto?> GetReportDetailByCathStudyIdAsync(G
         DoseAreaProductGycm2 = report.DoseAreaProductGycm2,
         MissingRequiredFields = report.IsConfirmed ? new() : GetMissingRequiredFields(report),
         Recommendations = report.Recommendations,
-        ConfirmedByUserId = report.ConfirmedByUserId?.ToString(),
-
-        ConfirmedByUser = (await _userRepository.GetByIdAsync(report.ConfirmedByUserId ?? Guid.Empty))?.Username ?? string.Empty,
+        ConfirmedByUser = await GetUserDisplayNameAsync(report.ConfirmedByUserId),
 
         Lesions = lesions.Select(l => new CoronaryLesionDto
         {
@@ -411,11 +415,18 @@ public async Task<ProcedureReportDetailDto?> GetReportDetailByCathStudyIdAsync(G
         }).ToList()
     };
 }
+private async Task<string> GetUserDisplayNameAsync(Guid? userId)
+{
+    if (userId is null) return string.Empty;
+    var u = await _userRepository.GetByIdAsync(userId.Value);
+    if (u is null) return string.Empty;
+    return string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName;
+}
 
 /// <summary>Update the narrative fields required before confirmation.</summary>
 public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativeDto dto, bool isAdmin = false)
 {
-    var report = await _reports.FindByIdAsync(reportId)
+    var report = await _reports.FindByIdAsync(reportId) 
         ?? throw new InvalidOperationException("Procedure report not found.");
 
     if (report.IsConfirmed && !isAdmin)
@@ -434,7 +445,8 @@ public async Task UpdateReportNarrativeAsync(Guid reportId, UpdateReportNarrativ
         if (report.IsConfirmed)
     {
         report.Lesions = await _lesions.GetByProcedureReportAsync(reportId);
-        report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report);
+        var header = await _reports.GetPatientHeaderAsync(report.CathStudyId);
+        report.PdfStoragePath = await _pdfGenerator.GenerateAsync(report, header);
     }
 
     await _reports.UpdateAsync(report);

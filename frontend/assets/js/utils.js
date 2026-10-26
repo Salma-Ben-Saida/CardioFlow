@@ -80,3 +80,6 @@ export function showEmptyState(container, message, icon = 'file') {
 }
 
 export default { formatDate, formatDateTime, calculateAge, formatSex, formatStatusBadge, getQueryParam, setQueryParams, debounce, showLoading, showEmptyState };
+
+export function escapeHtml(text) { if (!text) return ''; const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+export function getInitials(name) { if (!name) return '?'; const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[p.length - 1]?.[0] || '')).toUpperCase(); }
