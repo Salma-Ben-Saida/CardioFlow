@@ -76,3 +76,8 @@ coverage/
 
 
 orthanc.json
+
+
+
+# pacs ingestion settings
+backend/CathLab.WebApi/App_Data/

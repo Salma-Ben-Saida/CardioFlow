@@ -7,7 +7,7 @@ import { ingestPacsStudy } from '../../assets/js/api/pacs.js';
 import {
   getPacsOverview, ingestAllPacs, getArchive,
   archiveStudy, restoreStudy, purgeStudy,
-  archivePatient, restorePatient, purgePatient,
+  archivePatient, restorePatient, purgePatient, getIngestionSettings, setIngestionSettings,
 } from '../../assets/js/api/admin.js';
 import { confirmDialog } from '../../assets/js/components/confirm.js';
 import { showToast } from '../../assets/js/components/toast.js';
@@ -606,6 +606,7 @@ const ENTITY_LABELS = {
   InventoryProduct: 'Produit (pharmacie)',
   InventoryItem:    'Dispositif (pharmacie)',
   AppUser:          'Utilisateur',
+  IngestionSettings: 'Paramètres d\'ingestion',
 };
 function entityCell(type) {
   return escapeHtml(ENTITY_LABELS[type] || type || '—');
@@ -677,9 +678,42 @@ function renderPacsSummary(arr) {
   btn.disabled = nNew === 0;
   btn.textContent = nNew ? `Ingérer ${nNew === 1 ? 'la nouvelle étude' : `les ${nNew} nouvelles`}` : 'Aucune nouvelle étude';
 }
+async function loadIngestionSettings() {
+  const meta = $('#ingestion-meta');
+  try {
+    const s = await getIngestionSettings();
+    const input = $('#ingestion-interval');
+    input.min = s.minMinutes;
+    input.max = s.maxMinutes;
+    input.value = s.intervalMinutes;
+    meta.textContent = s.nextRunUtc ? `Prochaine ingestion vers ${fmtDateTime(s.nextRunUtc)}` : '';
+  } catch {
+    meta.textContent = 'Paramètre indisponible';
+  }
+}
+
+async function saveIngestionSettings() {
+  const input = $('#ingestion-interval');
+  const minutes = Number(input.value);
+  if (!Number.isInteger(minutes) || minutes < Number(input.min) || minutes > Number(input.max)) {
+    return toast(`Saisissez un entier entre ${input.min} et ${input.max} minutes`, 'error');
+  }
+  const btn = $('#btn-ingestion-save');
+  btn.disabled = true;
+  try {
+    await setIngestionSettings(minutes);
+    toast('Période d’ingestion mise à jour');
+    await loadIngestionSettings();
+  } catch (e) {
+    toast(`Erreur : ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 async function loadPacs() {
   const table = $('#pacs-table');
+  loadIngestionSettings();
   setTableLoading(table, 6);
   try {
     const arr = normalizeArray(await getPacsOverview());
@@ -956,6 +990,7 @@ $('#reports-status').addEventListener('change', renderReports);
 
   // PACS studies + archive  
   $('#btn-pacs-refresh').addEventListener('click', loadPacs);
+  $('#btn-ingestion-save').addEventListener('click', saveIngestionSettings);
   $('#btn-pacs-ingest-all').addEventListener('click', ingestAllNew);
   $('#pacs-table').addEventListener('click', onPacsAction);
   $('#archive-patients-table').addEventListener('click', onArchiveAction);

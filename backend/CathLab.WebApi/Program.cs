@@ -128,6 +128,8 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<ProcedureService>();
 
+builder.Services.AddSingleton<IngestionSettings>();
+builder.Services.AddHostedService<PacsIngestionWorker>();
 // Worker d'arrière-plan Singleton
 builder.Services.AddHostedService<PacsIngestionWorker>();
 
