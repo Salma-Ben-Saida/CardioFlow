@@ -4,7 +4,10 @@
   "DicomPort": 4242,
   "DicomAet": "ORTHANC",
   "RemoteAccessAllowed": true,
-  "AuthenticationEnabled": false,
+  "AuthenticationEnabled": true,
+  "RegisteredUsers": {
+  "cardioflow-api": "<678367-6923797-2973218-94739347-891567-39468374-394>"
+},
   
   "AcgCorsEnabled": true,
 

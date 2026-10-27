@@ -2,15 +2,15 @@
 
 # 🫀 CardioFlow
 
-**A clinical cath-lab management platform integrating PACS imaging, patient records, procedure documentation, and pharmacy inventory into a single, auditable workflow.**
+**A cath-lab management platform that brings PACS imaging, patient records, coronary procedure reports and pharmacy inventory into one auditable workflow.**
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![EF Core](https://img.shields.io/badge/EF%20Core-8.0-512BD4)](https://learn.microsoft.com/ef/core/)
+[![SQL Server](https://img.shields.io/badge/DB-SQL%20Server-CC2927?logo=microsoftsqlserver)](https://www.microsoft.com/sql-server)
 [![Orthanc PACS](https://img.shields.io/badge/PACS-Orthanc-blue)](https://www.orthanc-server.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#license)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
 
-[Overview](#overview) • [Architecture](#architecture) • [Getting Started](#getting-started) • [API Reference](#api-reference) • [Security](#authentication--security) • [Roadmap](#roadmap)
+[Overview](#overview) • [Roles](#roles-and-permissions) • [Architecture](#architecture) • [Getting Started](#getting-started) • [API](#api-reference) • [Security](#security) • [Roadmap](#roadmap)
 
 </div>
 
@@ -18,128 +18,150 @@
 
 ## Overview
 
-CardioFlow is a full-stack system built for interventional cardiology (cath lab) teams. It automates the ingestion of imaging studies from a PACS server (Orthanc), centralizes patient and procedure records, and tracks medical device inventory (stents, balloons, guidewires) through a clinically accurate reservation-to-consumption lifecycle.
+CardioFlow is a full-stack system for interventional cardiology teams. It ingests imaging studies from an Orthanc PACS server, centralises patient and procedure records, and tracks implantable devices (stents, balloons) from reservation to consumption.
 
-## 🎬 Demo
+**Demo:** [Watch the walkthrough](https://share.descript.com/view/8C6c1Z1BfQR)
 
-> Full walkthrough : [Watch on Descript](https://share.descript.com/view/8C6c1Z1BfQR)
+**Main features**
 
-**Core capabilities:**
+- 🔄 **Automated PACS ingestion**: a background worker polls Orthanc and ingests new studies idempotently (deduplicated by `AccessionNumber` / `StudyInstanceUid`).
+- 🗓️ **Intervention planning**: ingested studies are scheduled, rescheduled or cancelled from a planning screen.
+- 🧑‍⚕️ **Patient registry**: searchable, filterable, paginated, with incomplete-record detection, risk profile, optimistic concurrency and archiving.
+- 🩺 **Coronary mapping**: place lesions on an interactive vessel tree, attach stents and balloons, generate the report text.
+- 📄 **Report lifecycle**: draft, then irreversible confirmation, then PDF export. Confirmed reports can only be amended or deleted by an administrator.
+- 💊 **Pharmacy & inventory**: device reservation, consumption on confirmation, low-stock and expiry tracking, stock movement history.
+- 🖼️ **DICOM viewer**: a Cornerstone-based viewer served by Vite, reading from Orthanc.
+- 🧾 **Audit trail**: every sensitive action (confirm, update, delete, archive, restore, purge, stock operations) is logged, along with user activity (login/logout).
+- 🔐 **JWT authentication with role-based access control.**
 
-- 🔄 **Automated PACS ingestion** — background worker polls Orthanc every 15 minutes and ingests new studies idempotently.
-- 🧑‍⚕️ **Patient & study management** — searchable, paginated patient registry linked to cath lab studies.
-- 🩺 **Procedure documentation** — coronary lesion mapping with stent/balloon treatment tracking.
-- 💊 **Pharmacy & inventory control** — device reservation on use, irreversible consumption on report confirmation, low-stock and expiry tracking.
-- 🔐 **JWT authentication & RBAC** — role-scoped access for `Admin`, `Medecin`, and `ResponsablePharmacie`.
+---
+
+## Roles and permissions
+
+| Role | Dashboard | What they can do |
+|---|---|---|
+| `Admin` | Administration console | Everything: patients, users, reports (edit/delete), PACS ingestion, archive/restore/purge, audit and activity logs, stock overview |
+| `Medecin` | Doctor dashboard | Patient files, studies to treat, coronary mapping, report confirmation, PDF export, DICOM viewer |
+| `Secretaire` | Reception dashboard | Patient registry (create/edit), intervention planning. **No access** to DICOM viewer, coronary mapping, reports or PDFs |
+| `ResponsablePharmacie` | Pharmacy dashboard | Products, batches, stock levels, expiry, movements |
+
+Business rules worth knowing:
+
+- A **confirmed report is locked for doctors**. Only an `Admin` can amend its text fields (approach, catheter, conclusion, recommendations). The PDF is regenerated and the change is audit-logged.
+- Lesions and treatments of a confirmed report stay locked, because their devices are already `Consumed`.
+- **Deleting a draft** releases its reserved devices back to stock. **Deleting a confirmed report** keeps its devices `Consumed` (they were physically used) and reopens the study.
 
 ---
 
 ## Architecture
 
-CardioFlow follows a **Clean/Onion Architecture**, separating domain logic from infrastructure concerns:
+Clean / onion architecture. Dependencies point inward.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     CathLab.WebApi                       │
-│        Controllers · Auth Middleware · Swagger           │
-└───────────────────────────┬───────────────────────────────┘
-                             │
-┌───────────────────────────▼───────────────────────────────┐
-│                  CathLab.Application                      │
-│     Services · DTOs · Interfaces (ports)                  │
-└───────────────────────────┬───────────────────────────────┘
-                             │
-┌───────────────────────────▼───────────────────────────────┐
-│                 CathLab.Infrastructure                    │
-│  EF Core Persistence · Orthanc PACS Client · Background   │
-│  Workers · Repository Implementations                     │
-└───────────────────────────┬───────────────────────────────┘
-                             │
-┌───────────────────────────▼───────────────────────────────┐
-│                    CathLab.Domain                          │
-│     Entities · Business Rules (Patient, CathStudy, ...)   │
+│        Controllers · JWT auth · CORS · Swagger           │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│                  CathLab.Application                     │
+│        Services · DTOs · Interfaces (ports)              │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│                 CathLab.Infrastructure                   │
+│   EF Core · Orthanc reader · QuestPDF · Background       │
+│   workers · Repositories                                 │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│                     CathLab.Domain                       │
+│           Entities · Enums · Business rules              │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Design principles applied:**
-- Dependency Inversion — `Application` defines interfaces (`IPacsReader`, `IPatientRepository`, etc.); `Infrastructure` implements them.
-- Single Responsibility — one service per domain concern (`StudyIngestionService`, `PatientService`, `UserService`, `InventoryService`, `ProcedureService`).
-- Idempotent ingestion — studies are deduplicated by `AccessionNumber` / `StudyInstanceUid`.
+Design principles:
 
-Full component and deployment diagrams (PlantUML) are available in [`docs/`](docs/).
+- **Dependency inversion**: `Application` defines `IPacsReader`, `IProcedureReportRepository`, `IPdfGenerator`, and so on. `Infrastructure` implements them.
+- **One service per concern**: `StudyIngestionService`, `StudySchedulingService`, `PatientService`, `ProcedureService`, `InventoryService`, `UserService`, `AuditService`, `ArchiveService`.
+- **Transactions where stock is involved**: reservation, release and consumption run through a unit of work.
+
+PlantUML diagrams (use case, components, infrastructure, class diagram, ingestion sequence) are in [`docs/`](docs/).
 
 ---
 
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
 | API | ASP.NET Core 8 Web API |
-| ORM | Entity Framework Core |
-| Database | PostgreSQL / SQL Server (via `CathLabDbContext`) |
-| Imaging | Orthanc PACS (DICOM) |
-| Auth | JWT Bearer + PBKDF2-SHA512 password hashing |
-| Frontend | HTML / CSS / Vanilla JS |
-| Infra | Docker Compose |
-| Docs | PlantUML, Swagger / OpenAPI |
+| ORM / DB | Entity Framework Core 8 · **SQL Server** (application DB and read-only Orthanc DB) |
+| Imaging | Orthanc (DICOM) · Cornerstone3D viewer · Vite |
+| PDF | QuestPDF |
+| Auth | JWT Bearer · PBKDF2-HMAC-SHA512 password hashing |
+| Frontend | HTML / CSS / vanilla JavaScript (ES modules), no build step |
+| Infra | Docker Compose (Orthanc) |
+| Docs | Swagger / OpenAPI · PlantUML |
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 CardioFlow/
 ├── backend/
-│   ├── CathLab.Domain/            # Entities & core business models
-│   ├── CathLab.Application/       # DTOs, service interfaces, services
-│   ├── CathLab.Infrastructure/    # EF Core, PACS client, background jobs
-│   │   ├── Pacs/                  # Orthanc integration
-│   │   ├── Persistence/           # DbContext, migrations, repositories
-│   │   └── Background_Services/   # Scheduled ingestion worker
-│   └── CathLab.WebApi/            # Controllers, Program.cs, appsettings
+│   ├── CathLab.Domain/            # Entities, enums, domain rules
+│   ├── CathLab.Application/       # DTOs, interfaces, services
+│   ├── CathLab.Infrastructure/    # EF Core, migrations, Orthanc access, PDF, workers
+│   └── CathLab.WebApi/            # Controllers, Program.cs, configuration
 ├── frontend/
-│   └── pages/PharmacyManagement/  # Pharmacy dashboard (HTML/CSS/JS)
-├── database/
-│   ├── docker-compose.yml         # Orthanc + supporting containers
-│   ├── orthanc-config/            # Orthanc configuration
-│   └── OrthancPACS.sql            # DB fixture script
-└── docs/                          # PlantUML architecture diagrams
+│   ├── landing.html
+│   ├── assets/                    # css, shared js (api client, sidebar, toast, utils)
+│   └── pages/
+│       ├── login.html
+│       ├── Admin/                 # Administration console
+│       ├── dashboard/             # Doctor dashboard
+│       ├── secretaire/            # Reception dashboard
+│       ├── PharmacyManagement/    # Pharmacy dashboard
+│       ├── patients/              # List, detail, coronary mapping
+│       ├── studies/               # Intervention planning
+│       └── pacs/                  # PACS studies (doctor / admin)
+├── viewer/                        # Standalone DICOM viewer (Vite + Cornerstone)
+├── database/                      # docker-compose, Orthanc config, SQL fixture
+└── docs/                          # PlantUML diagrams
 ```
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Docker](https://www.docker.com/) & Docker Compose
-- A running database instance (PostgreSQL/SQL Server, per your connection string)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download) and the EF tool: `dotnet tool install --global dotnet-ef`
+- [Docker](https://www.docker.com/) with Docker Compose
+- A **SQL Server** instance for the application database, and read access to the Orthanc index database
+- [Node.js](https://nodejs.org/) 18+ (viewer only)
+- Any static file server for the frontend (VS Code Live Server, `npx serve`, …)
 
-### 1. Clone & configure
-
-```bash
-git clone https://github.com/<your-org>/cardioflow.git
-cd cardioflow
-```
-
-Create your local settings from the template:
+### 1. Clone
 
 ```bash
-cp backend/CathLab.WebApi/appsettings.Development.json.example \
-   backend/CathLab.WebApi/appsettings.Development.json
+git clone https://github.com/Salma-Ben-Saida/CardioFlow.git
+cd CardioFlow
 ```
 
-Set the following in `appsettings.Development.json`:
+### 2. Configure the API
+
+`appsettings.Development.json` is git-ignored and there is no template, so create `backend/CathLab.WebApi/appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "CathLabDb": "<your-connection-string>",
-    "OrthancPACS": "<orthanc-db-connection-string>"
+    "CathLabDb": "Server=localhost;Database=CathLab;User Id=...;Password=...;TrustServerCertificate=True",
+    "OrthancPACS": "Server=localhost;Database=OrthancPACS;User Id=...;Password=...;TrustServerCertificate=True"
   },
   "JwtSettings": {
-    "Secret": "replace-with-a-real-256-bit-secret",
+    "Secret": "replace-with-a-random-secret-of-at-least-32-characters",
     "Issuer": "CathLabApi",
     "Audience": "CathLabClients",
     "DurationInMinutes": 60
@@ -147,142 +169,154 @@ Set the following in `appsettings.Development.json`:
 }
 ```
 
-> ⚠️ **Never commit real secrets.** Use environment variables or a secrets manager in any shared or production environment.
+> ⚠️ Never commit real secrets. Use user-secrets or environment variables outside local development.
 
-### 2. Start infrastructure
+### 3. Start Orthanc
+
+Edit the volume path in `database/docker-compose.yml`. It currently points to a macOS path (`/Volumes/My_Disk/orthanc/db`), so replace it with a folder on your machine. Then:
 
 ```bash
 cd database
-docker-compose up -d
+docker compose up -d        # Orthanc: DICOM 4242, HTTP 8042
 ```
 
-This brings up the Orthanc PACS server and any supporting containers.
+`database/OrthancPACS.sql` is a fixture for the Orthanc index database.
 
-### 3. Apply migrations & run the API
+### 4. Apply migrations and run the API
 
 ```bash
 cd backend
 dotnet restore
 dotnet ef database update --project CathLab.Infrastructure --startup-project CathLab.WebApi
-dotnet run --project CathLab.WebApi/CathLab.WebApi.csproj
+dotnet run --project CathLab.WebApi
 ```
 
-The API will be available at `http://localhost:5152`, with Swagger UI at `/swagger`.
+API: `http://localhost:5152` · Swagger UI: `http://localhost:5152/swagger` (Development only).
 
-### 4. Verify
+PDF reports are written to a `reports/` folder in the API's content root.
 
-- Register a user → `POST /api/user`
-- Log in → `POST /api/auth/login`
-- Authorize Swagger with the returned bearer token
-- Trigger a manual PACS ingest → `POST /api/pacs/ingest/all`
+### 5. Serve the frontend
+
+Serve the **repository root** (pages use absolute paths like `/frontend/pages/login.html`) on port 5500 or 5501, then open:
+
+```
+http://localhost:5500/frontend/pages/login.html
+```
+
+The API base URL is set in `frontend/assets/js/api/client.js` (`http://localhost:5152` by default).
+
+### 6. Start the DICOM viewer (optional)
+
+```bash
+cd viewer
+npm install
+npm run dev                 # http://localhost:5501
+```
+
+The Vite dev server proxies `/orthanc-wadors` to Orthanc on port 8042. If you serve the main frontend on 5501 as well, use 5500 for it, because the viewer needs 5501.
+
+### 7. First login
+
+The first user has to be created directly (the user endpoint is admin-only). Insert an `Admin` row in the `Users` table of `CathLab` with a hash generated by the application's password hasher, or temporarily remove `[Authorize]` from the create-user endpoint in a local environment, create the admin, and restore it. Then log in at `/frontend/pages/login.html` and create the other accounts from the admin console.
 
 ---
 
-## API Reference
+## API reference
 
-**Base URL:** `http://localhost:5152`
-Interactive documentation: `http://localhost:5152/swagger`
+Base URL `http://localhost:5152`. Full interactive documentation is available at `/swagger`. All endpoints except login require `Authorization: Bearer <token>`.
 
-### Auth & Users
+### Auth and users
 
-| Method | Endpoint | Description | Auth |
+| Method | Endpoint | Description | Roles |
 |---|---|---|---|
-| `POST` | `/api/user` | Register a new user | `Admin` |
 | `POST` | `/api/auth/login` | Authenticate, receive JWT | Public |
-| `GET` | `/api/user` | Paginated user list | `Admin` |
-| `GET` | `/api/user/{id}` | Get user by ID | `Admin` |
+| `POST` | `/api/auth/logout` | Record logout in the activity log | Authenticated |
+| `GET/POST/PUT/DELETE` | `/api/user` · `/api/user/{id}` | User management | `Admin` |
 
-### Patients & Studies
+### Patients, studies and planning
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/patients` | Search/filter/paginate patients |
-| `GET` | `/api/cathstudies/{id}` | Get study metadata (incl. `PatientId`) |
-
-### PACS Ingestion
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/pacs/studies` | List pending studies (last 30 days) |
-| `POST` | `/api/pacs/ingest/{accessionNumber}` | Ingest a single study |
-| `POST` | `/api/pacs/ingest/all` | Ingest all pending studies |
-
-### Procedures & Lesion Treatment
-
-| Method | Endpoint | Description | Auth |
+| Method | Endpoint | Description | Roles |
 |---|---|---|---|
-| `GET` | `/api/procedures/reports/study/{cathStudyId}` | Get report for a study | `Admin, Medecin` |
-| `PUT` | `/api/procedures/reports/{reportId}` | Update report narrative | `Admin, Medecin` |
-| `POST` | `/api/procedures/lesions/{lesionId}/stent` | Reserve a stent for a lesion | `Admin, Medecin` |
-| `POST` | `/api/procedures/lesions/{lesionId}/balloon` | Reserve a balloon for a lesion | `Admin, Medecin` |
-| `DELETE` | `/api/procedures/lesions/{lesionId}` | Delete a lesion | `Admin, Medecin` |
-| `DELETE` | `/api/procedures/treatments/{treatmentId}` | Delete a treatment | `Admin, Medecin` |
-| `POST` | `/api/procedures/reports/{reportId}/confirm` | **Irreversible.** Finalizes report, moves reserved devices to Consumed | `Admin, Medecin` |
-| `GET` | `/api/procedures/reports/{reportId}/pdf` | Export report as PDF | `Admin, Medecin` |
+| `GET` | `/api/patients` | Search, filter, sort, paginate | Admin, Medecin, Secretaire |
+| `GET/PUT` | `/api/patients/{id}` | Read / edit (with `RowVersion`) | Admin, Medecin, Secretaire |
+| `GET` | `/api/cathstudies` | Studies with scheduling status | Admin, Medecin, Secretaire |
+| `PUT` | `/api/cathstudies/{id}/schedule` | Schedule or reschedule | Admin, Medecin, Secretaire |
+| `POST` | `/api/cathstudies/{id}/cancel` | Cancel a pending / scheduled study | Admin, Medecin, Secretaire |
 
-### Pharmacy & Inventory
+### PACS
 
-| Method | Endpoint | Description | Auth |
+| Method | Endpoint | Description | Roles |
 |---|---|---|---|
-| `GET` | `/api/pharmacy/items/available` | In-stock devices, filterable by type | Authenticated |
+| `GET` | `/api/pacs/studies` | Studies available in Orthanc | Admin, Medecin, Secretaire |
+| `GET` | `/api/pacs/overview` | Ingestion summary | Admin, Medecin, Secretaire |
+| `POST` | `/api/pacs/ingest/{accessionNumber}` | Ingest one study | Admin, Medecin, Secretaire |
+| `POST` | `/api/pacs/ingest/all` | Ingest all new studies | `Admin` |
+
+### Procedures and reports
+
+| Method | Endpoint | Description | Roles |
+|---|---|---|---|
+| `GET` | `/api/reports` | Reports (doctor: own, admin: all or `?doctorId=`) | Admin, Medecin |
+| `GET` | `/api/reports/patient/{patientId}` | Report history of a patient | Admin, Medecin |
+| `GET` | `/api/procedures/reports/study/{cathStudyId}` | Hydrate coronary mapping | Admin, Medecin |
+| `PUT` | `/api/procedures/reports/{reportId}` | Update narrative. Confirmed reports: **Admin only**, PDF regenerated | Admin, Medecin |
+| `DELETE` | `/api/procedures/reports/{reportId}` | Delete a report (draft or confirmed) | `Admin` |
+| `POST` | `/api/procedures/reports/{reportId}/confirm` | **Irreversible.** Lock report, consume devices, generate PDF | Admin, Medecin |
+| `GET` | `/api/procedures/reports/{reportId}/pdf` | Download PDF (confirmed only) | Admin, Medecin |
+| `POST` | `/api/procedures/lesions` | Add a lesion | Admin, Medecin |
+| `POST` | `/api/procedures/lesions/{id}/stent` · `/balloon` | Add a treatment (reserves a device) | Admin, Medecin |
+| `DELETE` | `/api/procedures/lesions/{id}` · `/treatments/{id}` | Remove (releases devices) | Admin, Medecin |
+
+### Pharmacy
+
+| Method | Endpoint | Description | Roles |
+|---|---|---|---|
+| `GET` | `/api/pharmacy/items/available` | In-stock devices by type | Authenticated |
 | `GET` | `/api/pharmacy/items/reserved/{cathStudyId}` | Devices reserved for a study | Authenticated |
-| `POST` | `/api/pharmacy/items/receive-batch` | Receive new inventory stock | `Admin, ResponsablePharmacie` |
+| `POST` | `/api/pharmacy/items/receive-batch` | Receive stock | Admin, ResponsablePharmacie |
+
+### Administration
+
+Archive, restore and permanently purge patients and studies, plus audit and activity logs, are exposed under `/api/admin/*` (`Admin` only).
 
 <details>
-<summary><strong>Example: Login request/response</strong></summary>
+<summary><strong>Example: login</strong></summary>
 
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
-{
-  "username": "john_doe",
-  "password": "SecurePassword123!"
-}
+{ "username": "john_doe", "password": "SecurePassword123!" }
 ```
 
 ```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "username": "john_doe",
-  "fullName": "John Doe"
-}
+{ "token": "eyJhbGciOi...", "username": "john_doe", "fullName": "John Doe", "role": "Medecin" }
 ```
-
-Use it on subsequent requests:
-
-```
-Authorization: Bearer <token>
-```
-
 </details>
 
 ---
 
-## Domain Model Highlights
+## Domain model highlights
 
-- **Device lifecycle:** `InStock → Reserved → Consumed`. Devices are reserved the moment they're added to a procedure and only become `Consumed` when the report is confirmed — mirroring real clinical use rather than optimistic deduction at order time.
-- **Idempotent ingestion:** every ingested study is deduplicated by `AccessionNumber` / `StudyInstanceUid`; re-running ingestion is always safe.
-- **Incomplete records:** patients created from ambiguous or partial DICOM metadata are flagged `IsIncomplete` for manual review.
+- **Device lifecycle**: `InStock → Reserved → Consumed`. A device is reserved when added to a treatment and consumed only when the report is confirmed.
+- **Study lifecycle**: `Pending → Scheduled → InProgress → Completed` (or `Cancelled`). A scheduled study moves to `InProgress` automatically when its time arrives.
+- **Idempotent ingestion**: unique indexes on accession number and study UID make re-running ingestion safe.
+- **Incomplete patients**: records built from partial DICOM metadata are flagged `IsIncomplete` for the secretary to complete.
+- **Soft delete**: patients and studies are archived first and can be restored. Permanent purge is a separate, type-to-confirm admin action.
+- **Optimistic concurrency**: patient edits carry a `RowVersion`, and stale updates return a conflict.
 
 ---
 
-## Authentication & Security
+## Security
 
-- **JWT Bearer authentication** with configurable issuer, audience, and expiry.
-- **Password hashing:** PBKDF2-HMAC-SHA512, 350,000 iterations, constant-time comparison to mitigate timing attacks.
-- **Role-based access control (RBAC):**
-  - `Admin` — full access
-  - `Medecin` — procedure documentation
-  - `ResponsablePharmacie` — inventory/pharmacy operations
-- **CORS:** locked to the configured frontend origin (`http://127.0.0.1:5500` in development).
+- JWT Bearer authentication with configurable issuer, audience and lifetime.
+- PBKDF2-HMAC-SHA512 password hashing (350,000 iterations) with constant-time comparison.
+- Role checks are enforced **in the API**. Hiding a button in the UI is never the only protection.
+- CORS is restricted to local development origins (`localhost`, `127.0.0.1`).
 
-**Production hardening checklist:**
-- [ ] Replace the JWT secret with a securely generated 256-bit+ key stored in a secrets manager (Azure Key Vault, AWS Secrets Manager, etc.), never in source control.
-- [ ] Serve over HTTPS only; enable HSTS.
-- [ ] Set restrictive CORS origins for production domains.
-- [ ] Enable rate limiting on `/api/auth/login`.
-- [ ] Rotate JWT signing keys periodically.
+### Known gaps before production
+
+- [ ] Serve over HTTPS and enable HSTS.
 
 ---
 
@@ -293,45 +327,47 @@ cd backend
 dotnet test
 ```
 
-> Integration tests around `IPacsReader` / `OrthancPacsReader` and the ingestion pipeline are recommended next steps — see [Roadmap](#roadmap).
+A test project is not included yet. See the roadmap.
 
 ---
 
-## Deployment Notes
+## Deployment notes
 
-- The API is stateless aside from the background worker; it can be horizontally scaled behind a load balancer, with the `PacsIngestionWorker` restricted to a single active instance (e.g., via a distributed lock or a dedicated worker deployment) to avoid duplicate ingestion cycles.
-- Run EF Core migrations as part of your CI/CD pipeline (`dotnet ef database update`) rather than on application startup in production.
-- Containerize `CathLab.WebApi` alongside Orthanc using the provided `database/docker-compose.yml` as a starting point for a full `docker-compose.prod.yml`.
+- Run `dotnet ef database update` in the CI/CD pipeline, not at application start.
+- `PacsIngestionWorker` runs inside the API process. With several API instances, run it on one instance only (or add a distributed lock) to avoid duplicate ingestion cycles.
+- Persist the `reports/` folder (generated PDFs) on durable storage.
 
 ---
 
 ## Roadmap
 
-- [ ] Automated integration test suite for PACS ingestion and inventory flows
-- [ ] Structured logging (Serilog) with correlation IDs across ingestion cycles
-- [ ] Health check endpoints (`/health`, `/health/ready`)
-- [ ] Distributed locking for the background ingestion worker in multi-instance deployments
-- [ ] OpenAPI client generation for the frontend
-- [ ] CI pipeline (build, test, lint) via GitHub Actions
+- [ ] Unit tests for report rules (lock, admin amendment, delete) and inventory transitions
+- [ ] Integration tests for PACS ingestion
+- [ ] Authorize DICOM endpoints and the viewer
+- [ ] Central API-URL configuration for frontend and viewer
+- [ ] Patient header and French labels in the PDF report
+- [ ] Search and filters on the admin report list
+- [ ] Health checks (`/health`) and structured logging (Serilog)
+- [ ] CI pipeline (build, test) with GitHub Actions
 
 ---
 
 ## Contributing
 
-1. Fork the repository and create a feature branch: `git checkout -b feature/your-feature`
-2. Follow existing project conventions (Clean Architecture boundaries, DTOs at the application layer, no domain logic in controllers).
-3. Add/update tests for any new service logic.
-4. Open a pull request with a clear description of the change and its motivation.
+1. Create a feature branch: `git checkout -b feature/your-feature`
+2. Respect the layer boundaries: no business logic in controllers, DTOs at the application layer.
+3. Add or update tests for service logic.
+4. Open a pull request describing the change and its motivation.
 
 ---
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for details.
-
----
+Distributed under the MIT License. See `LICENSE`.
 
 ## Acknowledgments
 
-- [Orthanc](https://www.orthanc-server.com/) — open-source, lightweight DICOM server powering PACS integration.
-- Architecture diagrams generated with [PlantUML](https://plantuml.com/).
+- [Orthanc](https://www.orthanc-server.com/) for the open-source DICOM server.
+- [Cornerstone3D](https://www.cornerstonejs.org/) for the DICOM viewer components.
+- [QuestPDF](https://www.questpdf.com/) for PDF generation.
+- [PlantUML](https://plantuml.com/) for the architecture diagrams.
