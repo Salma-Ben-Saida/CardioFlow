@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CathLab.Infrastructure", "C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CathLab.WebApi", "CathLab.WebApi\CathLab.WebApi.csproj", "{EF164E2A-0F7A-49B3-933B-206971AC0179}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CathLab.Tests", "CathLab.Tests\CathLab.Tests.csproj", "{9E224F58-EB67-4E49-BE42-36FD11B75908}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{EF164E2A-0F7A-49B3-933B-206971AC0179}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF164E2A-0F7A-49B3-933B-206971AC0179}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF164E2A-0F7A-49B3-933B-206971AC0179}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E224F58-EB67-4E49-BE42-36FD11B75908}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E224F58-EB67-4E49-BE42-36FD11B75908}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E224F58-EB67-4E49-BE42-36FD11B75908}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E224F58-EB67-4E49-BE42-36FD11B75908}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

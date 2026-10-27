@@ -13,18 +13,11 @@ export default defineConfig({
   ],
   server: {
     port: 5501,
+    strictPort: true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
-    // AJOUT D'UN PROXY INVERSE : Vite va lui-même faire la passerelle CORS
-    proxy: {
-      '/orthanc-wadors': {
-        target: 'http://localhost:8042',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/orthanc-wadors/, ''),
-      }
-    }
   },
   build: {
     outDir: '../frontend/pages/studies/viewer-dist',

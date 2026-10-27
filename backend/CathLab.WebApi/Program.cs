@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 
+DotNetEnv.Env.TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Configuration d'Authentification JWT ---
@@ -37,7 +38,7 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(secretKey),
         ClockSkew = TimeSpan.Zero, // Supprime la tolérance de 5 minutes par défaut
         
-        // 👈 CORRECTIF CRUCIAL : Indique à .NET de lire la clé "role" brute du JSON de votre Token
+        // Indique à .NET de lire la clé "role" brute du JSON de votre Token
         RoleClaimType = "role" 
     };
 });
@@ -156,7 +157,17 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod());
 });
 
-builder.Services.AddHttpClient("orthanc");
+var orthancUser = builder.Configuration["Orthanc:Username"];
+var orthancPass = builder.Configuration["Orthanc:Password"];
+if (string.IsNullOrWhiteSpace(orthancUser) || string.IsNullOrWhiteSpace(orthancPass))
+    throw new InvalidOperationException("Orthanc:Username and Orthanc:Password must be configured.");
+
+builder.Services.AddHttpClient("orthanc", client =>
+{
+    var cred = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{orthancUser}:{orthancPass}"));
+    client.DefaultRequestHeaders.Authorization =
+        new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", cred);
+});
 
 
 var app = builder.Build();

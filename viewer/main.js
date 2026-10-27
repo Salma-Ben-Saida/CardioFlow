@@ -21,13 +21,17 @@ import cornerstoneDICOMImageLoader from '@cornerstonejs/dicom-image-loader';
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const API_BASE = `${location.protocol}//${location.hostname}:5152`;
-const _t = new URLSearchParams(location.hash.slice(1)).get('token');
-if (_t) {
-  sessionStorage.setItem('authToken', _t);
+let authToken = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+if (authToken) {
   history.replaceState(null, '', location.pathname + location.search); // drop token from the address bar
 }
-const authHeaders = () => ({ Authorization: 'Bearer ' + (sessionStorage.getItem('authToken') || '') });
-const DICOMWEB_BASE = 'http://localhost:5501/orthanc-wadors/dicom-web';
+const authHeaders = () => {
+  if (!authToken) {
+    return {};
+  }
+  return { Authorization: `Bearer ${authToken}` };
+};
+const DICOMWEB_BASE = `${API_BASE}/api/dicom/web`;
 
 // ── Metadata maps ─────────────────────────────────────────────────────────────
 const customMetadataCache   = new Map(); // instanceUID → metadata obj
@@ -119,6 +123,11 @@ async function main() {
 
   await initCore();
 
+  if (!authToken) {
+    showError('Open the viewer from CardioFlow');
+    return;
+  }
+
   await cornerstoneDICOMImageLoader.init({
     maxWebWorkers: Math.max(navigator.hardwareConcurrency - 1, 1),
     startWebWorkersOnDemand: true,
@@ -128,14 +137,9 @@ async function main() {
         strict: false,
       },
     },
-    options: {
-      beforeSend(xhr) {
-        xhr.setRequestHeader(
-          'Accept',
-          'multipart/related; type="application/octet-stream"; transfer-syntax=*'
-        );
-      },
-    },
+    beforeSend: async () => ({
+      Authorization: authHeaders().Authorization || '',
+    }),
   });
 
   await initTools();
@@ -147,12 +151,34 @@ async function main() {
   const studyUID = params.get('studyUID');
   if (!studyUID) { showError('No studyUID provided.'); return; }
 
+  if (!authToken) {
+    showError('Open the viewer from CardioFlow');
+    return;
+  }
+
   const data = await fetch(
     `${API_BASE}/api/dicom/study/${encodeURIComponent(studyUID)}/instances`,
-  { headers: authHeaders() }
+    { headers: authHeaders() }
   ).then(r => {
+    if (r.status === 401) {
+      throw Object.assign(new Error('SESSION_EXPIRED'), { status: 401 });
+    }
+    if (r.status === 403) {
+      throw Object.assign(new Error('FORBIDDEN'), { status: 403 });
+    }
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
+  }).catch(err => {
+    if (err?.status === 401) {
+      showError('Session expired, reopen the viewer from CardioFlow');
+      throw err;
+    }
+    if (err?.status === 403) {
+      showError('Your role is not allowed to view images');
+      throw err;
+    }
+    showError(err?.message || 'Unable to load study data');
+    throw err;
   });
 
   if (!data.series?.length) { showError('No series found for this study.'); return; }
@@ -332,7 +358,9 @@ async function fetchInstanceMeta(series, inst) {
     `${DICOMWEB_BASE}/studies/${studyUID}/series/${seriesUID}` +
     `/instances/${instanceUID}/metadata`;
 
-  const json = await fetch(metadataUrl).then(r => {
+  const json = await fetch(metadataUrl, { headers: authHeaders() }).then(r => {
+    if (r.status === 401) throw Object.assign(new Error('SESSION_EXPIRED'), { status: 401 });
+    if (r.status === 403) throw Object.assign(new Error('FORBIDDEN'), { status: 403 });
     if (!r.ok) throw new Error(`Metadata fetch failed: ${r.status}`);
     return r.json();
   });
@@ -500,4 +528,11 @@ function showError(msg) {
   if (v) v.innerHTML = `<p style="color:#f87171;padding:2rem">${msg}</p>`;
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  showError(err?.status === 401
+    ? 'Session expired, reopen the viewer from CardioFlow'
+    : err?.status === 403
+      ? 'Your role is not allowed to view images'
+      : 'Unable to load the viewer. Please reopen it from CardioFlow.');
+});

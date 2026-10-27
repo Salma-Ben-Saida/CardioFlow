@@ -241,7 +241,7 @@ if (_hash && document.getElementById(`${_hash}Panel`)) activateTab(_hash);
 
        function imagingActions(s) {
     const viewImagesBtn = s.studyInstanceUid
-        ? `<a href="href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}#token=${encodeURIComponent(sessionStorage.getItem('authToken') || '')}""
+        ? `<a href="http://localhost:5501/?studyUID=${encodeURIComponent(s.studyInstanceUid)}#token=${encodeURIComponent(sessionStorage.getItem('authToken') || '')}"
               target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Ouvrir le visualiseur DICOM">
                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2">
