@@ -484,3 +484,11 @@ a.btn { display: inline-block; text-decoration: none; }
 /* Dashboard: right column = reports + PACS preview, same total height as the movements card */
 .panel-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .panel-stack > .panel { flex: 1; }
+.ingestion-setting {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px; margin-bottom: 12px;
+  background: #F5F3FB; border: 1px solid #e4def5; border-radius: 10px;
+  font-size: 13px; color: #3b3356;
+}
+.ingestion-setting .input { width: 90px; }
+.ingestion-meta { margin-left: auto; color: #6b6580; font-size: 12px; }

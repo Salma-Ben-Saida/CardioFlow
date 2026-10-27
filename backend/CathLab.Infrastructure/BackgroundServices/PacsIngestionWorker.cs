@@ -9,34 +9,40 @@ public class PacsIngestionWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PacsIngestionWorker> _logger;
-
-    // Poll every 15 minutes - can be adjusted as needed
-    private readonly TimeSpan _interval = TimeSpan.FromSeconds(900);
+    private readonly IngestionSettings _settings;
 
     public PacsIngestionWorker(
         IServiceScopeFactory scopeFactory,
-        ILogger<PacsIngestionWorker> logger)
+        ILogger<PacsIngestionWorker> logger,
+        IngestionSettings settings)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _settings = settings;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("PACS ingestion worker started");
+        _logger.LogInformation("PACS ingestion worker started (every {Min} min)", _settings.IntervalMinutes);
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                await RunIngestionCycleAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during PACS ingestion cycle");
-            }
+            try { await RunIngestionCycleAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Error during PACS ingestion cycle"); }
 
-            await Task.Delay(_interval, stoppingToken);
+            _settings.MarkRun(DateTime.UtcNow);
+
+            // Wait until lastRun + interval, re-evaluating whenever the admin changes the period.
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var changeToken = _settings.GetChangeToken();           // fetch BEFORE computing the deadline
+                var remaining = _settings.LastRunUtc!.Value + _settings.Interval - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero) break;
+
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, changeToken);
+                try { await Task.Delay(remaining, linked.Token); }
+                catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested) { /* period changed */ }
+            }
         }
     }
 

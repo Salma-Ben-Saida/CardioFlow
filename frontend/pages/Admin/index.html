@@ -311,6 +311,13 @@
                   <button class="btn btn-primary" id="btn-pacs-ingest-all" disabled>Ingérer les nouvelles</button>
                 </div>
               </div>
+              <div class="ingestion-setting">
+  <label for="ingestion-interval">Ingestion automatique toutes les</label>
+  <input type="number" id="ingestion-interval" class="input" min="1" max="1440" step="1">
+  <span>minutes</span>
+  <button class="btn btn-primary" id="btn-ingestion-save" type="button">Enregistrer</button>
+  <span class="ingestion-meta" id="ingestion-meta"></span>
+</div>
               <div class="summary-chips" id="pacs-summary"></div>
               <div class="table-wrap">
                 <table class="data-table" id="pacs-table">
