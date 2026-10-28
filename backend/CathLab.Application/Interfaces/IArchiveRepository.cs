@@ -10,7 +10,8 @@ public interface IArchiveRepository
 
     Task<List<CathStudy>> GetArchivedStudiesAsync();
     Task<List<Patient>> GetArchivedPatientsAsync();
-    Task<List<CathStudy>> GetStudiesByAccessionAsync(IEnumerable<string> accessionNumbers); // includes archived
+    Task<List<CathStudy>> GetStudiesByUidAsync(
+    IEnumerable<string> studyInstanceUids);
 
     void RemoveStudy(CathStudy study);
     void RemovePatient(Patient patient);

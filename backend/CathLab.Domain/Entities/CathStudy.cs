@@ -6,8 +6,14 @@ public class CathStudy
     public Guid PatientId { get; set; }
     public Guid? OperatorId { get; set; }
 
-    public string AccessionNumber { get; set; } = null!;
-    public string? StudyInstanceUid { get; set; }
+    /// <summary>Business key: DICOM StudyInstanceUID (mandatory and globally unique in DICOM).</summary>
+    public string StudyInstanceUid { get; set; } = null!;
+
+    /// <summary>Informational only: optional in DICOM, may be empty and is not unique.</summary>
+    public string AccessionNumber { get; set; } = "";
+
+    /// <summary>Human-readable label: accession number when present, otherwise the StudyInstanceUID.</summary>
+    public string Label => string.IsNullOrWhiteSpace(AccessionNumber) ? StudyInstanceUid : AccessionNumber;
     public DateTime StudyDate { get; set; }
     public StudyStatus Status { get; set; } = StudyStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

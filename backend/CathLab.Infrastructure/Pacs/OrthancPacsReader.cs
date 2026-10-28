@@ -77,8 +77,10 @@ public class OrthancPacsReader : IPacsReader
 
         return new PacsStudyDto
         {
-            StudyInstanceUid = studyUid ?? publicId,
-            AccessionNumber  = accession ?? publicId,
+            // StudyInstanceUID is mandatory in DICOM: it is the business key.
+            // AccessionNumber is optional (often empty): informational only.
+            StudyInstanceUid = studyUid ?? string.Empty,
+            AccessionNumber  = accession ?? string.Empty,
             PatientId        = patientId ?? string.Empty,
             PatientName      = patientName,
             PatientBirthDate = ParseDate(birthDate),
@@ -87,18 +89,21 @@ public class OrthancPacsReader : IPacsReader
             Modality         = modality
         };
     }
-    public async Task<PacsStudyDto?> GetStudyByAccessionAsync(string accessionNumber)
+
+    public async Task<PacsStudyDto?> GetStudyByUidAsync(string studyInstanceUid)
     {
+        if (string.IsNullOrWhiteSpace(studyInstanceUid)) return null;
+
         var identifier = await _ctx.DicomIdentifiers
             .FirstOrDefaultAsync(d =>
-                d.TagGroup == TagGroupAccession &&
-                d.TagElement == TagElementAccession &&
-                d.Value == accessionNumber);
+                d.TagGroup == TagGroupStudyUid &&
+                d.TagElement == TagElementStudyUid &&
+                d.Value == studyInstanceUid);
 
         if (identifier == null) return null;
 
         var resource = await _ctx.Resources
-            .FirstOrDefaultAsync(r => r.InternalId == identifier.Id);
+            .FirstOrDefaultAsync(r => r.InternalId == identifier.Id && r.ResourceType == 1);
 
         if (resource == null) return null;
 

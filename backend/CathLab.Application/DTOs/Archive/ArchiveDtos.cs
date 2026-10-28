@@ -19,7 +19,8 @@ public class ArchivedPatientDto
 public class ArchivedStudyDto
 {
     public Guid Id { get; set; }
-    public string AccessionNumber { get; set; } = null!;
+    public string AccessionNumber { get; set; } = "";
+    public string StudyInstanceUid { get; set; } = "";
     public DateTime StudyDate { get; set; }
     public Guid PatientId { get; set; }
     public string? PatientName { get; set; }

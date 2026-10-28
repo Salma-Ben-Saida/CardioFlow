@@ -640,10 +640,11 @@ const PACS_STATE = {
 };
 
 function pacsActions(s) {
-  const acc = escapeHtml(s.accessionNumber);
+  const acc = escapeHtml(s.accessionNumber || s.studyInstanceUid || '—');
+  const uid = escapeHtml(s.studyInstanceUid || s.accessionNumber || '');
   switch (s.state) {
     case 'New':
-      return `<button class="btn btn-primary btn-sm" data-pacs-action="ingest" data-accession="${acc}">Ingérer</button>`;
+      return `<button class="btn btn-primary btn-sm" data-pacs-action="ingest" data-uid="${uid}">Ingérer</button>`;
     case 'Ingested':
       return `<a class="btn btn-ghost btn-sm" href="/frontend/pages/patients/detail.html?id=${encodeURIComponent(s.patientId)}">Voir le patient</a>
         <button class="btn btn-danger btn-sm" data-pacs-action="archive-study" data-id="${s.cathStudyId}" data-accession="${acc}">Archiver</button>`;
@@ -659,7 +660,7 @@ function pacsActions(s) {
 function pacsRow(s) {
   const st = PACS_STATE[s.state] || { label: s.state, pill: 'pill-grey' };
   return `<tr>
-    <td>${escapeHtml(s.accessionNumber)}</td>
+    <td>${escapeHtml(s.accessionNumber || s.studyInstanceUid || '—')}</td>
     <td>${escapeHtml(s.patientName || '—')}<span class="cell-sub">${escapeHtml(s.patientDicomId || '')}</span></td>
     <td>${fmtDate(s.studyDate)}</td>
     <td>${escapeHtml(s.modality || '—')}</td>
@@ -750,12 +751,12 @@ async function ingestAllNew() {
 async function onPacsAction(e) {
   const btn = e.target.closest('[data-pacs-action]');
   if (!btn || btn.disabled) return;
-  const { pacsAction, id, accession } = btn.dataset;
+  const { pacsAction, id, accession, uid } = btn.dataset;
 
   switch (pacsAction) {
     case 'ingest':
       return withBusy(btn, async () => {
-        const r = await ingestPacsStudy(accession, null); // null = no manual override of patient data
+        const r = await ingestPacsStudy(uid || accession, null); // null = no manual override of patient data
         if (r.wasArchived) toast(r.info || 'Étude archivée : non ingérée', 'error');
         else if (r.wasAlreadyIngested) toast('Étude déjà ingérée');
         else toast(r.patientIsIncomplete ? 'Étude ingérée — dossier patient incomplet' : 'Étude ingérée');

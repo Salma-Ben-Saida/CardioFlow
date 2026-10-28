@@ -69,7 +69,7 @@ public class PatientLifecycleService
         await _repo.SaveChangesAsync();
 
         await _audit.LogActionAsync(actorUserId, "Archive", "CathStudy", study.Id,
-            $"Étude {study.AccessionNumber} archivée. Motif : {why}");
+            $"Étude {study.Label} archivée. Motif : {why}");
         return true;
     }
 
@@ -88,7 +88,7 @@ public class PatientLifecycleService
         await _repo.SaveChangesAsync();
 
         await _audit.LogActionAsync(actorUserId, "Restore", "CathStudy", study.Id,
-            $"Étude {study.AccessionNumber} restaurée.");
+            $"Étude {study.Label} restaurée.");
         return true;
     }
 
@@ -104,7 +104,7 @@ public class PatientLifecycleService
             throw new InvalidOperationException(
                 "Suppression définitive impossible : le rapport de cette étude est confirmé.");
 
-        var accession = study.AccessionNumber;
+        var accession = study.Label;
 
         await _uow.ExecuteInTransactionAsync(async () =>
         {
@@ -245,7 +245,8 @@ public class PatientLifecycleService
                 HasConfirmedReport = HasConfirmedReport(s),
                 DeletedAt = s.DeletedAt,
                 DeletedByName = await NameOf(s.DeletedByUserId),
-                DeleteReason = s.DeleteReason
+                DeleteReason = s.DeleteReason,
+                StudyInstanceUid = s.StudyInstanceUid
             });
 
         return dto;

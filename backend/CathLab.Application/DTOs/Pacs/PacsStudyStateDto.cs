@@ -2,7 +2,7 @@ namespace CathLab.Application.DTOs.Pacs;
 
 public class PacsStudyStateDto
 {
-    public string AccessionNumber { get; set; } = null!;
+    public string AccessionNumber { get; set; } = ""; 
     public string StudyInstanceUid { get; set; } = null!;
     public string PatientDicomId { get; set; } = string.Empty;
     public string? PatientName { get; set; }

@@ -4,7 +4,8 @@ namespace CathLab.Application.Interfaces;
 
 public interface ICathStudyRepository
 {
-    Task<CathStudy?> FindByAccessionNumberAsync(string accessionNumber);
+    Task<CathStudy?> FindByStudyInstanceUidAsync(
+    string studyInstanceUid);
     Task<CathStudy> CreateAsync(CathStudy study);
     Task<CathStudy?> FindByIdAsync(Guid id);
     Task<List<CathStudy>> GetAllWithPatientAsync();
