@@ -32,15 +32,15 @@ public class PacsController : ControllerBase
     [HttpGet("overview")]
     public async Task<IActionResult> GetOverview() => Ok(await _overview.GetAsync());
 
-    // Ingest one study by accession number
-    [HttpPost("ingest/{accessionNumber}")]
-public async Task<IActionResult> IngestOne(string accessionNumber, [FromBody] PatientOverrideDto? overrideData)
-{
-    var result = await _ingestion.IngestStudyAsync(accessionNumber, overrideData);
-    if (!result.Succeeded)
-        return BadRequest(new { error = result.Error });
-    return Ok(result);
-}
+    // Ingest one study by DICOM StudyInstanceUID
+    [HttpPost("ingest/{studyInstanceUid}")]
+    public async Task<IActionResult> IngestOne(string studyInstanceUid, [FromBody] PatientOverrideDto? overrideData)
+    {
+        var result = await _ingestion.IngestStudyAsync(studyInstanceUid, overrideData);
+        if (!result.Succeeded)
+            return BadRequest(new { error = result.Error });
+        return Ok(result);
+    }
 
     // Ingest all studies from last 30 days
     [HttpPost("ingest/all")]

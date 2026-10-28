@@ -139,17 +139,20 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("StudyInstanceUid")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccessionNumber")
-                        .IsUnique();
+                    b.HasIndex("AccessionNumber");
 
                     b.HasIndex("OperatorId");
 
                     b.HasIndex("PatientId");
+
+                    b.HasIndex("StudyInstanceUid")
+                        .IsUnique();
 
                     b.ToTable("CathStudies");
                 });

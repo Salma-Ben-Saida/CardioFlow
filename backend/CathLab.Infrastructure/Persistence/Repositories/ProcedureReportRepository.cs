@@ -66,7 +66,12 @@ public class ProcedureReportRepository : IProcedureReportRepository
     public async Task<PatientHeader?> GetPatientHeaderAsync(Guid cathStudyId) =>
     await _db.CathStudies.AsNoTracking()
         .Where(s => s.Id == cathStudyId && s.Patient != null)
-        .Select(s => new PatientHeader(s.Patient!.FullName, s.Patient.BirthDate, s.Patient.Sex, s.StudyDate, s.AccessionNumber))
+        .Select(s => new PatientHeader(
+            s.Patient!.FullName,
+            s.Patient.BirthDate,
+            s.Patient.Sex,
+            s.StudyDate,
+            s.AccessionNumber != "" ? s.AccessionNumber : s.StudyInstanceUid))
         .FirstOrDefaultAsync();
  
     public async Task<List<ProcedureReport>> GetByPatientIdAsync(Guid patientId)

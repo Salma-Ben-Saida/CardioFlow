@@ -32,13 +32,20 @@ public class ArchiveRepository : IArchiveRepository
             .OrderByDescending(s => s.DeletedAt)
             .ToListAsync();
 
-        public async Task<List<CathStudy>> GetStudiesByAccessionAsync(IEnumerable<string> accessionNumbers)
+    public async Task<List<CathStudy>> GetStudiesByUidAsync(IEnumerable<string> studyInstanceUids)
     {
-        var list = accessionNumbers.ToList();
+        var list = studyInstanceUids
+            .Where(uid => !string.IsNullOrWhiteSpace(uid))
+            .Distinct()
+            .ToList();
+
+        if (list.Count == 0)
+            return new List<CathStudy>();
+
         return await _ctx.CathStudies
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => list.Contains(s.AccessionNumber))
+            .Where(s => list.Contains(s.StudyInstanceUid))
             .ToListAsync();
     }
 

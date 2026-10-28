@@ -58,8 +58,9 @@ public class CathLabDbContext : DbContext
             e.HasKey(s => s.Id);
             e.Property(s => s.Id).ValueGeneratedOnAdd();
             e.Property(s => s.AccessionNumber).HasMaxLength(100);
-            e.Property(s => s.StudyInstanceUid).HasMaxLength(200);
-            e.HasIndex(s => s.AccessionNumber).IsUnique();
+            e.Property(s => s.StudyInstanceUid).IsRequired().HasMaxLength(200);
+            e.HasIndex(s => s.StudyInstanceUid).IsUnique();
+            e.HasIndex(s => s.AccessionNumber);
             e.Property(s => s.DeleteReason).HasMaxLength(500);
             e.HasQueryFilter(s => !s.IsDeleted);
             e.Property(s => s.Status)

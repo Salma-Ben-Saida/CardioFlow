@@ -80,8 +80,9 @@
         }
 
         function actions(s) {
+            const uid = s.studyInstanceUid || s.accessionNumber || '';
             if (s.state === 'New') {
-                return `<button class="btn btn-primary btn-sm" data-accession="${escapeHtml(s.accessionNumber)}">Ingérer</button>`;
+                return `<button class="btn btn-primary btn-sm" data-uid="${escapeHtml(uid)}">Ingérer</button>`;
             }
             if (s.state === 'Ingested') {
                 return `<a class="btn btn-secondary btn-sm" href="/frontend/pages/patients/detail.html?id=${encodeURIComponent(s.patientId)}">Voir le patient</a>`;
@@ -91,8 +92,9 @@
 
         function row(s) {
             const st = STATES[s.state] || { label: s.state, badge: 'badge-neutral' };
+            const displayValue = s.accessionNumber || s.studyInstanceUid || '—';
             return `<tr>
-                <td>${escapeHtml(s.accessionNumber)}</td>
+                <td>${escapeHtml(displayValue)}</td>
                 <td><div style="font-weight:500;">${escapeHtml(s.patientName || '—')}</div><div style="font-size:12px;color:#6b7280;">${escapeHtml(s.patientDicomId || '')}</div></td>
                 <td>${fmtDate(s.studyDate)}</td>
                 <td>${escapeHtml(s.modality || '—')}</td>
@@ -116,11 +118,12 @@
         }
 
         tbody.addEventListener('click', async (e) => {
-            const btn = e.target.closest('button[data-accession]');
+            const btn = e.target.closest('button[data-uid]');
             if (!btn || btn.disabled) return;
             btn.disabled = true;
             try {
-                const r = await ingestPacsStudy(btn.dataset.accession, null); // null = no manual patient override
+                const uid = btn.dataset.uid;
+                const r = await ingestPacsStudy(uid, null); // null = no manual patient override
                 if (r.wasArchived) showToast.error(r.info || 'Étude archivée : non ingérée');
                 else if (r.wasAlreadyIngested) showToast.info('Étude déjà ingérée');
                 else if (r.patientIsIncomplete) showToast.warning('Étude ingérée — dossier patient incomplet');

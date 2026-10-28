@@ -10,12 +10,12 @@ public class CathStudyRepository : ICathStudyRepository
     private readonly CathLabDbContext _ctx;
     public CathStudyRepository(CathLabDbContext ctx) => _ctx = ctx;
 
-    public async Task<CathStudy?> FindByAccessionNumberAsync(string accessionNumber) =>
+    public async Task<CathStudy?> FindByStudyInstanceUidAsync(string studyInstanceUid) =>
         await _ctx.CathStudies
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(s => s.AccessionNumber == accessionNumber);
+            .FirstOrDefaultAsync(s => s.StudyInstanceUid == studyInstanceUid);
 
-        public async Task<CathStudy> CreateAsync(CathStudy study)
+    public async Task<CathStudy> CreateAsync(CathStudy study)
     {
         study.Id = Guid.NewGuid();
         study.CreatedAt = DateTime.UtcNow;
@@ -27,7 +27,7 @@ public class CathStudyRepository : ICathStudyRepository
         catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
             _ctx.Entry(study).State = EntityState.Detached;   // keep the scoped context clean
-            throw new DuplicateEntityException($"Study {study.AccessionNumber} already exists.", ex);
+            throw new DuplicateEntityException($"Study {study.StudyInstanceUid} already exists.", ex);
         }
         catch
         {

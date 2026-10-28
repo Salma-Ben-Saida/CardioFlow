@@ -278,7 +278,7 @@ async function loadStudies() {
 
         tbody.innerHTML = studies.map(s => `
             <tr>
-                <td><div style="font-weight:500;">${escapeHtml(s.accessionNumber)}</div></td>
+                <td><div style="font-weight:500;">${escapeHtml(s.accessionNumber || s.studyInstanceUid || '—')}</div></td>
                 <td>${formatDate(s.studyDate)}</td>
                 <td><span class="badge ${s.status === 'Complete' ? 'badge-success' : 'badge-warning'}">${escapeHtml(s.status)}</span></td>
                 <td>${escapeHtml(s.operatorName || '-')}</td>
@@ -287,7 +287,7 @@ async function loadStudies() {
                     <div style="display:flex; gap:6px;">
                         ${canViewImaging ? imagingActions(s) : ''}
                         ${canArchive
-                            ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber)}" title="Archiver cette étude">Archiver</button>`
+                            ? `<button type="button" class="btn btn-ghost btn-sm" data-archive-study="${s.id}" data-accession="${escapeHtml(s.accessionNumber || s.studyInstanceUid || '—')}" title="Archiver cette étude">Archiver</button>`
                             : ''}
                     </div>
                 </td>

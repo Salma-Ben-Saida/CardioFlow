@@ -18,10 +18,15 @@ public class PacsOverviewService
     public async Task<List<PacsStudyStateDto>> GetAsync()
     {
         var pacsStudies = await _pacs.GetPendingStudiesAsync();
+        var uids = pacsStudies
+            .Select(s => s.StudyInstanceUid)
+            .Where(uid => !string.IsNullOrWhiteSpace(uid))
+            .Distinct()
+            .ToList();
 
-        var accessions = pacsStudies.Select(s => s.AccessionNumber).Distinct().ToList();
-        var dbStudies = (await _repo.GetStudiesByAccessionAsync(accessions))
-            .ToDictionary(s => s.AccessionNumber);
+        var dbStudies = (await _repo.GetStudiesByUidAsync(uids))
+            .Where(s => !string.IsNullOrWhiteSpace(s.StudyInstanceUid))
+            .ToDictionary(s => s.StudyInstanceUid!, StringComparer.Ordinal);
 
         var archivedPatients = await _repo.GetArchivedPatientsAsync();
         var archivedIds = archivedPatients.Select(p => p.Id).ToHashSet();
@@ -43,7 +48,8 @@ public class PacsOverviewService
                 State            = "New"
             };
 
-            if (dbStudies.TryGetValue(s.AccessionNumber, out var db))
+            if (!string.IsNullOrWhiteSpace(s.StudyInstanceUid)
+                && dbStudies.TryGetValue(s.StudyInstanceUid, out var db))
             {
                 dto.CathStudyId = db.Id;
                 dto.PatientId   = db.PatientId;

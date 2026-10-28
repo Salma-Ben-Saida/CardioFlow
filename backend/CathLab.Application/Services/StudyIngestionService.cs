@@ -21,31 +21,30 @@ public class StudyIngestionService
         _studyRepo = studyRepo;
     }
 
-        public async Task<IngestResult> IngestStudyAsync(string accessionNumber, PatientOverrideDto? overrideData = null)
+    public async Task<IngestResult> IngestStudyAsync(string studyInstanceUid, PatientOverrideDto? overrideData = null)
     {
-        // 1 — fetch from PACS
-        var dto = await _pacsReader.GetStudyByAccessionAsync(accessionNumber);
-        if (dto == null)
-            return IngestResult.Fail($"Study {accessionNumber} not found in PACS");
+        if (string.IsNullOrWhiteSpace(studyInstanceUid))
+            return IngestResult.Fail("Study has no StudyInstanceUID; cannot ingest it.");
 
-        // 2 — avoid duplicate
-        var existing = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
+        var dto = await _pacsReader.GetStudyByUidAsync(studyInstanceUid);
+        if (dto == null)
+            return IngestResult.Fail($"Study {studyInstanceUid} not found in PACS");
+
+        var existing = await _studyRepo.FindByStudyInstanceUidAsync(studyInstanceUid);
         if (existing != null)
             return existing.IsDeleted
                 ? IngestResult.SkippedArchived(existing.Id,
-                    $"Study {accessionNumber} is archived; restore it from the archive instead.")
+                    $"Study {studyInstanceUid} is archived; restore it from the archive instead.")
                 : IngestResult.AlreadyExists(existing.Id);
 
-        // 2b — an empty PatientID would silently merge unrelated patients under one record
         if (string.IsNullOrWhiteSpace(dto.PatientId))
             return IngestResult.Fail(
-                $"Study {accessionNumber} has no PatientID in PACS; cannot link it to a patient safely.");
+                $"Study {studyInstanceUid} has no PatientID in PACS; cannot link it to a patient safely.");
 
-        // 3 — find or create patient (race-safe)
         var patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId);
         if (patient is { IsDeleted: true })
             return IngestResult.SkippedArchived(null,
-                $"Patient {dto.PatientId} is archived; study {accessionNumber} was not ingested.");
+                $"Patient {dto.PatientId} is archived; study {studyInstanceUid} was not ingested.");
         if (patient == null)
         {
             try
@@ -54,7 +53,6 @@ public class StudyIngestionService
             }
             catch (DuplicateEntityException)
             {
-                // another ingestion created it a moment ago
                 patient = await _patientRepo.FindByConquestIdAsync(dto.PatientId)
                           ?? throw new InvalidOperationException(
                                 $"Patient {dto.PatientId} vanished during ingestion.");
@@ -63,15 +61,14 @@ public class StudyIngestionService
         else if (overrideData != null)
         {
             ApplyOverride(patient, overrideData);
-            patient.RecomputeCompleteness(); 
+            patient.RecomputeCompleteness();
             patient = await _patientRepo.UpdateAsync(patient);
         }
 
-        // 4 — create study (race-safe)
         var study = new CathStudy
         {
             PatientId        = patient.Id,
-            AccessionNumber  = dto.AccessionNumber,
+            AccessionNumber  = dto.AccessionNumber ?? "",
             StudyInstanceUid = dto.StudyInstanceUid,
             StudyDate        = dto.StudyDate.HasValue
                                 ? dto.StudyDate.Value.ToDateTime(TimeOnly.MinValue)
@@ -85,10 +82,10 @@ public class StudyIngestionService
         }
         catch (DuplicateEntityException)
         {
-            var now = await _studyRepo.FindByAccessionNumberAsync(accessionNumber);
+            var now = await _studyRepo.FindByStudyInstanceUidAsync(studyInstanceUid);
             return now != null
                 ? IngestResult.AlreadyExists(now.Id)
-                : IngestResult.Fail($"Study {accessionNumber} could not be created.");
+                : IngestResult.Fail($"Study {studyInstanceUid} could not be created.");
         }
 
         return IngestResult.Success(study.Id, patient.Id, patient.IsIncomplete);
@@ -102,12 +99,11 @@ public class StudyIngestionService
         {
             try
             {
-                results.Add(await IngestStudyAsync(dto.AccessionNumber));
+                results.Add(await IngestStudyAsync(dto.StudyInstanceUid));
             }
             catch (Exception ex)
             {
-                // one bad study must not abort the whole cycle
-                results.Add(IngestResult.Fail($"Study {dto.AccessionNumber}: {ex.Message}"));
+                results.Add(IngestResult.Fail($"Study {dto.StudyInstanceUid}: {ex.Message}"));
             }
         }
         return results;
