@@ -94,7 +94,7 @@
             loginBtnText.style.display = 'none';
             loginSpinner.style.display = 'inline-block';
             try {
-                const response = await fetch('http://localhost:5152/api/Auth/login', {
+                const response = await fetch('/api/Auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ Username, Password })

@@ -5,7 +5,7 @@
 import { get as apiGetClient, post as apiPostClient, put as apiPutClient } from '../../assets/js/api/client.js';
 
 /* ---------- API config ---------- */
-const API_BASE = 'http://localhost:5152/api';
+const API_BASE = '/api';
 
 const API = {
   base: API_BASE,
@@ -100,7 +100,7 @@ function toast(msg, type = 'success') {
 
 /* ---------- Fetch wrapper ---------- */
 function toApiEndpoint(url) {
-  const origin = 'http://localhost:5152';
+  const origin = '';
   if (url.startsWith(origin)) return url.slice(origin.length);
   return url;
 }
@@ -568,7 +568,7 @@ async function confirmDeleteProduct() {
   if (!state.selectedProductForDelete) return;
 
   try {
-    const response = await fetch(`http://localhost:5152/api/pharmacy/products/${state.selectedProductForDelete.id}`, {
+    const response = await fetch(`/api/pharmacy/products/${state.selectedProductForDelete.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
@@ -683,7 +683,7 @@ async function confirmDeleteItem() {
   if (!state.selectedItemForDelete) return;
 
   try {
-    const response = await fetch(`http://localhost:5152/api/pharmacy/items/${state.selectedItemForDelete.id}`, {
+    const response = await fetch(`/api/pharmacy/items/${state.selectedItemForDelete.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`,
@@ -848,7 +848,7 @@ window.logoutUser = async function() {
   const token = sessionStorage.getItem('authToken');
   try {
     if (token) {
-      await fetch('http://localhost:5152/api/Auth/logout', {
+      await fetch('/api/Auth/logout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

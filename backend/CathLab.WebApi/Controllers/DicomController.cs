@@ -15,12 +15,13 @@ public class DicomController : ControllerBase
 {
     private readonly HttpClient _http;
     private readonly ILogger<DicomController> _logger;
-    private readonly string _orthancBase = "http://localhost:8042";
+    private readonly string _orthancBase;
 
-    public DicomController(IHttpClientFactory f, ILogger<DicomController> logger)
+    public DicomController(IHttpClientFactory f, ILogger<DicomController> logger, IConfiguration config)
     {
         _http = f.CreateClient("orthanc");
         _logger = logger;
+        _orthancBase = config["Orthanc:BaseUrl"] ?? "http://localhost:8042";
     }
 
     [HttpGet("web/{**path}")]

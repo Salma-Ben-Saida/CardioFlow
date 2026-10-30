@@ -1,0 +1,32 @@
+services:
+  api:
+    build: ./backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__CathLabDb: "Server=host.docker.internal,1433;Database=CathLabDB;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;Encrypt=False"
+      ConnectionStrings__OrthancPACS: "Server=host.docker.internal,1433;Database=OrthancPACS;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;Encrypt=False"
+      JwtSettings__Secret: ${JWT_SECRET}
+      JwtSettings__Issuer: CathLabApi
+      JwtSettings__Audience: CathLabClient
+      JwtSettings__DurationInMinutes: "60"
+      Orthanc__BaseUrl: http://host.docker.internal:8042
+      Orthanc__Username: ${Orthanc__Username}
+      Orthanc__Password: ${Orthanc__Password}
+    volumes:
+      - ${REPORTS_DIR}:${REPORTS_DIR}
+      - appdata:/app/App_Data
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "80:80"
+
+volumes:
+  appdata:
