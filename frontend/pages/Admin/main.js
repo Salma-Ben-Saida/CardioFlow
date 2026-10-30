@@ -944,7 +944,7 @@ if (!confirmed) return;
   const token = sessionStorage.getItem('authToken');
   try {
     if (token) {
-      await fetch('http://localhost:5152/api/Auth/logout', {
+      await fetch('/api/Auth/logout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

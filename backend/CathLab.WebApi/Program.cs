@@ -12,7 +12,11 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 
+try{
 DotNetEnv.Env.TraversePath().Load();
+}catch(Exception ex){
+    Console.WriteLine($"Erreur lors du chargement des variables d'environnement : {ex.Message}");
+}
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Configuration d'Authentification JWT ---
@@ -130,8 +134,7 @@ builder.Services.AddScoped<ProcedureService>();
 
 builder.Services.AddSingleton<IngestionSettings>();
 builder.Services.AddHostedService<PacsIngestionWorker>();
-// Worker d'arrière-plan Singleton
-builder.Services.AddHostedService<PacsIngestionWorker>();
+
 
 // Services et Répertoires d'utilisateurs
 builder.Services.AddScoped<IUserRepository, UserRepository>();

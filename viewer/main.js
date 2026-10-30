@@ -20,7 +20,7 @@ import {
 import cornerstoneDICOMImageLoader from '@cornerstonejs/dicom-image-loader';
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const API_BASE = `${location.protocol}//${location.hostname}:5152`;
+const API_BASE = ``;
 let authToken = new URLSearchParams(location.hash.slice(1)).get('token') || '';
 if (authToken) {
   history.replaceState(null, '', location.pathname + location.search); // drop token from the address bar

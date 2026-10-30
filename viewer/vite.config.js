@@ -19,6 +19,9 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
+  worker: {
+    format: 'es',
+  },
   build: {
     outDir: '../frontend/pages/studies/viewer-dist',
     commonjsOptions: {

@@ -1,20 +1,66 @@
-@startuml "usecase"
+@startuml "usecase-global"
 left to right direction
 skinparam packageStyle rectangle
+skinparam shadowing false
+title CardioFlow – Diagramme de cas d'utilisation global
 
-actor "Médecin" as Doctor
-actor "Secrétaire" as Assistant
-actor "Pharmacien" as Pharmacist
+' ===== Acteurs principaux =====
+actor "Médecin" as Medecin
+actor "Secrétaire" as Secretaire
+actor "Responsable\nPharmacie" as Pharmacien
 actor "Administrateur" as Admin
+actor "Planificateur\nd'ingestion" as Worker <<système>>
 
-rectangle "CardioFlow - Cath Lab Management System" {
+' ===== Acteur secondaire =====
+actor "Serveur PACS\n(Orthanc)" as Orthanc <<système>>
 
-    usecase "S'authentifier" as UC1
-
-   
+rectangle "CardioFlow" {
+  usecase "Gérer les patients" as UC1
+  usecase "Planifier\nles interventions" as UC2
+  usecase "Ingérer une étude PACS\nà la demande" as UC3
+  usecase "Ingérer automatiquement\nles études PACS" as UC4
+  usecase "Visualiser\nles images DICOM" as UC5
+  usecase "Cartographier les lésions\net rédiger le compte rendu" as UC6
+  usecase "Gérer la pharmacie\net le stock" as UC7
+  usecase "Gérer les utilisateurs" as UC8
+  usecase "Configurer\nl'ingestion PACS" as UC9
+  usecase "Gérer l'archivage\ndes données" as UC10
+  usecase "Gérer les audits\net les logs" as UC11
 }
 
-Doctor --> UC1
+' ===== Associations : Médecin =====
+Medecin -- UC1
+Medecin -- UC2
+Medecin -- UC3
+Medecin -- UC5
+Medecin -- UC6
 
+' ===== Associations : Secrétaire =====
+Secretaire -- UC1
+Secretaire -- UC2
+Secretaire -- UC3
+
+' ===== Associations : Responsable pharmacie =====
+Pharmacien -- UC7
+
+' ===== Associations : Administrateur =====
+Admin -- UC1
+Admin -- UC2
+Admin -- UC3
+Admin -- UC5
+Admin -- UC6
+Admin -- UC7
+Admin -- UC8
+Admin -- UC9
+Admin -- UC10
+Admin -- UC11
+
+' ===== Acteur système déclencheur =====
+Worker -- UC4
+
+' ===== Acteur secondaire : Orthanc =====
+UC3 -- Orthanc
+UC4 -- Orthanc
+UC5 -- Orthanc
 
 @enduml
