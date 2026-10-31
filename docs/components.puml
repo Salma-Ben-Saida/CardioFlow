@@ -1,104 +1,93 @@
-@startuml Hospital_PACS_Production_Architecture
-
-skinparam nodesep 100 
-skinparam ranksep 120 
-
-skinparam linetype ortho
-skinparam nodesep 90
-skinparam ranksep 120
+@startuml Architecture_PACS_CardioFlow
 skinparam shadowing false
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam defaultFontSize 12
+skinparam arrowFontSize 11
+title CardioFlow – Architecture de déploiement et flux DICOM
 
 ' =========================
-' EXTERNAL IMAGING DEVICES
+' ACQUISITION DES IMAGES
 ' =========================
-package "Imaging Modalities" #F5F5F5 {
+package "Modalités d'imagerie" #F5F5F5 {
+  [Philips XA\n(angiographe)] as philips
+  [Autres modalités DICOM\n(optionnel)] as other
+}
 
-  [Philips XA] as philips
-  [CT Scanner] as ct
-  [MRI Scanner] as mri
+package "PACS hérité (optionnel)" #FFF3E0 {
+  [Serveur ConQuest\n(archive DICOM)] as conquest
 }
 
 ' =========================
-' LEGACY PACS SYSTEM
+' SERVEUR PACS
 ' =========================
-package "Legacy Hospital PACS (Optional)" #FFF3E0 {
-
-  [ConQuest PACS Server\n(DICOM Archive)] as conquest
+package "Serveur PACS – Orthanc (conteneur)" #E3F2FD {
+  [Service DICOM\nC-STORE · port 4242] as dicom
+  [API REST + DICOMweb\nport 8042 · authentification Basic] as rest
+  [Fichiers DICOM (.dcm)\nstockage sur disque] as files
 }
 
 ' =========================
-' MODERN PACS CORE
+' BASES DE DONNÉES
 ' =========================
-package "PACS Core Layer (DICOM Standard)" #E3F2FD {
-
-  [DICOM C-STORE\n(Receive Studies)] as store
-  [DICOM C-FIND / C-MOVE\n(Query & Retrieve)] as qr
-  [PACS Archive Storage\n(DICOM Files + Index)] as archive
+package "SQL Server (port 1433)" #FFFDE7 {
+  database "OrthancPACS\n(index DICOM)" as idx
+  database "CathLabDB\n(données cliniques)" as cathdb
 }
 
 ' =========================
-' MODERN WEB GATEWAY
+' APPLICATION CARDIOFLOW
 ' =========================
-package "Web Access Layer (DICOMweb Gateway)" #E8F5E9 {
+package "Conteneur api – ASP.NET Core" #E8F5E9 {
+  [API CathLab\n(contrôleurs REST · JWT)] as api
+  [Worker d'ingestion\n(PacsIngestionWorker)] as worker
+}
 
-  [Orthanc Gateway\n(DICOMweb + REST API)] as orthanc
-  [WADO-RS / QIDO-RS\nDICOMweb Services] as dicomweb
+package "Conteneur web – nginx" #EDE7F6 {
+  [nginx\nfichiers statiques\net reverse proxy /api] as nginx
+}
+
+package "Navigateur de l'utilisateur" #F3E5F5 {
+  [Interface web\nHTML / JavaScript] as ui
+  [Visualiseur DICOM\nCornerstone3D] as viewer
 }
 
 ' =========================
-' CLINICAL APPLICATION LAYER
+' FLUX : ACQUISITION
 ' =========================
-package "Clinical Application Layer" #E1F5FE {
+philips --> dicom : C-STORE
+other --> dicom : C-STORE
+conquest --> dicom : C-STORE\n(routage optionnel)
 
-  [ASP.NET Core API\nCathLab System] as api
-  database "CathLabDB\n(Clinical Data)" as cathdb
-}
-
-' =========================
-' FRONTEND LAYER
-' =========================
-package "Web Viewer Layer" #F3E5F5 {
-
-  [Cornerstone.js / OHIF Viewer\n(Web DICOM Viewer)] as viewer
-}
+dicom --> files : écrit les instances
+dicom --> idx : indexe les études\n(plugin ODBC)
+rest --> files : lit les images
 
 ' =========================
-' FLOWS - IMAGING INGESTION
+' FLUX : APPLICATION
 ' =========================
-philips --> store : C-STORE (DICOM Send)
-ct --> store
-mri --> store
+ui --> nginx : HTTP /api/...
+viewer --> nginx : HTTP /api/dicom/...\n(jeton JWT)
+nginx --> api : proxy /api
 
-store --> archive : store DICOM instances
+api --> cathdb : EF Core\n(lecture / écriture)
+api --> idx : EF Core\n(lecture seule)
+api --> rest : HTTP (Basic)\nimages, aperçus, DICOMweb
 
-' =========================
-' OPTIONAL LEGACY INTEGRATION
-' =========================
-conquest --> store : DICOM Forwarding\n(optional routing)
+worker --> idx : interroge périodiquement\nles nouvelles études
+worker --> cathdb : ingère patients\net études (idempotent)
 
-' =========================
-' MODERN WEB ACCESS FLOW
-' =========================
-archive --> orthanc : internal DICOM access
-orthanc --> dicomweb : REST / DICOMweb API
-dicomweb --> viewer : WADO-RS images
-
-' =========================
-' CLINICAL SYSTEM FLOW
-' =========================
-api --> cathdb : CRUD Patients / Reports
-api --> orthanc : Study metadata + image links
-
-' =========================
-' LINKING LAYER (IMPORTANT)
-' =========================
 note right of api
-Uses DICOM UIDs:
-- PatientID (0010,0020)
-- StudyInstanceUID (0020,000D)
-- AccessionNumber (0008,0050)
+  L'API et le worker lisent l'index Orthanc
+  (SQL Server) en lecture seule, et récupèrent
+  les images via l'API REST d'Orthanc.
+  Le visualiseur n'accède jamais directement
+  à Orthanc : tout passe par l'API (JWT).
 
-No direct PACS database dependency.
+  Identifiants DICOM utilisés :
+  - PatientID (0010,0020)
+  - StudyInstanceUID (0020,000D)
+  - AccessionNumber (0008,0050)
 end note
 
 @enduml
