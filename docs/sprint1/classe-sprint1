@@ -1,0 +1,37 @@
+@startuml "class-sprint1-domaine"
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam classAttributeIconSize 0
+skinparam roundCorner 0
+skinparam nodesep 80
+skinparam ranksep 90
+skinparam class {
+  BackgroundColor #FFFFCC
+  BorderColor #000000
+  ArrowColor #000000
+}
+skinparam ArrowColor #000000
+
+class AppUser {
+  + Id : Guid
+  + Username : string
+  + PasswordHash : string
+  + FullName : string
+  + Role : UserRole
+  + IsActive : bool
+  + CreatedAt : DateTime
+}
+
+enum UserRole <<enumeration>> {
+  Medecin
+  Secretaire
+  ResponsablePharmacie
+  Admin
+}
+
+AppUser "*" -right-> "1" UserRole : possède  >
+@enduml

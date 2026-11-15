@@ -1,0 +1,131 @@
+@startuml CardioFlow_Architecture_Logique
+skinparam dpi 150
+skinparam shadowing false
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 15
+skinparam roundCorner 14
+skinparam nodesep 35
+skinparam ranksep 55
+skinparam ArrowFontSize 13
+skinparam ArrowThickness 1.6
+skinparam ArrowColor #455A64
+skinparam packageFontSize 18
+skinparam packageFontStyle bold
+skinparam packageBorderThickness 2.5
+skinparam componentBorderThickness 1.5
+skinparam componentFontSize 14
+skinparam interfaceBorderThickness 2
+
+title <size:24><b>CardioFlow - Architecture logique en oignon</b></size>\n<size:15>Règle de dépendance : les flèches rouges pointent toujours vers l'intérieur (vers Domain)</size>\n
+
+' ---------- Externes (ligne du haut) ----------
+node "Frontend HTML / JS\n+ visualiseur DICOM" as Front #ECEFF1
+node "Orthanc\nAPI REST" as OrthancRest #FFF3E0
+database "OrthancPACS\n(index DICOM)" as OrthancDb #FFF3E0
+database "CathLabDb\n(SQL Server)" as CathDb #E3F2FD
+
+' ---------- Ligne 2 : couche externe ----------
+package "CathLab.WebApi  -  présentation" as WebApi #E8F5E9 {
+  component "Contrôleurs REST\nAuth · User · Admin · Patients · CathStudies\nPacs · Dicom · Procedures · Reports · Pharmacy" as Ctrl #FFFFFF
+  component "JWT Bearer + RBAC\n4 rôles : Admin, Medecin,\nSecretaire, ResponsablePharmacie" as Auth #FFFFFF
+  component "Program.cs\nracine de composition (DI)\nCORS · Swagger" as Comp #FFFFFF
+}
+
+package "CathLab.Infrastructure  -  adaptateurs" as Infra #E3F2FD {
+  component "OrthancPacsReader" as OPR #FFFFFF
+  component "Dépôts EF Core (11)" as Repos #FFFFFF
+  component "UnitOfWork" as UoW #FFFFFF
+  component "QuestPdfProcedure\nReportGenerator" as PdfImpl #FFFFFF
+  component "PacsIngestionWorker\n(BackgroundService)" as Worker #FFFFFF
+  component "OrthancPacsContext\n(lecture seule)" as OCtx #FFFFFF
+  component "CathLabDbContext\n(EF Core)" as Ctx #FFFFFF
+}
+
+' ---------- Ligne 3 : Application ----------
+package "CathLab.Application  -  cas d'usage" as App #FFF8E1 {
+  package "Services applicatifs (un service par préoccupation)" as Svc #FFFDE7 {
+    component "StudyIngestionService" as SIS #FFFFFF
+    component "PacsOverviewService" as POS #FFFFFF
+    component "PatientService" as PS #FFFFFF
+    component "PatientLifecycleService" as PLS #FFFFFF
+    component "StudySchedulingService" as SSS #FFFFFF
+    component "ProcedureService" as PrS #FFFFFF
+    component "InventoryService" as IS #FFFFFF
+    component "UserService" as US #FFFFFF
+    component "AuditService" as AS #FFFFFF
+  }
+  package "Ports (interfaces)" as Ports #FFFDE7 {
+    rectangle "<<interface>>\nIPacsReader" as IPacs #FFFFFF
+    rectangle "<<interface>>\nIXxxRepository (x11)" as IRepos #FFFFFF
+    rectangle "<<interface>>\nIUnitOfWork" as IUoW #FFFFFF
+    rectangle "<<interface>>\nIPdfGenerator" as IPdf #FFFFFF
+  }
+  component "DTOs" as Dto #FFFFFF
+}
+
+' ---------- Ligne 4 : noyau ----------
+package "CathLab.Domain  -  noyau métier (aucune dépendance)" as Domain #FCE4EC {
+  component "Patient · RiskProfile · CathStudy" as D1 #FFFFFF
+  component "ProcedureReport · CoronaryLesion\nLesionTreatment <|-- StentImplant / BalloonDilation (TPT)" as D2 #FFFFFF
+  component "InventoryProduct · InventoryItem · StockMovement\n(catalogue / unité / mouvement)" as D3 #FFFFFF
+  component "AppUser · UserRole · AuditLog · UserActivityLog" as D4 #FFFFFF
+}
+
+' ---------- Grille interne (alignement) ----------
+Ctrl -[hidden]down- Auth
+Auth -[hidden]down- Comp
+OPR -[hidden]right- Repos
+Repos -[hidden]right- UoW
+UoW -[hidden]right- PdfImpl
+OCtx -[hidden]right- Ctx
+Worker -[hidden]right- OCtx
+OPR -[hidden]down- OCtx
+Repos -[hidden]down- Ctx
+
+SIS -[hidden]right- POS
+POS -[hidden]right- PS
+PLS -[hidden]right- SSS
+SSS -[hidden]right- PrS
+IS -[hidden]right- US
+US -[hidden]right- AS
+SIS -[hidden]down- PLS
+PLS -[hidden]down- IS
+IPacs -[hidden]right- IRepos
+IUoW -[hidden]right- IPdf
+IPacs -[hidden]down- IUoW
+
+D1 -[hidden]right- D2
+D3 -[hidden]right- D4
+D1 -[hidden]down- D3
+Ports -[hidden]right- Svc
+IUoW -[hidden]down- Dto
+Infra -[hidden]right- WebApi
+Ctrl -[hidden]down- Svc
+
+' ---------- Flux externes ----------
+Front -down-> Ctrl : HTTP / JSON (JWT)
+OPR -up-> OrthancRest : HTTP
+OCtx -up-> OrthancDb : SQL
+Ctx -up-> CathDb : SQL
+
+' ---------- Dépendances ----------
+Ctrl -down-> Svc : appelle
+Comp ..right.> Infra : enregistre les implémentations (DI)
+Worker -down-> SIS : déclenche l'ingestion
+
+OPR ..|> IPacs : implémente
+Repos ..|> IRepos : implémente
+UoW ..|> IUoW
+PdfImpl ..|> IPdf
+
+Svc -left-> Ports : dépendent des\ninterfaces
+App -[thickness=4,#C62828]down-> Domain : dépend de
+Infra -[thickness=4,#C62828]-> Domain : dépend de
+
+legend right
+  <b>Légende</b>
+  ──▶  dépendance
+  ┈┈▷  implémentation d'un port
+  <color:#C62828>━━▶</color>  règle de dépendance (vers le noyau)
+endlegend
+@enduml

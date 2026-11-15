@@ -1,0 +1,65 @@
+@startuml "usecase-sprint2"
+left to right direction
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam nodesep 40
+skinparam ranksep 130
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #F4F8FC
+  BorderColor #1F4E79
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+}
+skinparam ArrowColor #404040
+title Sprint 2 – Diagramme de cas d'utilisation
+
+actor "Administrateur" as Admin
+actor "Secrétaire" as Sec
+actor "Médecin" as Med
+actor "Service\nd'ingestion" as Worker <<système>>
+actor "Serveur PACS\n(Orthanc / Conquest)" as Pacs <<système>>
+
+' L'administrateur dispose des droits du médecin et de la secrétaire
+Admin --|> Med
+Admin --|> Sec
+
+rectangle "CardioFlow – Ingestion PACS et gestion des patients" {
+  usecase "Consulter les études\ndu PACS" as UC1
+  usecase "Importer une étude\ndepuis le PACS" as UC2
+  usecase "Importer toutes\nles études" as UC3
+  usecase "Importer automatiquement\nles nouvelles études" as UC4
+  usecase "Paramétrer l'ingestion\nautomatique" as UC5
+
+  usecase "Rechercher et filtrer\nles patients" as UC6
+  usecase "Consulter le dossier\nd'un patient" as UC7
+  usecase "Compléter un\ndossier incomplet" as UC8
+  usecase "Renseigner le profil de risque\ncardiovasculaire" as UC9
+}
+
+Sec -- UC1
+Sec -- UC2
+Sec -- UC6
+Sec -- UC7
+Sec -- UC8
+
+Med -- UC1
+Med -- UC2
+Med -- UC6
+Med -- UC7
+Med -- UC9
+
+Admin -- UC3
+Admin -- UC5
+
+Worker -- UC4
+
+UC1 -- Pacs
+UC2 -- Pacs
+UC3 -- Pacs
+UC4 -- Pacs
+@enduml

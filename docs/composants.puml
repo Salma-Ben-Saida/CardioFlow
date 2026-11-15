@@ -1,0 +1,113 @@
+@startuml CardioFlow_Diagramme_Composants
+skinparam dpi 150
+skinparam shadowing false
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 15
+skinparam roundCorner 10
+skinparam nodesep 110
+skinparam ranksep 65
+skinparam ArrowFontSize 13
+skinparam ArrowThickness 1.5
+skinparam packageFontSize 18
+skinparam packageFontStyle bold
+skinparam packageBorderThickness 2.5
+skinparam componentStyle uml2
+
+title <size:22><b>CardioFlow – Diagramme de composants (architecture en oignon)</b></size>\n
+
+package "CathLab.WebApi" as WebApi #E8F5E9 {
+  component "Authentification\nJWT / RBAC" as Auth
+  component "Contrôleurs REST" as Ctrl
+  component "Program.cs\n(racine de composition)" as Comp
+}
+
+package "CathLab.Domain" as Domain #FCE4EC {
+  component "Entités métier" as Ent
+}
+
+package "CathLab.Application" as App #FFF8E1 {
+  package "Services applicatifs" as Svc #FFFDE7 {
+    component "StudyIngestionService" as SIS
+    component "PacsOverviewService" as POS
+    component "PatientService" as PS
+    component "PatientLifecycleService" as PLS
+    component "StudySchedulingService" as SSS
+    component "ProcedureService" as PrS
+    component "InventoryService" as IS
+    component "UserService" as US
+    component "AuditService" as AS
+  }
+  interface "IPacsReader" as IPacs
+  interface "IXxxRepository" as IRepos
+  interface "IUnitOfWork" as IUoW
+  interface "IPdfGenerator" as IPdf
+}
+
+package "CathLab.Infrastructure" as Infra #E3F2FD {
+  component "OrthancPacsReader" as OPR
+  component "Dépôts EF Core" as Repos
+  component "UnitOfWork" as UoW
+  component "QuestPdf\nReportGenerator" as PdfImpl
+  component "PacsIngestionWorker" as Worker
+  component "OrthancPacsContext" as OCtx
+  component "CathLabDbContext" as Ctx
+}
+
+component "Serveur Orthanc" as Orthanc <<externe>> #FFF3E0
+component "Index OrthancPACS" as OrthancDb <<externe>> #FFF3E0
+component "Base CathLabDb" as CathDb <<externe>> #FFF3E0
+
+' ---- Alignement ----
+Auth -[hidden]right- Ctrl
+Ctrl -[hidden]right- Comp
+SIS -[hidden]right- POS
+POS -[hidden]right- PS
+PLS -[hidden]right- SSS
+SSS -[hidden]right- PrS
+IS -[hidden]right- US
+US -[hidden]right- AS
+SIS -[hidden]down- PLS
+PLS -[hidden]down- IS
+IPacs -[hidden]right- IRepos
+IRepos -[hidden]right- IUoW
+IUoW -[hidden]right- IPdf
+OPR -[hidden]right- Repos
+Repos -[hidden]right- UoW
+UoW -[hidden]right- PdfImpl
+PdfImpl -[hidden]right- Worker
+OCtx -[hidden]right- Ctx
+OPR -[hidden]down- OCtx
+Orthanc -[hidden]right- OrthancDb
+OrthancDb -[hidden]right- CathDb
+Domain -[hidden]right- App
+
+' ---- WebApi ----
+Ctrl -down-> Svc : <<use>>
+Auth ..> Ctrl : <<use>>
+Comp ..> Infra : <<use>>
+
+' ---- Interfaces requises (Application) ----
+Svc -down-> IPacs : <<use>>
+Svc -down-> IRepos : <<use>>
+Svc -down-> IUoW : <<use>>
+Svc -down-> IPdf : <<use>>
+
+' ---- Interfaces fournies (Infrastructure) ----
+IPacs -down- OPR
+IRepos -down- Repos
+IUoW -down- UoW
+IPdf -down- PdfImpl
+
+' ---- Infrastructure interne et externe ----
+Worker -up-> SIS : <<use>>
+Repos -down-> Ctx : <<use>>
+UoW -down-> Ctx : <<use>>
+OPR -down-> OCtx : <<use>>
+OPR -down-> Orthanc : <<use>>
+OCtx -down-> OrthancDb : <<use>>
+Ctx -down-> CathDb : <<use>>
+
+' ---- Règle de dépendance vers le Domain ----
+App -left-> Domain : <<use>>
+Infra -up-> Domain : <<use>>
+@enduml

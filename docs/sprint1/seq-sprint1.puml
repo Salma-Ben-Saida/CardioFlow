@@ -1,0 +1,45 @@
+@startuml "sequence-login"
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+title Sprint 1 – Diagramme de séquence : authentification
+
+actor "Utilisateur" as U
+participant "Navigateur\n(interface web)" as B
+participant "AuthController\n(API)" as C
+participant "UserService" as S
+database "CathLabDB" as DB
+participant "AuditService" as A
+
+U -> B : saisit identifiant\net mot de passe
+B -> C : POST /api/auth/login\n{ username, password }
+C -> S : LoginAsync(dto)
+S -> DB : rechercher l'utilisateur\npar identifiant
+DB --> S : utilisateur (ou aucun)
+
+alt utilisateur introuvable ou compte désactivé
+  S --> C : erreur « Identifiants invalides »
+  C -> A : journaliser LoginFailed
+  C --> B : 401 Unauthorized
+  B --> U : affiche le message d'erreur
+else utilisateur actif
+  S -> S : vérifier le mot de passe\n(PBKDF2-HMAC-SHA512)
+  alt mot de passe incorrect
+    S --> C : erreur « Identifiants invalides »
+    C -> A : journaliser LoginFailed
+    C --> B : 401 Unauthorized
+    B --> U : affiche le message d'erreur
+  else mot de passe correct
+    S -> S : générer le jeton JWT\n(identifiant, nom, rôle, expiration)\nsigné HMAC-SHA256
+    S --> C : jeton + informations utilisateur
+    C -> A : journaliser LoginSuccess
+    C --> B : 200 OK { token, username, fullName, userId }
+    B -> B : conserver le jeton
+    B --> U : accès à l'application
+  end
+end
+@enduml

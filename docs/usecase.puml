@@ -1,66 +1,99 @@
 @startuml "usecase-global"
 left to right direction
-skinparam packageStyle rectangle
 skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam nodesep 35
+skinparam ranksep 140
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #F4F8FC
+  BorderColor #1F4E79
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+}
+skinparam ArrowColor #404040
 title CardioFlow – Diagramme de cas d'utilisation global
 
-' ===== Acteurs principaux =====
 actor "Médecin" as Medecin
 actor "Secrétaire" as Secretaire
-actor "Responsable\nPharmacie" as Pharmacien
+actor "Responsable\nde pharmacie" as Pharmacien
 actor "Administrateur" as Admin
-actor "Planificateur\nd'ingestion" as Worker <<système>>
 
-' ===== Acteur secondaire =====
-actor "Serveur PACS\n(Orthanc)" as Orthanc <<système>>
+actor "Angiographe Philips XA\n(envoie les images DICOM\nau PACS, port 4242)" as Angio <<système>>
+actor "Serveur PACS\n(Orthanc / Conquest)" as Pacs <<système>>
+actor "Service\nd'ingestion" as Worker <<système>>
+
+' L'administrateur dispose des droits des trois autres rôles
+Admin --|> Medecin
+Admin --|> Secretaire
+Admin --|> Pharmacien
 
 rectangle "CardioFlow" {
-  usecase "Gérer les patients" as UC1
-  usecase "Planifier\nles interventions" as UC2
-  usecase "Ingérer une étude PACS\nà la demande" as UC3
-  usecase "Ingérer automatiquement\nles études PACS" as UC4
-  usecase "Visualiser\nles images DICOM" as UC5
-  usecase "Cartographier les lésions\net rédiger le compte rendu" as UC6
-  usecase "Gérer la pharmacie\net le stock" as UC7
-  usecase "Gérer les utilisateurs" as UC8
-  usecase "Configurer\nl'ingestion PACS" as UC9
-  usecase "Gérer l'archivage\ndes données" as UC10
-  usecase "Gérer les audits\net les logs" as UC11
+  usecase "S'authentifier" as UC0
+
+  usecase "Consulter et modifier\nles patients" as UC1
+  usecase "Consulter la liste et\nle détail des études" as UC2
+  usecase "Planifier, replanifier\nou annuler une étude" as UC3
+  usecase "Importer une étude\ndepuis le PACS" as UC4
+  usecase "Importer toutes\nles études" as UC5
+  usecase "Importer automatiquement\nles études" as UC6
+
+  usecase "Cartographier les lésions,\najouter stents et ballons" as UC7
+  usecase "Rédiger et confirmer\nle compte rendu" as UC8
+  usecase "Corriger ou supprimer\nun compte rendu" as UC9
+  usecase "Consulter les\nimages DICOM" as UC10
+
+  usecase "Gérer le catalogue\net le stock" as UC11
+  usecase "Réserver ou libérer\nun dispositif" as UC12
+
+  usecase "Gérer les utilisateurs" as UC13
+  usecase "Archiver, restaurer\net purger" as UC14
+  usecase "Consulter les journaux\nd'audit et d'activité" as UC15
 }
 
-' ===== Associations : Médecin =====
-Medecin -- UC1
-Medecin -- UC2
-Medecin -- UC3
-Medecin -- UC5
-Medecin -- UC6
+' Acteurs humains (l'administrateur hérite des trois autres rôles)
+Pharmacien -- UC0
+Secretaire -- UC0
+Medecin -- UC0
 
-' ===== Associations : Secrétaire =====
 Secretaire -- UC1
 Secretaire -- UC2
 Secretaire -- UC3
+Secretaire -- UC4
 
-' ===== Associations : Responsable pharmacie =====
-Pharmacien -- UC7
+Medecin -- UC7
+Medecin -- UC8
+Medecin -- UC10
+Medecin -- UC12
+Medecin -- UC1
+Medecin -- UC2
+Medecin -- UC3
+Medecin -- UC4
 
-' ===== Associations : Administrateur =====
-Admin -- UC1
-Admin -- UC2
-Admin -- UC3
+Pharmacien -- UC11
+Pharmacien -- UC12
+
 Admin -- UC5
-Admin -- UC6
-Admin -- UC7
-Admin -- UC8
 Admin -- UC9
-Admin -- UC10
-Admin -- UC11
+Admin -- UC13
+Admin -- UC14
+Admin -- UC15
 
-' ===== Acteur système déclencheur =====
-Worker -- UC4
+' Systèmes externes
+Worker -- UC6
+UC4 -- Pacs
+UC5 -- Pacs
+UC6 -- Pacs
+UC10 -- Pacs
+Angio -down- Pacs
 
-' ===== Acteur secondaire : Orthanc =====
-UC3 -- Orthanc
-UC4 -- Orthanc
-UC5 -- Orthanc
-
+note bottom of Admin
+  L'administrateur hérite des droits
+  du médecin, de la secrétaire et du
+  responsable de pharmacie.
+end note
 @enduml

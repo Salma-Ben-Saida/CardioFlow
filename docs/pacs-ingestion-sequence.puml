@@ -1,56 +1,66 @@
-@startuml ""
-title PACS Ingestion Sequence — CardioFlow
-actor Client
-participant "PacsController" as Controller
-participant "PacsIngestionWorker" as Worker
-participant "StudyIngestionService" as Service
-participant "IPacsReader / OrthancPacsReader" as Reader
-participant "Orthanc (PACS)" as Orthanc
-participant "IPatientRepository" as PatientRepo
-participant "ICathStudyRepository" as StudyRepo
+@startuml "sequence-ingestion"
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam sequenceMessageAlign center
+title Sprint 2 – Diagramme de séquence : ingestion d'une étude
 
-== Trigger ==
-alt Manual ingestion
-    Client -> Controller: POST /api/pacs/ingest/{accession}
-    Controller -> Service: IngestStudy(accession)
-else Scheduled ingestion
-    Worker -> Service: IngestAllPending()
+actor "Utilisateur" as U
+participant "PacsController" as C
+participant "PacsIngestionWorker" as W
+participant "StudyIngestionService" as S
+participant "IPacsReader\n(OrthancPacsReader)" as R
+database "OrthancPACS\n(index SQL)" as P
+participant "IPatientRepository" as PR
+participant "ICathStudyRepository" as SR
+
+== Déclenchement ==
+alt import manuel
+  U -> C : POST /api/pacs/ingest/{studyInstanceUid}
+  C -> S : IngestStudyAsync(studyInstanceUid)
+else import automatique (à intervalle régulier)
+  W -> S : IngestAllPendingAsync()
+  note right: pour chaque étude en attente,\nmême traitement que l'import manuel
 end
 
-== Read from PACS ==
-Service -> Reader: GetStudyByAccession(accession) / GetPendingStudies()
-Reader -> Orthanc: Query DB / API for studies
-Orthanc --> Reader: PacsStudyDto (Accession, StudyUID, PatientIds, StudyDate, Modality)
-Reader --> Service: List<PacsStudyDto>
+== Lecture dans le PACS ==
+S -> R : GetStudyByUidAsync(studyInstanceUid)
+R -> P : rechercher l'étude\npar son identifiant
+P --> R : métadonnées de l'étude
+R --> S : PacsStudyDto
 
-== For each study ==
-loop for each study
-    Service -> StudyRepo: ExistsByAccession(study.AccessionNumber)?
-    alt study exists
-        StudyRepo --> Service: true
-        Service -> Service: log("already exists")
-    else new study
-        Service -> PatientRepo: FindByConquestId(study.ConquestPatientId)
-        alt patient found
-            PatientRepo --> Service: Patient
-        else create patient
-            Service -> PatientRepo: CreatePatient(from PacsStudyDto)
-            PatientRepo --> Service: Patient
-        end
-        Service -> StudyRepo: CreateStudy(CathStudy entity linked to Patient)
-        StudyRepo --> Service: Created
-        Service -> Service: mark IsIncomplete if patient metadata incomplete
+alt étude introuvable
+  S --> C : IngestResult en échec
+else étude trouvée
+  S -> SR : FindByStudyInstanceUidAsync(uid)
+  alt étude déjà importée
+    SR --> S : étude existante
+    S --> C : IngestResult (déjà importée)
+  else nouvelle étude
+    alt identifiant patient absent
+      S --> C : IngestResult en échec
+    else identifiant patient présent
+      S -> PR : FindByConquestIdAsync(patientId)
+      alt patient inconnu
+        S -> PR : CreateAsync(patient issu du PACS)
+        note right: dossier marqué « incomplet »\nsi des informations manquent
+        PR --> S : patient
+      else patient existant
+        PR --> S : patient
+      end
+      S -> SR : CreateAsync(CathStudy, statut « en attente »)
+      SR --> S : étude créée
+      S --> C : IngestResult (succès)
     end
-    Service -> Service: log result (success/failed)
+  end
 end
 
-== Completion ==
-alt called from Controller
-    Service --> Controller: IngestResult (success/alreadyExists/error)
-    Controller --> Client: HTTP Response
-else called from Worker
-    Service --> Worker: Summary (counts, errors)
-    Worker -> Worker: log and continue
+== Retour ==
+alt appel manuel
+  C --> U : 200 OK (résultat) ou 400 (message d'erreur)
+else appel automatique
+  S --> W : liste des résultats
+  W -> W : compter nouvelles, déjà importées,\narchivées et échecs, puis journaliser
 end
-
 @enduml

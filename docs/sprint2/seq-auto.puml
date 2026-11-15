@@ -1,0 +1,73 @@
+@startuml "sequence-ingestion-automatique"
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam sequenceMessageAlign center
+title Sprint 2 – Diagramme de séquence : ingestion automatique des études
+
+participant "PacsIngestionWorker" as W
+participant "StudyIngestionService" as S
+participant "IPacsReader\n(OrthancPacsReader)" as R
+database "OrthancPACS\n(index SQL)" as P
+participant "ICathStudyRepository" as SR
+participant "IPatientRepository" as PR
+
+loop à chaque intervalle configuré
+  W -> S : IngestAllPendingAsync()
+
+  == Lecture des études récentes du PACS ==
+  S -> R : GetPendingStudiesAsync()
+  R -> P : lire les études récentes
+  P --> R : métadonnées des études
+  R --> S : liste de PacsStudyDto
+
+  == Traitement de chaque étude ==
+  loop pour chaque étude
+    S -> R : GetStudyByUidAsync(studyInstanceUid)
+    R -> P : rechercher l'étude par son identifiant
+    P --> R : métadonnées de l'étude
+    R --> S : PacsStudyDto
+
+    alt étude introuvable ou sans identifiant
+      S -> S : résultat « échec »
+    else étude trouvée
+      S -> SR : FindByStudyInstanceUidAsync(uid)
+      alt étude déjà importée
+        SR --> S : étude existante
+        S -> S : résultat « déjà importée »\n(ou « ignorée » si archivée)
+      else nouvelle étude
+        alt identifiant patient absent
+          S -> S : résultat « échec »\n(PatientID manquant)
+        else identifiant patient présent
+          S -> PR : FindByConquestIdAsync(patientId)
+          alt patient inconnu
+            S -> PR : CreateAsync(patient issu du PACS)
+            note right: dossier marqué « incomplet »\nsi des informations manquent
+            PR --> S : patient
+          else patient existant
+            PR --> S : patient
+          end
+          S -> SR : CreateAsync(CathStudy, statut « en attente »)
+          alt création réussie
+            SR --> S : étude créée
+            S -> S : résultat « succès »
+          else doublon détecté (import simultané)
+            SR --> S : erreur de doublon
+            S -> SR : FindByStudyInstanceUidAsync(uid)
+            S -> S : résultat « déjà importée »
+          end
+        end
+      end
+    end
+
+    opt exception sur cette étude
+      S -> S : enregistrer l'échec et\npasser à l'étude suivante
+    end
+  end
+
+  == Bilan du cycle ==
+  S --> W : liste des IngestResult
+  W -> W : compter nouvelles études, déjà importées,\narchivées et échecs, puis journaliser
+end
+@enduml

@@ -1,0 +1,267 @@
+@startuml CardioFlow_Diagramme_Classes_EA
+' ===== Style Enterprise Architect =====
+skinparam dpi 170
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 14
+skinparam classAttributeIconSize 0
+skinparam classFontSize 18
+skinparam classFontStyle bold
+skinparam classAttributeFontSize 15
+skinparam classStereotypeFontSize 12
+skinparam classBackgroundColor #FFFFCC
+skinparam classBorderColor #333333
+skinparam classBorderThickness 1.2
+skinparam classHeaderBackgroundColor #FFFFCC
+skinparam roundCorner 0
+skinparam ArrowColor #333333
+skinparam ArrowFontSize 15
+skinparam ArrowThickness 1.2
+skinparam packageStyle folder
+skinparam packageBackgroundColor #FFFFFF
+skinparam packageBorderColor #7F7F7F
+skinparam packageFontSize 16
+skinparam packageFontStyle bold
+skinparam noteBackgroundColor #FFFFE0
+skinparam noteBorderColor #7F7F7F
+skinparam nodesep 150
+skinparam ranksep 110
+skinparam linetype ortho
+hide circle
+hide empty members
+
+title <size:22><b>CardioFlow – Diagramme de classes global</b></size>\n<size:14>Modèle de données en deux couches : OrthancPACS (index DICOM) et CathLabDb (données cliniques)</size>\n<size:13>Référence douce : aucune clé étrangère entre les deux bases ; l'ingestion copie les identifiants DICOM de manière idempotente.</size>\n
+
+' ===================== OrthancPACS =====================
+package "OrthancPACS" {
+  class PacsPatient <<index DICOM>> {
+    + PatientID : string
+  }
+  class PacsStudy <<index DICOM>> {
+    + StudyInstanceUID : string
+    + AccessionNumber : string
+    + StudyDate : date
+  }
+}
+
+' ===================== CathLabDb =====================
+package "CathLabDb" {
+
+  class AppUser <<entity>> {
+    + Id : Guid {id}
+    + Username : string
+    + PasswordHash : string
+    + FullName : string
+    + Role : UserRole
+    + IsActive : bool
+    + CreatedAt : DateTime
+  }
+  class AuditLog <<entity>> {
+    + Id : Guid {id}
+    + Action : string
+    + EntityType : string
+    + EntityId : Guid
+    + Detail : string [0..1]
+    + OccurredAt : DateTime
+  }
+  class UserActivityLog <<entity>> {
+    + Id : Guid {id}
+    + UserId : Guid [0..1] {sans FK}
+    + Username : string
+    + Action : string
+    + IpAddress : string [0..1]
+    + OccurredAt : DateTime
+  }
+
+  class Patient <<entity>> {
+    + Id : Guid {id}
+    + ConquestPatientID : string [0..1]
+    + NationalId : string [0..1]
+    + FullName : string
+    + BirthDate : DateOnly [0..1]
+    + Sex : string [0..1]
+    + BloodGroup : string [0..1]
+    + IsIncomplete : bool
+    + IsDeleted : bool
+    --
+    + RecomputeCompleteness() : void
+    + Archive(userId, reason, now) : void
+    + Restore() : void
+  }
+  class RiskProfile <<entity>> {
+    + Id : Guid {id}
+    + Hypertension : bool
+    + Diabetes : bool
+    + Dyslipidemia : bool
+    + Smoking : bool
+    + PriorMI : bool
+    + PriorPCI : bool
+    + PriorCABG : bool
+    + EjectionFraction : decimal [0..1]
+  }
+  class CathStudy <<entity>> {
+    + Id : Guid {id}
+    + StudyInstanceUid : string
+    + AccessionNumber : string
+    + StudyDate : DateTime
+    + Status : StudyStatus
+    + ScheduledAt : DateTime [0..1]
+    + IsDeleted : bool
+    --
+    + Schedule(date) : void
+    + Cancel() : void
+    + StartIfDue(now) : void
+    + Complete() : void
+    + Archive(userId, reason, now) : void
+    + Restore() : void
+  }
+  class ProcedureReport <<entity>> {
+    + Id : Guid {id}
+    + Approach : string [0..1]
+    + CatheterUsed : string [0..1]
+    + ContrastVolumeMl : decimal [0..1]
+    + DoseAreaProductGycm2 : decimal [0..1]
+    + TimiFlowBaseline : byte [0..1]
+    + TimiFlowFinal : byte [0..1]
+    + Conclusion : string [0..1]
+    + IsConfirmed : bool
+    + ConfirmedAt : DateTime [0..1]
+  }
+  class CoronaryLesion <<entity>> {
+    + Id : Guid {id}
+    + Vessel : string
+    + SegmentNumber : byte
+    + StenosisPercent : byte
+    + LesionType : LesionType
+    + TimiFlow : byte [0..1]
+    + IsTreated : bool
+    + Calcified : bool
+    + Thrombus : bool
+  }
+  abstract class LesionTreatment <<entity>> {
+    + Id : Guid {id}
+    + TimiFlowAfter : byte [0..1]
+    + PerformedAt : DateTime
+    + Notes : string [0..1]
+  }
+  class StentImplant <<entity>> {
+    + StentDiameterMm : decimal
+    + StentLengthMm : decimal
+    + LandingZoneProximal : string [0..1]
+    + LandingZoneDistal : string [0..1]
+    + PostDilationPerformed : bool
+  }
+  class BalloonDilation <<entity>> {
+    + BalloonDiameterMm : decimal
+    + BalloonLengthMm : decimal
+    + MaxPressureAtm : byte
+    + InflationDurationSec : int
+    + IsPreDilation : bool
+    + IsPostDilation : bool
+  }
+
+  class InventoryProduct <<catalogue>> {
+    + Id : Guid {id}
+    + Reference : string {unique}
+    + ProductName : string
+    + DeviceType : DeviceType
+    + Manufacturer : string [0..1]
+    + MinimumStockLevel : int
+    + CurrentStock : int
+  }
+  class InventoryItem <<unité>> {
+    + Id : Guid {id}
+    + Barcode : string {unique}
+    + LotNumber : string [0..1]
+    + SerialNumber : string [0..1]
+    + ExpiryDate : DateOnly
+    + Status : ItemStatus
+    + ReceivedAt : DateTime
+    + ReservedAt : DateTime [0..1]
+    + ConsumedAt : DateTime [0..1]
+  }
+  class StockMovement <<mouvement>> {
+    + Id : Guid {id}
+    + MovementType : MovementType
+    + Quantity : int
+    + ReferenceNote : string [0..1]
+    + MovedAt : DateTime
+  }
+}
+
+' ===================== Énumérations =====================
+package "Énumérations" {
+  enum UserRole <<enumeration>> {
+    Medecin
+    Secretaire
+    ResponsablePharmacie
+    Admin
+  }
+  enum StudyStatus <<enumeration>> {
+    Pending
+    Scheduled
+    InProgress
+    Completed
+    Cancelled
+  }
+  enum LesionType <<enumeration>> {
+    TypeA
+    TypeB1
+    TypeB2
+    TypeC
+  }
+  enum DeviceType <<enumeration>> {
+    Ballon
+    Stent
+    Autre
+  }
+  enum ItemStatus <<enumeration>> {
+    InStock
+    Reserved
+    Consumed
+    Wasted
+    Expired
+  }
+  enum MovementType <<enumeration>> {
+    Reception
+    Consumption
+    Return
+    Waste
+  }
+}
+
+' ===================== Relations =====================
+' Références douces (aucune clé étrangère entre les deux bases)
+Patient .up.> PacsPatient : <<soft reference>>
+CathStudy .up.> PacsStudy : <<soft reference>>
+PacsPatient "1" -right- "0..*" PacsStudy : possède >
+
+' Dossier clinique
+Patient "1" -right- "0..*" CathStudy : fait l'objet de >
+Patient "1" *-down- "0..1" RiskProfile : possède >
+CathStudy "1" -right- "0..1" ProcedureReport : produit >
+ProcedureReport "1" *-right- "0..*" CoronaryLesion : contient >
+CoronaryLesion "1" *-down- "0..*" LesionTreatment : reçoit >
+
+' Héritage (TPT)
+StentImplant -up-|> LesionTreatment
+BalloonDilation -up-|> LesionTreatment
+
+' Pharmacie
+InventoryProduct "1" *-up- "0..*" InventoryItem : se décline en >
+InventoryProduct "1" -left- "0..*" StockMovement : trace >
+CathStudy "0..1" -down- "0..*" InventoryItem : réserve >
+LesionTreatment "0..1" -left- "1" InventoryItem : consomme >
+
+' Utilisateurs (navigabilité vers AppUser)
+Patient "0..*" -up-> "1" AppUser : créé par >
+CathStudy "0..*" -up-> "0..1" AppUser : opérateur >
+ProcedureReport "0..*" -up-> "0..1" AppUser : confirmé par >
+StockMovement "0..*" -left-> "1" AppUser : enregistré par >
+AuditLog "0..*" -down-> "1" AppUser : acteur >
+
+' ===================== Alignement =====================
+PacsPatient -[hidden]down- Patient
+StockMovement -[hidden]right- UserActivityLog
+StentImplant -[hidden]right- BalloonDilation
+@enduml

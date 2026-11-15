@@ -20,7 +20,7 @@
 ## Context
 
 CardioFlow was developed as part of a PFA (Projet de Fin d'Année) project
-at <Nom de l'institut>, in collaboration with Clinisys ERP.
+at Higher Institute of Computer Science and Multimedia of Sfax (ISIMS), in collaboration with Clinisys ERP.
 
 ## Overview
 

@@ -1,0 +1,48 @@
+@startuml "usecase-sprint1"
+left to right direction
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam nodesep 40
+skinparam ranksep 120
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #F4F8FC
+  BorderColor #1F4E79
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+}
+skinparam ArrowColor #404040
+title Sprint 1 – Diagramme de cas d'utilisation
+
+actor "Utilisateur\n(médecin, secrétaire,\nresponsable de pharmacie)" as User
+actor "Administrateur" as Admin
+
+rectangle "CardioFlow – Authentification et gestion des utilisateurs" {
+  usecase "S'authentifier" as UC1
+  usecase "Se déconnecter" as UC2
+
+  usecase "Gérer les comptes\nutilisateurs" as UC3
+  usecase "Créer un compte" as UC31
+  usecase "Modifier un compte" as UC32
+  usecase "Consulter les comptes" as UC33
+  usecase "Supprimer un compte" as UC34
+  usecase "Attribuer un rôle" as UC35
+}
+
+Admin --|> User
+
+User -- UC1
+User -- UC2
+Admin -- UC3
+
+UC3 <.. UC31 : <<extend>>
+UC3 <.. UC32 : <<extend>>
+UC3 <.. UC33 : <<extend>>
+UC3 <.. UC34 : <<extend>>
+UC31 ..> UC35 : <<include>>
+UC32 ..> UC35 : <<include>>
+@enduml
