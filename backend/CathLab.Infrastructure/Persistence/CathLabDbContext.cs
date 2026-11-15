@@ -98,6 +98,7 @@ public class CathLabDbContext : DbContext
             e.Property(p => p.DoseAreaProductGycm2).HasPrecision(8, 2);
             e.Property(p => p.DominanceType).HasMaxLength(50);
             e.Property(p => p.PdfStoragePath).HasMaxLength(500);
+            e.Property(p => p.RowVersion).IsRowVersion();
 
             e.HasOne(p => p.CathStudy)
              .WithOne(s => s.ProcedureReport)
@@ -183,6 +184,7 @@ public class CathLabDbContext : DbContext
             e.Property(i => i.Status)
              .HasConversion<string>()
              .HasMaxLength(20);
+            e.Property(i => i.RowVersion).IsRowVersion();
 
             e.HasIndex(i => i.Barcode).IsUnique();
 

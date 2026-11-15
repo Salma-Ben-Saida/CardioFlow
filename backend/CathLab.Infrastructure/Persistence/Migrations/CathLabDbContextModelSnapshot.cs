@@ -246,6 +246,12 @@ namespace CathLab.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ReservedForCathStudyId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("SerialNumber")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -478,6 +484,12 @@ namespace CathLab.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime>("ReportGeneratedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<byte?>("TimiFlowBaseline")
                         .HasColumnType("tinyint");

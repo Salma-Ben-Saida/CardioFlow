@@ -30,4 +30,5 @@ public class InventoryItem
 
     // Set once this item is actually implanted/used (Status -> Consumed).
     public LesionTreatment? Treatment { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
 }

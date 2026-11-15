@@ -195,7 +195,17 @@ app.UseHttpsRedirection();
 // L'ordre ici est déjà correct dans votre code d'origine :
 app.UseAuthentication(); // 1. Détecte et valide le Token
 app.UseAuthorization();  // 2. Vérifie les permissions d'accès au contrôleur
-
+app.Use(async (ctx, next) =>
+{
+    try { await next(); }
+    catch (DbUpdateConcurrencyException)
+    {
+        if (ctx.Response.HasStarted) throw;
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+        const string msg = "Cette ressource vient d'être modifiée par un autre utilisateur. Rechargez la page puis réessayez.";
+        await ctx.Response.WriteAsJsonAsync(new { message = msg, error = msg });
+    }
+});
 app.MapControllers();
 
 app.Run();
